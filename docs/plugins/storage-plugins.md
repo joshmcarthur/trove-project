@@ -125,7 +125,7 @@ export default {
 
   async initialize(core) {
     // Setup storage
-    this.connection = await createConnection(core.config);
+    this.connection = await createDatabase(core.config);
   },
 
   async shutdown() {
@@ -140,12 +140,16 @@ export default {
   },
 
   async getEvent(id) {
-    // Retrieve event
+    // Mock implementation to retrieve event
+    const event = await this.database.getEventById(id);
+
     return event;
   },
 
   async queryEvents(query) {
-    // Search events
+    // Mock implementation to search events
+    const events = await this.database.searchEvents(query);
+
     return events;
   },
 };
