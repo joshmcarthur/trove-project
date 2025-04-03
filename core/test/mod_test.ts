@@ -1,7 +1,7 @@
 import {
   assertEquals,
   assertRejects,
-} from "https://deno.land/std/testing/asserts.ts";
+} from "https://deno.land/std/assert/mod.ts";
 import { createTestCore } from "./utils.ts";
 
 Deno.test("Trove", async (t) => {

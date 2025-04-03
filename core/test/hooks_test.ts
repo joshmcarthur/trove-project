@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std/assert/mod.ts";
 import { HookSystem } from "../hooks.ts";
 import { TestLogger } from "./utils.ts";
 
@@ -51,6 +51,7 @@ Deno.test("HookSystem", async (t) => {
     hooks.registerHook("plugin2", "test:hook", () => Promise.resolve());
     hooks.unregisterPlugin("plugin1");
 
+    // Allow any here to access the private hooks map
     // deno-lint-ignore no-explicit-any
     const hookSet = (hooks as any).hooks.get("test:hook");
     assertEquals(

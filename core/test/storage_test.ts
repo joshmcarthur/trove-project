@@ -1,8 +1,7 @@
-// core/test/storage.test.ts
 import {
   assertEquals,
   assertRejects,
-} from "https://deno.land/std/testing/asserts.ts";
+} from "https://deno.land/std/assert/mod.ts";
 import { StorageManager } from "../storage.ts";
 import { TestLogger } from "./utils.ts";
 import { PluginSystem } from "../plugins.ts";
@@ -10,7 +9,7 @@ import { HookSystem } from "../hooks.ts";
 import {
   CoreSystem,
   Event,
-  EventId,
+  EventFile,
   EventStorage,
   FileStorage,
   Plugin,
