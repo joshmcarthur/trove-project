@@ -32,7 +32,7 @@ export class StorageManager {
 
     const eventPlugin = await this.loadPlugin(
       config.events.plugin,
-      "storage:events",
+      ["storage:events"],
     );
     this.eventStorage = eventPlugin as unknown as EventStorage;
     await this.eventStorage.initialize(config.events.options);
@@ -40,7 +40,7 @@ export class StorageManager {
     if (config.files) {
       const filePlugin = await this.loadPlugin(
         config.files.plugin,
-        "storage:files",
+        ["storage:files"],
       );
       this.fileStorage = filePlugin as unknown as FileStorage;
       await this.fileStorage.initialize(config.files.options);
@@ -49,7 +49,7 @@ export class StorageManager {
     if (config.links && config.links !== "useEventStorage") {
       const linkPlugin = await this.loadPlugin(
         config.links.plugin,
-        "storage:links",
+        ["storage:links"],
       );
       this.linkStorage = linkPlugin as unknown as LinkStorage;
       await this.linkStorage.initialize(config.links.options);
@@ -110,22 +110,18 @@ export class StorageManager {
     }
   }
 
-  private async loadPlugin(
+  private loadPlugin(
     pluginName: string,
-    requiredCapability: StorageCapability,
+    requiredCapabilities: StorageCapability[],
   ): Promise<Plugin> {
-    const plugin = await this.plugins.getPlugin(pluginName);
+    const plugin = this.plugins.getPlugin(pluginName, requiredCapabilities);
 
     if (!plugin) {
-      throw new Error(`Plugin not found: ${pluginName}`);
-    }
-
-    if (!plugin.capabilities.includes(requiredCapability)) {
       throw new Error(
-        `Plugin ${pluginName} does not support capability: ${requiredCapability}`,
+        `Plugin with required capabilities ${requiredCapabilities} not found: ${pluginName}`,
       );
     }
 
-    return plugin;
+    return Promise.resolve(plugin);
   }
 }

@@ -1,4 +1,4 @@
-import { CoreSystem, Logger, Plugin } from "./types.ts";
+import { CoreSystem, Logger, Plugin, StorageCapability } from "./types.ts";
 import { HookSystem } from "./hooks.ts";
 
 export class PluginSystem {
@@ -35,7 +35,7 @@ export class PluginSystem {
         this.logger.debug(`Initialized plugin: ${plugin.name}`);
       } catch (error) {
         this.logger.error(`Failed to initialize plugin ${plugin.name}:`, error);
-        this.unloadPlugin(plugin.name);
+        await this.unloadPlugin(plugin.name);
         throw error;
       }
     }
@@ -77,8 +77,22 @@ export class PluginSystem {
     }
   }
 
-  getPlugin(name: string): Plugin | undefined {
-    return this.plugins.get(name);
+  getPlugin(
+    name: string,
+    requiredCapabilities?: StorageCapability[],
+  ): Plugin | undefined {
+    const plugin = this.plugins.get(name);
+    if (!plugin) return undefined;
+
+    if (requiredCapabilities) {
+      for (const capability of requiredCapabilities) {
+        if (!plugin.capabilities.includes(capability)) {
+          return undefined;
+        }
+      }
+    }
+
+    return plugin;
   }
 
   getAllPlugins(): Plugin[] {
