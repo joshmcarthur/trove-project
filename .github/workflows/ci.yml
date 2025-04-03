@@ -19,3 +19,12 @@ jobs:
 
       - name: Verify formatting
         run: deno fmt --check
+
+      - name: Run linter
+        run: deno lint
+
+      - name: Type check
+        run: deno check core/mod.ts
+
+      - name: Run tests
+        run: deno test -A
