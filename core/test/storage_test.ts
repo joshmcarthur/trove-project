@@ -122,12 +122,14 @@ Deno.test("StorageManager", async (t) => {
         producer: "test",
         schema: { id: "test", version: "1.0" },
         payload: {},
-        files: [{
-          id: "file-id",
-          contentType: "text/plain",
-          size: 4,
-          data: "test",
-        }],
+        files: [
+          {
+            id: "file-id",
+            contentType: "text/plain",
+            size: 4,
+            data: "test",
+          },
+        ],
         links: [],
       };
 
