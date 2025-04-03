@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-order: 2
+nav_order: 2
 ---
 
 # Quick Start Guide

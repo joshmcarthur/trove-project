@@ -1,5 +1,6 @@
 ---
 title: Storage Plugins
+parent: Plugins
 order: 2
 ---
 
@@ -16,7 +17,7 @@ Stores event data and metadata:
 
 ```ts
 interface EventStoragePlugin extends StoragePlugin {
-  type: "event";
+  capabilities: ["storage:events"];
 
   saveEvent(event: Event): Promise<Event>;
   getEvent(id: EventId): Promise<Event | null>;
@@ -30,7 +31,7 @@ Handles binary and text file data:
 
 ```ts
 interface FileStoragePlugin extends StoragePlugin {
-  type: "file";
+  capabilities: ["storage:files"];
 
   saveFile(file: EventFile): Promise<string>;
   getFile(fileId: string): Promise<EventFile | null>;
@@ -44,7 +45,7 @@ Manages relationships between events:
 
 ```ts
 interface LinkStoragePlugin extends StoragePlugin {
-  type: "link";
+  capabilities: ["storage:links"];
 
   saveLink(sourceEventId: EventId, link: EventLink): Promise<void>;
   getLinks(eventId: EventId, options?: { type?: string }): Promise<EventLink[]>;
@@ -120,7 +121,7 @@ Cloud storage for files:
 ```ts
 export default {
   name: "my-storage",
-  type: "event",
+  capabilities: ["storage:events"],
 
   async initialize(core) {
     // Setup storage

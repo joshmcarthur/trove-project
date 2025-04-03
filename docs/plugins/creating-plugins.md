@@ -1,5 +1,6 @@
 ---
 title: Creating Plugins
+parent: Plugins
 order: 1
 ---
 
@@ -98,7 +99,7 @@ Implement storage backends:
 export default {
   name: "my-storage",
   version: "1.0.0",
-  type: "storage",
+  capabilities: ["storage:events"],
 
   async initialize(core) {
     // Setup storage connection
@@ -127,6 +128,7 @@ Add HTTP endpoints:
 export default {
   name: "my-api",
   version: "1.0.0",
+  capabilities: ["http:handler"],
 
   hooks: {
     "http:request": async ({ request }) => {
@@ -179,7 +181,7 @@ Create test files alongside your plugins:
 ```ts
 // my-plugin.test.ts
 import { assertEquals } from "https://deno.land/std/testing/asserts.ts";
-import { createTestCore } from "trove/testing/mod.ts";
+import { createTestCore } from "trove/test/utils.ts";
 import myPlugin from "./my-plugin.ts";
 
 Deno.test("my plugin processes events correctly", async () => {

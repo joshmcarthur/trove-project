@@ -1,5 +1,6 @@
 ---
 title: Hooks
+parent: Concepts
 order: 2
 ---
 

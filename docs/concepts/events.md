@@ -1,5 +1,6 @@
 ---
 title: Events
+parent: Concepts
 order: 1
 ---
 

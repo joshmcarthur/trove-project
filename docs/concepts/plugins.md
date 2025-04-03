@@ -1,3 +1,9 @@
+---
+title: Plugins
+parent: Concepts
+order: 3
+---
+
 # Plugin System
 
 Trove's plugin system is designed to be flexible and extensible. Plugins can:
