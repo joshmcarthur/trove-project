@@ -20,20 +20,20 @@ const mockEventStorage: Plugin & EventStorage = {
   name: "mock-event-storage",
   version: "1.0.0",
   capabilities: ["storage:events"],
-  initialize: async () => {},
-  saveEvent: async (event: Event) => event,
-  getEvent: async (id: EventId) => null,
-  queryEvents: async () => [],
+  initialize: () => Promise.resolve(),
+  saveEvent: (event: Event) => Promise.resolve(event),
+  getEvent: () => Promise.resolve(null),
+  queryEvents: () => Promise.resolve([]),
 };
 
 const mockFileStorage: Plugin & FileStorage = {
   name: "mock-file-storage",
   version: "1.0.0",
   capabilities: ["storage:files"],
-  initialize: async () => {},
-  saveFile: async () => "file-id",
-  getFile: async () => null,
-  getFileData: async () => new Uint8Array(),
+  initialize: () => Promise.resolve(),
+  saveFile: (file: EventFile) => Promise.resolve(file.id),
+  getFile: () => Promise.resolve(null),
+  getFileData: () => Promise.resolve(new Uint8Array()),
 };
 
 Deno.test("StorageManager", async (t) => {
