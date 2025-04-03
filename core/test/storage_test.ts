@@ -156,7 +156,7 @@ Deno.test("StorageManager", async (t) => {
             },
           }),
         Error,
-        "Plugin not found: non-existent",
+        "Plugin with required capabilities storage:events not found: non-existent",
       );
     });
 
@@ -182,7 +182,7 @@ Deno.test("StorageManager", async (t) => {
             },
           }),
         Error,
-        "Plugin mock-file-storage does not support capability: storage:events",
+        "Plugin with required capabilities storage:events not found: mock-file-storage",
       );
     });
   });
