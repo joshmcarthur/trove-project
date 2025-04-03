@@ -1,6 +1,6 @@
 ---
 title: Installation
-order: 1
+nav_order: 1
 ---
 
 # Installing Trove
