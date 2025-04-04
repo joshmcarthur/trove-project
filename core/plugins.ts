@@ -59,11 +59,12 @@ export class PluginSystem {
   }
 
   async loadPluginsFromDirectory(directory: string): Promise<void> {
+    this.logger.info("Loading plugins from directory:", directory);
     try {
       for await (const entry of Deno.readDir(directory)) {
         if (!entry.isFile || !entry.name.endsWith(".ts")) continue;
 
-        const module = await import(`file://${directory}/${entry.name}`);
+        const module = await import(`${directory}/${entry.name}`);
         if (!module.default || typeof module.default !== "object") {
           this.logger.warn(`Skipping ${entry.name}: no default export`);
           continue;
