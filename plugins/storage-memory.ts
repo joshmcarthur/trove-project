@@ -9,9 +9,9 @@ import {
   LinkStorage,
   Plugin,
 } from "@trove/core/types.ts";
-import { MemoryEventStorage } from "./event-storage.ts";
-import { MemoryFileStorage } from "./file-storage.ts";
-import { MemoryLinkStorage } from "./link-storage.ts";
+import { MemoryEventStorage } from "./storage-memory/event-storage.ts";
+import { MemoryFileStorage } from "./storage-memory/file-storage.ts";
+import { MemoryLinkStorage } from "./storage-memory/link-storage.ts";
 
 // Storage instances
 const eventStorage = new MemoryEventStorage();
