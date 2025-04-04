@@ -1,6 +1,6 @@
 import { CoreConfig, Logger } from "../types.ts";
 import { Trove } from "@trove/core/mod.ts";
-import MemoryPlugin from "@trove/plugins/storage/memory/index.ts";
+import MemoryPlugin from "@trove/plugins/storage-memory.ts";
 
 export class TestLogger implements Logger {
   public logs: Array<{ level: string; message: string; args: unknown[] }> = [];
