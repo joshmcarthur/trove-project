@@ -63,7 +63,7 @@ jobs:
           deno-version: v2.x
 
       - name: Build binary
-        run: deno compile --allow-read --allow-write --allow-net --target ${{ matrix.platform }}-latest cli.ts -o trove-${{ matrix.platform }}
+        run: deno compile --allow-read --allow-write --allow-net --target ${{ matrix.platform }} cli.ts -o trove-${{ matrix.platform }}
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v2
