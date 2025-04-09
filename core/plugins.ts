@@ -1,5 +1,6 @@
 import { CoreSystem, Logger, Plugin, StorageCapability } from "./types.ts";
 import { HookSystem } from "./hooks.ts";
+import { PluginLoader } from "./plugin_loader.ts";
 
 export class PluginSystem {
   private plugins: Map<string, Plugin> = new Map();
@@ -15,20 +16,21 @@ export class PluginSystem {
 
   async loadPlugin(plugin: Plugin): Promise<void> {
     if (this.plugins.has(plugin.name)) {
-      throw new Error(`Plugin ${plugin.name} is already registered`);
+      this.logger.warn(
+        `Plugin ${plugin.name} is already registered. Skipping loading.`,
+      );
+      return;
     }
 
     this.plugins.set(plugin.name, plugin);
     this.logger.info(`Loading plugin: ${plugin.name} v${plugin.version}`);
 
-    // Register hooks
     if (plugin.hooks) {
       for (const [hookName, handler] of Object.entries(plugin.hooks)) {
         this.hooks.registerHook(plugin.name, hookName, handler);
       }
     }
 
-    // Initialize plugin
     if (plugin.initialize) {
       try {
         await plugin.initialize(this.core);
@@ -36,18 +38,22 @@ export class PluginSystem {
       } catch (error) {
         this.logger.error(`Failed to initialize plugin ${plugin.name}:`, error);
         await this.unloadPlugin(plugin.name);
-        throw error;
+        throw new Error(`Initialization failed for plugin ${plugin.name}`);
       }
     }
   }
 
   async unloadPlugin(pluginName: string): Promise<void> {
     const plugin = this.plugins.get(pluginName);
-    if (!plugin) return;
+    if (!plugin) {
+      this.logger.debug(`Attempted to unload non-existent plugin: ${pluginName}`);
+      return;
+    }
 
     if (plugin.shutdown) {
       try {
         await plugin.shutdown();
+        this.logger.debug(`Successfully shut down plugin: ${pluginName}`);
       } catch (error) {
         this.logger.error(`Error shutting down plugin ${pluginName}:`, error);
       }
@@ -58,24 +64,13 @@ export class PluginSystem {
     this.logger.info(`Unloaded plugin: ${pluginName}`);
   }
 
-  async loadPluginsFromDirectory(directory: string): Promise<void> {
-    this.logger.info("Loading plugins from directory:", directory);
-    try {
-      for await (const entry of Deno.readDir(directory)) {
-        if (!entry.isFile || !entry.name.endsWith(".ts")) continue;
-
-        const module = await import(`${directory}/${entry.name}`);
-        if (!module.default || typeof module.default !== "object") {
-          this.logger.warn(`Skipping ${entry.name}: no default export`);
-          continue;
-        }
-
-        await this.loadPlugin(module.default);
-      }
-    } catch (error) {
-      this.logger.error(`Error loading plugins from ${directory}:`, error);
-      throw error;
-    }
+  async loadPlugins(sources: string[]): Promise<void> {
+    const loader = new PluginLoader(
+      (plugin) => this.loadPlugin(plugin),
+      this.logger,
+    );
+    await loader.loadPluginsFromSources(sources);
+    this.logger.info(`Finished processing ${sources.length} plugin source(s).`);
   }
 
   getPlugin(
@@ -86,8 +81,12 @@ export class PluginSystem {
     if (!plugin) return undefined;
 
     if (requiredCapabilities) {
+      const capabilities = plugin.capabilities || [];
       for (const capability of requiredCapabilities) {
-        if (!plugin.capabilities.includes(capability)) {
+        if (!capabilities.includes(capability)) {
+          this.logger.warn(
+            `Plugin ${name} does not have required capability: ${capability}`,
+          );
           return undefined;
         }
       }

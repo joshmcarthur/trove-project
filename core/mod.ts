@@ -38,10 +38,8 @@ export class Trove implements CoreSystem {
 
     this.logger.info("Initializing Trove...");
 
-    // Load plugins from configured directories
-    for (const dir of this.config.plugins.directories) {
-      await this.plugins.loadPluginsFromDirectory(Deno.realPathSync(dir));
-    }
+    // Load plugins from configured sources
+    await this.plugins.loadPlugins(this.config.plugins.sources);
 
     // Initialize storage
     await this.storage.initialize(this.config.storage);
