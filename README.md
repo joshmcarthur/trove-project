@@ -21,7 +21,7 @@ import { Trove } from "trove/core/mod.ts";
 
 const trove = new Trove({
   plugins: {
-    directories: ["./plugins"],
+    sources: ["./plugins"],
   },
   storage: {
     events: {

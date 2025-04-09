@@ -53,7 +53,7 @@ export function createTestConfig(
       links: "useEventStorage",
     },
     plugins: {
-      directories: [],
+      sources: [],
     },
     logger: new TestLogger(),
     ...overrides,
