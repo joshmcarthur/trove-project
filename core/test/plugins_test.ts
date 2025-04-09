@@ -1,7 +1,4 @@
-import {
-  assertEquals,
-  assertRejects,
-} from "https://deno.land/std/assert/mod.ts";
+import { assertEquals } from "https://deno.land/std/assert/mod.ts";
 import { PluginSystem } from "../plugins.ts";
 import { HookSystem } from "../hooks.ts";
 import { TestLogger } from "./utils.ts";
@@ -41,11 +38,19 @@ Deno.test("PluginSystem", async (t) => {
     };
 
     await plugins.loadPlugin(testPlugin);
-    await assertRejects(
-      () => plugins.loadPlugin(testPlugin),
-      Error,
-      "Plugin test-plugin is already registered",
-    );
+    await plugins.loadPlugin(testPlugin);
+    assertEquals(logger.logs, [
+      {
+        args: [],
+        level: "info",
+        message: "Loading plugin: test-plugin v1.0.0",
+      },
+      {
+        args: [],
+        level: "warn",
+        message: "Plugin test-plugin is already registered. Skipping loading.",
+      },
+    ]);
   });
 
   await t.step("gets plugins by capability", () => {
