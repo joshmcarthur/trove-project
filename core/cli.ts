@@ -36,6 +36,10 @@ export async function run(
     default: { config: "trove.config.ts" },
   });
   const keepAlive = setInterval(() => {}, 5000);
+  let didShutdown: () => void;
+  const shutdown = new Promise<void>((resolve) => {
+    didShutdown = resolve;
+  });
 
   try {
     const configLoader = new ConfigLoader(logger);
@@ -53,16 +57,22 @@ export async function run(
       try {
         await trove.shutdown();
         logger.info("Trove shutdown complete.");
+        didShutdown();
         Deno.exit(0);
-      } catch (shutdownError) {
-        logger.error("Error during shutdown:", shutdownError);
+      } catch (error) {
+        logger.error("Error during shutdown:", error);
+        didShutdown();
         Deno.exit(1);
       }
     });
+
+    return await shutdown;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Fatal error during startup: ${message}`);
     clearInterval(keepAlive);
+    // @ts-ignore didShutdown is defined at the top-level of the run function
+    didShutdown();
     Deno.exit(1);
   }
 }
