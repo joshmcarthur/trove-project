@@ -1,7 +1,20 @@
-FROM denoland/deno:debian
+ARG DENO_VERSION=2.2.8
+ARG DENO_BIN_IMAGE=denoland/deno:bin-${DENO_VERSION}
+
+FROM ${DENO_BIN_IMAGE} AS deno_bin
+
+FROM debian:stable-slim
+
+COPY --from=deno_bin /deno /usr/local/bin/deno
+
+RUN useradd --uid 1990 --home-dir /opt/trove --user-group trove \
+  && mkdir /opt/trove/ \
+  && chown trove:trove /opt/trove/
 
 # Create app directory
-WORKDIR /app
+WORKDIR /opt/trove
+
+USER trove
 
 # Cache the dependencies as a layer
 COPY deno.lock* .
@@ -9,10 +22,6 @@ COPY deno.lock* .
 COPY . .
 RUN deno cache core/cli.ts
 
-# Compile the main app
-RUN deno compile --allow-read --allow-write --allow-net --output trove core/cli.ts
 
-# The binary runs with the correct permissions
-USER deno
 
-ENTRYPOINT ["/app/trove"]
+ENTRYPOINT ["/usr/local/bin/deno", "run", "--allow-read", "--allow-write", "--allow-net", "core/cli.ts"]
