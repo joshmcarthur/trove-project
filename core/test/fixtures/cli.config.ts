@@ -1,6 +1,4 @@
-import { CoreConfig } from "../../types.ts";
-
-const config: CoreConfig = {
+const config = {
   storage: {
     events: {
       plugin: "memory-storage",
@@ -13,7 +11,7 @@ const config: CoreConfig = {
     links: "useEventStorage",
   },
   plugins: {
-    directories: ["plugins"],
+    sources: ["../../../plugins"],
   },
 };
 

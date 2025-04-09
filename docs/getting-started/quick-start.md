@@ -24,7 +24,7 @@ import { Trove } from "https://deno.land/x/trove/core/mod.ts";
 
 const trove = new Trove({
   plugins: {
-    directories: ["./plugins"],
+    sources: ["./plugins"],
   },
   storage: {
     events: {

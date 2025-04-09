@@ -76,7 +76,7 @@ export interface Logger {
 
 export interface CoreConfig {
   plugins: {
-    directories: string[];
+    sources: string[];
     config?: Record<string, unknown>;
   };
   storage: StorageConfiguration;

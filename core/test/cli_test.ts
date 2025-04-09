@@ -1,79 +1,49 @@
+import { assertEquals } from "https://deno.land/std@0.220.1/assert/mod.ts";
 import {
-  assertEquals,
-  assertRejects,
-} from "https://deno.land/std@0.220.1/assert/mod.ts";
-import { loadConfig, run } from "../cli.ts";
-
-Deno.test("loadConfig", async (t) => {
-  await t.step("loads valid configuration", async () => {
-    const configPath = "./test/fixtures/cli.config.ts";
-    const config = await loadConfig(configPath);
-    assertEquals(config.plugins.directories, ["plugins"]);
-  });
-
-  await t.step("throws error on invalid configuration", async () => {
-    const configPath = "./core/test/fixtures/nonexistent.config.ts";
-    await assertRejects(
-      () => loadConfig(configPath),
-      Error,
-      "Failed to load configuration",
-    );
-  });
-});
+  assertSpyCalls,
+  stub,
+} from "https://deno.land/std@0.220.1/testing/mock.ts";
+import { run } from "../cli.ts";
+import { TestLogger } from "./utils.ts";
 
 Deno.test("run", async (t) => {
+  const logger = new TestLogger();
+
   await t.step("initializes and shuts down Trove on SIGINT", async () => {
-    // Store original functions
-    const originalAddSignalListener = Deno.addSignalListener;
-    const originalExit = Deno.exit;
+    const exitStub = stub(Deno, "exit");
+    const addSignalListenerStub = stub(
+      Deno,
+      "addSignalListener",
+      (_signal: Deno.Signal, handler: () => void) => handler(),
+    );
 
     try {
-      // Mock addSignalListener to immediately trigger the callback
-      Deno.addSignalListener = (_signal: Deno.Signal, handler: () => void) => {
-        // Schedule the handler to run after current execution
-        queueMicrotask(handler);
-      };
-
-      // Mock exit
-      let exitCode: number | undefined;
-      let exitCalled = false;
-      // @ts-ignore: Deno.exit is being mocked
-      Deno.exit = (code?: number) => {
-        exitCode = code;
-        exitCalled = true;
-      };
-
       const configPath = "./core/test/fixtures/cli.config.ts";
-      await run(["--config", configPath]);
+      await run(["--config", configPath], logger);
 
-      assertEquals(exitCode, 0);
-      assertEquals(exitCalled, true);
+      assertSpyCalls(exitStub, 1);
+      assertEquals(exitStub.calls[0].args[0], 0);
+
+      assertSpyCalls(addSignalListenerStub, 1);
+      assertEquals(addSignalListenerStub.calls[0].args[0], "SIGINT");
     } finally {
-      // Restore original functions
-      Deno.addSignalListener = originalAddSignalListener;
-      Deno.exit = originalExit;
+      exitStub.restore();
+      addSignalListenerStub.restore();
     }
   });
 
   await t.step("exits with error on invalid config", async () => {
-    const originalExit = Deno.exit;
-    let exitCode: number | undefined;
-    let exitCalled = false;
+    const exitStub = stub(Deno, "exit");
 
     try {
-      // @ts-ignore: Deno.exit is being mocked
-      Deno.exit = (code?: number) => {
-        exitCode = code;
-        exitCalled = true;
-      };
-
       const configPath = "nonexistent.config.ts";
-      await run(["--config", configPath]);
+      await run(["--config", configPath], logger);
 
-      assertEquals(exitCode, 1);
-      assertEquals(exitCalled, true);
+      // Assert that exit was called with error code
+      assertSpyCalls(exitStub, 1);
+      assertEquals(exitStub.calls[0].args[0], 1);
     } finally {
-      Deno.exit = originalExit;
+      exitStub.restore();
     }
   });
 });
