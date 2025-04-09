@@ -1,5 +1,4 @@
 import { parse } from "https://deno.land/std@0.220.1/flags/mod.ts";
-import { join } from "https://deno.land/std@0.220.1/path/mod.ts";
 import {
   blue,
   gray,
@@ -7,6 +6,7 @@ import {
   yellow,
 } from "https://deno.land/std@0.220.1/fmt/colors.ts";
 import { CoreConfig, Logger, Trove } from "./mod.ts";
+import { ConfigLoader } from "./config_loader.ts";
 
 class ColorLogger implements Logger {
   debug(message: string, ...args: unknown[]): void {
@@ -26,21 +26,10 @@ class ColorLogger implements Logger {
   }
 }
 
-export async function loadConfig(configPath: string): Promise<CoreConfig> {
-  try {
-    const configModule = await import(configPath);
-    return configModule.default;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Failed to load configuration from ${configPath}: ${message}`,
-    );
-  }
-}
-
 export async function run(args: string[] = Deno.args): Promise<void> {
   const flags = parse(args, {
     string: ["config"],
+    alias: { c: "config" },
     default: { config: "trove.config.ts" },
   });
 
@@ -48,29 +37,36 @@ export async function run(args: string[] = Deno.args): Promise<void> {
   const keepAlive = setInterval(() => {}, 5000);
 
   try {
-    const configPath = join(Deno.cwd(), flags.config);
-    const config = await loadConfig(configPath);
+    const configLoader = new ConfigLoader(logger);
+    const config: CoreConfig = await configLoader.load(flags.config);
+
     config.logger = logger;
 
     const trove = new Trove(config);
     await trove.initialize();
-    logger.info("Trove is running. Press Ctrl+C to stop.");
+    logger.info("Trove initialized successfully. Press Ctrl+C to stop.");
 
-    Deno.addSignalListener("SIGINT", () => {
+    Deno.addSignalListener("SIGINT", async () => {
       logger.info("Received SIGINT, shutting down...");
-      clearTimeout(keepAlive);
-      trove.shutdown();
-      Deno.exit(0);
+      clearInterval(keepAlive);
+      try {
+        await trove.shutdown();
+        logger.info("Trove shutdown complete.");
+        Deno.exit(0);
+      } catch (shutdownError) {
+        logger.error("Error during shutdown:", shutdownError);
+        Deno.exit(1);
+      }
     });
+
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(message);
-    clearTimeout(keepAlive);
+    logger.error(`Fatal error during startup: ${message}`);
+    clearInterval(keepAlive);
     Deno.exit(1);
   }
 }
 
-// Run CLI if this module is executed directly
 if (import.meta.main) {
   run();
 }
