@@ -26,14 +26,15 @@ class ColorLogger implements Logger {
   }
 }
 
-export async function run(args: string[] = Deno.args): Promise<void> {
+export async function run(
+  args: string[] = Deno.args,
+  logger: Logger = new ColorLogger(),
+): Promise<void> {
   const flags = parse(args, {
     string: ["config"],
     alias: { c: "config" },
     default: { config: "trove.config.ts" },
   });
-
-  const logger = new ColorLogger();
   const keepAlive = setInterval(() => {}, 5000);
 
   try {
