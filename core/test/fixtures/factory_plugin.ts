@@ -1,1 +1,5 @@
-export default () => ({ name: "factory-plugin", version: "1.1", capabilities: [] });
+export default () => ({
+  name: "factory-plugin",
+  version: "1.1",
+  capabilities: [],
+});
