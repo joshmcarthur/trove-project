@@ -46,7 +46,9 @@ export class PluginSystem {
   async unloadPlugin(pluginName: string): Promise<void> {
     const plugin = this.plugins.get(pluginName);
     if (!plugin) {
-      this.logger.debug(`Attempted to unload non-existent plugin: ${pluginName}`);
+      this.logger.debug(
+        `Attempted to unload non-existent plugin: ${pluginName}`,
+      );
       return;
     }
 

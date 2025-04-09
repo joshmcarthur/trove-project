@@ -49,7 +49,6 @@ try {
   if (!(e instanceof Deno.errors.AlreadyExists)) throw e;
 }
 
-
 Deno.test("ConfigLoader", async (t) => {
   let logger: TestLogger;
   let configLoader: ConfigLoader;
@@ -70,13 +69,22 @@ Deno.test("ConfigLoader", async (t) => {
 
     // Check normalization of plugin sources based on config file location
     const expectedBaseDir = dirname(validConfigPath);
-    assertEquals(config.plugins.sources[0], join(expectedBaseDir, "relative_plugin.ts"));
-    assertEquals(config.plugins.sources[1], "https://example.com/remote_plugin.ts");
+    assertEquals(
+      config.plugins.sources[0],
+      join(expectedBaseDir, "relative_plugin.ts"),
+    );
+    assertEquals(
+      config.plugins.sources[1],
+      "https://example.com/remote_plugin.ts",
+    );
     assertEquals(config.plugins.sources[2], "/absolute_plugin.ts"); // Absolute paths remain unchanged
 
     // Check logger output (optional)
     assertStringIncludes(logger.logs[0]?.message || "", validConfigPath);
-    assertStringIncludes(logger.logs.at(-1)?.message || "", "Configuration loaded successfully.");
+    assertStringIncludes(
+      logger.logs.at(-1)?.message || "",
+      "Configuration loaded successfully.",
+    );
   });
 
   await t.step("throws error for non-existent configuration file", async () => {
@@ -85,18 +93,23 @@ Deno.test("ConfigLoader", async (t) => {
     await assertRejects(
       () => configLoader.load(configPath),
       Error,
-      `Configuration loading failed: Configuration file not found at: ${normalize(configPath)}`,
+      `Configuration loading failed: Configuration file not found at: ${
+        normalize(configPath)
+      }`,
     );
   });
 
-   await t.step("throws error for configuration without default export", async () => {
+  await t.step(
+    "throws error for configuration without default export",
+    async () => {
       setup();
       await assertRejects(
-          () => configLoader.load(invalidExportConfigPath),
-          Error,
-          "Configuration loading failed: Configuration file must have a default export that is an object."
+        () => configLoader.load(invalidExportConfigPath),
+        Error,
+        "Configuration loading failed: Configuration file must have a default export that is an object.",
       );
-  });
+    },
+  );
 
   // Add more tests:
   // - Loading from HTTP URL (might require mocking fetch or a local server)

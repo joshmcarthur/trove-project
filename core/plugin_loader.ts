@@ -99,7 +99,10 @@ export class PluginLoader {
       if (error instanceof Deno.errors.NotFound) {
         this.logger.warn(`Plugin directory not found: ${directory}`);
       } else {
-        this.logger.error(`Error reading plugin directory ${directory}:`, error);
+        this.logger.error(
+          `Error reading plugin directory ${directory}:`,
+          error,
+        );
       }
       // Don't throw if a directory is optional/doesn't exist
     }

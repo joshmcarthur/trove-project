@@ -1,4 +1,9 @@
-import { dirname, join, isAbsolute, normalize } from "https://deno.land/std@0.220.1/path/mod.ts";
+import {
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+} from "https://deno.land/std@0.220.1/path/mod.ts";
 import { CoreConfig, Logger } from "./types.ts"; // Assuming CoreConfig is defined in types.ts
 
 /**
@@ -25,12 +30,17 @@ export class ConfigLoader {
 
     try {
       // Handle HTTP/HTTPS URLs
-      if (configPathOrUrl.startsWith("http://") || configPathOrUrl.startsWith("https://")) {
+      if (
+        configPathOrUrl.startsWith("http://") ||
+        configPathOrUrl.startsWith("https://")
+      ) {
         importUrl = configPathOrUrl;
         // For remote configs, base directory for relative plugin paths is CWD
         // Alternatively, could disallow relative paths in remote configs.
         configDir = Deno.cwd();
-        this.logger.debug(`Using current working directory (${configDir}) as base for relative paths in remote config.`);
+        this.logger.debug(
+          `Using current working directory (${configDir}) as base for relative paths in remote config.`,
+        );
       } else {
         // Handle local file paths (absolute or relative)
         const absolutePath = isAbsolute(configPathOrUrl)
@@ -39,14 +49,13 @@ export class ConfigLoader {
 
         // Ensure the file exists before trying to import
         try {
-            await Deno.stat(absolutePath);
+          await Deno.stat(absolutePath);
         } catch (statError) {
-             if (statError instanceof Deno.errors.NotFound) {
-                 throw new Error(`Configuration file not found at: ${absolutePath}`);
-             }
-             throw statError; // Re-throw other stat errors
+          if (statError instanceof Deno.errors.NotFound) {
+            throw new Error(`Configuration file not found at: ${absolutePath}`);
+          }
+          throw statError; // Re-throw other stat errors
         }
-
 
         importUrl = new URL("file://" + absolutePath).href;
         configDir = dirname(absolutePath);
@@ -55,8 +64,10 @@ export class ConfigLoader {
 
       // Dynamically import the configuration module
       const configModule = await import(importUrl);
-      if (!configModule.default || typeof configModule.default !== 'object') {
-        throw new Error(`Configuration file must have a default export that is an object.`);
+      if (!configModule.default || typeof configModule.default !== "object") {
+        throw new Error(
+          `Configuration file must have a default export that is an object.`,
+        );
       }
       const config: Partial<CoreConfig> = configModule.default; // Start with partial
 
@@ -75,12 +86,16 @@ export class ConfigLoader {
           source.startsWith("file://") || source.startsWith("jsr:") ||
           source.startsWith("npm:") || isAbsolute(source)
         ) {
-          this.logger.debug(`Plugin source is absolute/specifier, keeping as is: ${source}`);
+          this.logger.debug(
+            `Plugin source is absolute/specifier, keeping as is: ${source}`,
+          );
           return source;
         }
         // Resolve relative paths against the config file's directory
         const resolvedPath = join(configDir, source);
-        this.logger.debug(`Resolved relative plugin source "${source}" to "${resolvedPath}"`);
+        this.logger.debug(
+          `Resolved relative plugin source "${source}" to "${resolvedPath}"`,
+        );
         return resolvedPath;
       });
 
@@ -89,10 +104,11 @@ export class ConfigLoader {
 
       this.logger.info(`Configuration loaded successfully.`);
       return config as CoreConfig; // Cast to CoreConfig after normalization
-
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to load configuration from ${configPathOrUrl}: ${message}`);
+      this.logger.error(
+        `Failed to load configuration from ${configPathOrUrl}: ${message}`,
+      );
       // Re-throw a more specific error to be caught by the CLI runner
       throw new Error(`Configuration loading failed: ${message}`);
     }

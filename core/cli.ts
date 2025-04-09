@@ -58,7 +58,6 @@ export async function run(args: string[] = Deno.args): Promise<void> {
         Deno.exit(1);
       }
     });
-
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Fatal error during startup: ${message}`);
