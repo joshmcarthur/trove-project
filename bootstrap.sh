@@ -4,11 +4,12 @@ set -e
 # Default values
 HEAD=false
 DENO_VERSION="2.2.8"
-CLI_URL="https://raw.githubusercontent.com/joshmcarthur/trove-project/refs/heads/main/core/cli.ts"
-REPO_GIT="https://github.com/joshmcarthur/trove-project.git"
-REPO_BRANCH="main"
-INSTALL_DIR="$HOME/.trove"
-DENO_DIR="$INSTALL_DIR/.deno"
+TROVE_CLI_URL="https://raw.githubusercontent.com/joshmcarthur/trove-project/refs/heads/main/core/cli.ts"
+TROVE_GIT="https://github.com/joshmcarthur/trove-project.git"
+TROVE_BRANCH="${TROVE_BRANCH:-main}"
+TROVE_INSTALL_DIR="$HOME/.trove"
+TROVE_CLONE_DIR="$TROVE_INSTALL_DIR/git"
+DENO_DIR="$TROVE_INSTALL_DIR/.deno"
 
 # Parse bootstrap arguments while preserving remaining args for CLI
 CLI_ARGS=()
@@ -68,21 +69,23 @@ if [ "$HEAD" = true ]; then
     echo "Installing development version from Git..."
 
     # Create installation directory if it doesn't exist
-    mkdir -p "$INSTALL_DIR"
+    mkdir -p "$TROVE_INSTALL_DIR"
 
     # Clone or update repository
-    if [ -d "$INSTALL_DIR/.git" ]; then
+    if [ -d "$TROVE_CLONE_DIR/.git" ]; then
         echo "Updating existing repository..."
-        cd "$INSTALL_DIR"
-        git pull origin "$REPO_BRANCH"
+        cd "$TROVE_CLONE_DIR"
+        git checkout "$TROVE_BRANCH"
+        git pull origin "$TROVE_BRANCH"
     else
         echo "Cloning repository..."
-        git clone "$REPO_GIT" "$INSTALL_DIR"
-        cd "$INSTALL_DIR"
+        mkdir -p "$TROVE_CLONE_DIR"
+        git clone "$TROVE_GIT" "$TROVE_CLONE_DIR" --branch "$TROVE_BRANCH"
+        cd "$TROVE_CLONE_DIR"
     fi
 
     echo "Starting Trove from local installation..."
-    "$DENO_DIR/bin/deno" run --allow-net --allow-read --allow-write --allow-env --allow-run cli.ts "$@"
+    "$DENO_DIR/bin/deno" run --allow-net --allow-read --allow-write --allow-env --allow-run "$TROVE_CLONE_DIR/core/cli.ts" "$@"
 else
     echo "Starting Trove from stable release..."
     "$DENO_DIR/bin/deno" run --allow-net --allow-read --allow-write --allow-env --allow-run "$CLI_URL" "$@"
