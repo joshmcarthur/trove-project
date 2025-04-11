@@ -29,36 +29,34 @@ export class ConfigLoader {
     let configDir: string;
 
     try {
-      // Handle HTTP/HTTPS URLs
+      // Always resolve relative paths against CWD first
+      const resolvedPath = isAbsolute(configPathOrUrl)
+        ? normalize(configPathOrUrl)
+        : normalize(join(Deno.cwd(), configPathOrUrl));
+
+      // Then check if it's a URL or local file
       if (
         configPathOrUrl.startsWith("http://") ||
         configPathOrUrl.startsWith("https://")
       ) {
         importUrl = configPathOrUrl;
-        // For remote configs, base directory for relative plugin paths is CWD
-        // Alternatively, could disallow relative paths in remote configs.
         configDir = Deno.cwd();
         this.logger.debug(
           `Using current working directory (${configDir}) as base for relative paths in remote config.`,
         );
       } else {
-        // Handle local file paths (absolute or relative)
-        const absolutePath = isAbsolute(configPathOrUrl)
-          ? normalize(configPathOrUrl)
-          : normalize(join(Deno.cwd(), configPathOrUrl));
-
-        // Ensure the file exists before trying to import
+        // For local config files, verify they exist
         try {
-          await Deno.stat(absolutePath);
+          await Deno.stat(resolvedPath);
         } catch (statError) {
           if (statError instanceof Deno.errors.NotFound) {
-            throw new Error(`Configuration file not found at: ${absolutePath}`);
+            throw new Error(`Configuration file not found at: ${resolvedPath}`);
           }
-          throw statError; // Re-throw other stat errors
+          throw statError;
         }
 
-        importUrl = new URL("file://" + absolutePath).href;
-        configDir = dirname(absolutePath);
+        importUrl = new URL(`file://${resolvedPath}`).href;
+        configDir = dirname(resolvedPath);
         this.logger.debug(`Configuration base directory set to: ${configDir}`);
       }
 
@@ -69,14 +67,13 @@ export class ConfigLoader {
           `Configuration file must have a default export that is an object.`,
         );
       }
-      const config: Partial<CoreConfig> = configModule.default; // Start with partial
+      const config: Partial<CoreConfig> = configModule.default;
 
       // --- Normalize Configuration ---
       // Ensure core properties and plugin structure exist
-      config.plugins = config?.plugins ?? { sources: [] };
+      config.plugins = config?.plugins ?? { sources: [], config: {} };
       config.plugins.sources = config?.plugins?.sources ?? [];
       config.plugins.config = config?.plugins?.config ?? {};
-      // Add other default/required config sections here as needed
 
       // Normalize plugin source paths
       config.plugins.sources = config.plugins.sources.map((source: string) => {
@@ -99,11 +96,8 @@ export class ConfigLoader {
         return resolvedPath;
       });
 
-      // --- TODO: Add more validation/normalization here in the future ---
-      // Example: Validate storage path, check required fields, etc.
-
       this.logger.info(`Configuration loaded successfully.`);
-      return config as CoreConfig; // Cast to CoreConfig after normalization
+      return config as CoreConfig;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(

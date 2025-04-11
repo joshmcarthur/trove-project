@@ -41,11 +41,9 @@ export class PluginLoader {
         this.logger.info(`Loading plugin from URL/Specifier: ${source}`);
         await this._loadAndValidate(source, source);
       } else {
-        // Assume it's a local path (file or directory)
-        // Path normalization should happen before calling this (e.g., in loadConfig).
-        // If relative, resolve against CWD as a fallback.
+        // For local paths, always resolve relative to CWD
         const absoluteSourcePath = isAbsolute(source)
-          ? source
+          ? normalize(source)
           : normalize(join(Deno.cwd(), source));
 
         try {
@@ -54,7 +52,7 @@ export class PluginLoader {
             await this._loadFromDirectory(absoluteSourcePath);
           } else if (fileInfo.isFile) {
             this.logger.info(`Loading plugin from file: ${absoluteSourcePath}`);
-            const importUrl = new URL("file://" + absoluteSourcePath).href;
+            const importUrl = new URL(`file://${absoluteSourcePath}`).href;
             await this._loadAndValidate(absoluteSourcePath, importUrl);
           } else {
             this.logger.warn(
@@ -91,8 +89,7 @@ export class PluginLoader {
           continue;
         }
         const absolutePath = join(directory, entry.name);
-        const importUrl = new URL("file://" + absolutePath).href;
-        // Pass description and importUrl to the validation method
+        const importUrl = new URL(`file://${absolutePath}`).href;
         await this._loadAndValidate(absolutePath, importUrl);
       }
     } catch (error: unknown) {
