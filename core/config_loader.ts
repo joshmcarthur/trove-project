@@ -51,7 +51,9 @@ export class ConfigLoader {
           await Deno.stat(resolvedConfigPath);
         } catch (statError) {
           if (statError instanceof Deno.errors.NotFound) {
-            throw new Error(`Configuration file not found at: ${resolvedConfigPath}`);
+            throw new Error(
+              `Configuration file not found at: ${resolvedConfigPath}`,
+            );
           }
           throw statError;
         }
@@ -116,5 +118,4 @@ export class ConfigLoader {
     // PWD is more reliable than Deno.cwd() as it represents the shell's working directory
     return Deno.env.get("PWD") || Deno.cwd();
   }
-
 }
