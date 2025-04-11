@@ -11,6 +11,9 @@ TROVE_INSTALL_DIR="$HOME/.trove"
 TROVE_CLONE_DIR="$TROVE_INSTALL_DIR/git"
 DENO_DIR="$TROVE_INSTALL_DIR/.deno"
 
+# Store original working directory
+ORIGINAL_PWD="$PWD"
+
 # Parse bootstrap arguments while preserving remaining args for CLI
 CLI_ARGS=()
 while [[ "$#" -gt 0 ]]; do
@@ -85,6 +88,8 @@ if [ "$HEAD" = true ]; then
     fi
 
     echo "Starting Trove from local installation..."
+    # Run the CLI with the original working directory
+    cd "$ORIGINAL_PWD"
     "$DENO_DIR/bin/deno" run --allow-net --allow-read --allow-write --allow-env --allow-run "$TROVE_CLONE_DIR/core/cli.ts" "$@"
 else
     echo "Starting Trove from stable release..."
