@@ -29,12 +29,7 @@ export class ConfigLoader {
     let configDir: string;
 
     try {
-      // Always resolve relative paths against CWD first
-      const resolvedPath = isAbsolute(configPathOrUrl)
-        ? normalize(configPathOrUrl)
-        : normalize(join(Deno.cwd(), configPathOrUrl));
-
-      // Then check if it's a URL or local file
+      // First check if it's a remote URL
       if (
         configPathOrUrl.startsWith("http://") ||
         configPathOrUrl.startsWith("https://")
@@ -45,18 +40,23 @@ export class ConfigLoader {
           `Using current working directory (${configDir}) as base for relative paths in remote config.`,
         );
       } else {
-        // For local config files, verify they exist
+        // For all local paths (whether the CLI is run from URL, absolute path, or locally),
+        // resolve config path relative to CWD
+        const resolvedConfigPath = isAbsolute(configPathOrUrl)
+          ? normalize(configPathOrUrl)
+          : normalize(join(Deno.cwd(), configPathOrUrl));
+
         try {
-          await Deno.stat(resolvedPath);
+          await Deno.stat(resolvedConfigPath);
         } catch (statError) {
           if (statError instanceof Deno.errors.NotFound) {
-            throw new Error(`Configuration file not found at: ${resolvedPath}`);
+            throw new Error(`Configuration file not found at: ${resolvedConfigPath}`);
           }
           throw statError;
         }
 
-        importUrl = new URL(`file://${resolvedPath}`).href;
-        configDir = dirname(resolvedPath);
+        importUrl = new URL(`file://${resolvedConfigPath}`).href;
+        configDir = dirname(resolvedConfigPath);
         this.logger.debug(`Configuration base directory set to: ${configDir}`);
       }
 
