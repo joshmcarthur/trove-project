@@ -27,6 +27,7 @@ export class ConfigLoader {
     this.logger.info(`Loading configuration from: ${configPathOrUrl}`);
     let importUrl: string;
     let configDir: string;
+    const cwd = this.getCurrentWorkingDir();
 
     try {
       // First check if it's a remote URL
@@ -35,16 +36,16 @@ export class ConfigLoader {
         configPathOrUrl.startsWith("https://")
       ) {
         importUrl = configPathOrUrl;
-        configDir = Deno.cwd();
+        configDir = cwd;
         this.logger.debug(
-          `Using current working directory (${configDir}) as base for relative paths in remote config.`,
+          `Using shell working directory (${configDir}) as base for relative paths in remote config.`,
         );
       } else {
         // For all local paths (whether the CLI is run from URL, absolute path, or locally),
-        // resolve config path relative to CWD
+        // resolve config path relative to shell's CWD
         const resolvedConfigPath = isAbsolute(configPathOrUrl)
           ? normalize(configPathOrUrl)
-          : normalize(join(Deno.cwd(), configPathOrUrl));
+          : normalize(join(cwd, configPathOrUrl));
 
         try {
           await Deno.stat(resolvedConfigPath);
@@ -107,4 +108,13 @@ export class ConfigLoader {
       throw new Error(`Configuration loading failed: ${message}`);
     }
   }
+
+  /**
+   * Gets the actual shell working directory, not the script directory
+   */
+  private getCurrentWorkingDir(): string {
+    // PWD is more reliable than Deno.cwd() as it represents the shell's working directory
+    return Deno.env.get("PWD") || Deno.cwd();
+  }
+
 }
