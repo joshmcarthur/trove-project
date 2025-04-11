@@ -27,38 +27,39 @@ export class ConfigLoader {
     this.logger.info(`Loading configuration from: ${configPathOrUrl}`);
     let importUrl: string;
     let configDir: string;
+    const cwd = this.getCurrentWorkingDir();
 
     try {
-      // Handle HTTP/HTTPS URLs
+      // First check if it's a remote URL
       if (
         configPathOrUrl.startsWith("http://") ||
         configPathOrUrl.startsWith("https://")
       ) {
         importUrl = configPathOrUrl;
-        // For remote configs, base directory for relative plugin paths is CWD
-        // Alternatively, could disallow relative paths in remote configs.
-        configDir = Deno.cwd();
+        configDir = cwd;
         this.logger.debug(
-          `Using current working directory (${configDir}) as base for relative paths in remote config.`,
+          `Using shell working directory (${configDir}) as base for relative paths in remote config.`,
         );
       } else {
-        // Handle local file paths (absolute or relative)
-        const absolutePath = isAbsolute(configPathOrUrl)
+        // For all local paths (whether the CLI is run from URL, absolute path, or locally),
+        // resolve config path relative to shell's CWD
+        const resolvedConfigPath = isAbsolute(configPathOrUrl)
           ? normalize(configPathOrUrl)
-          : normalize(join(Deno.cwd(), configPathOrUrl));
+          : normalize(join(cwd, configPathOrUrl));
 
-        // Ensure the file exists before trying to import
         try {
-          await Deno.stat(absolutePath);
+          await Deno.stat(resolvedConfigPath);
         } catch (statError) {
           if (statError instanceof Deno.errors.NotFound) {
-            throw new Error(`Configuration file not found at: ${absolutePath}`);
+            throw new Error(
+              `Configuration file not found at: ${resolvedConfigPath}`,
+            );
           }
-          throw statError; // Re-throw other stat errors
+          throw statError;
         }
 
-        importUrl = new URL("file://" + absolutePath).href;
-        configDir = dirname(absolutePath);
+        importUrl = new URL(`file://${resolvedConfigPath}`).href;
+        configDir = dirname(resolvedConfigPath);
         this.logger.debug(`Configuration base directory set to: ${configDir}`);
       }
 
@@ -69,14 +70,13 @@ export class ConfigLoader {
           `Configuration file must have a default export that is an object.`,
         );
       }
-      const config: Partial<CoreConfig> = configModule.default; // Start with partial
+      const config: Partial<CoreConfig> = configModule.default;
 
       // --- Normalize Configuration ---
       // Ensure core properties and plugin structure exist
-      config.plugins = config?.plugins ?? { sources: [] };
+      config.plugins = config?.plugins ?? { sources: [], config: {} };
       config.plugins.sources = config?.plugins?.sources ?? [];
       config.plugins.config = config?.plugins?.config ?? {};
-      // Add other default/required config sections here as needed
 
       // Normalize plugin source paths
       config.plugins.sources = config.plugins.sources.map((source: string) => {
@@ -99,11 +99,8 @@ export class ConfigLoader {
         return resolvedPath;
       });
 
-      // --- TODO: Add more validation/normalization here in the future ---
-      // Example: Validate storage path, check required fields, etc.
-
       this.logger.info(`Configuration loaded successfully.`);
-      return config as CoreConfig; // Cast to CoreConfig after normalization
+      return config as CoreConfig;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -112,5 +109,13 @@ export class ConfigLoader {
       // Re-throw a more specific error to be caught by the CLI runner
       throw new Error(`Configuration loading failed: ${message}`);
     }
+  }
+
+  /**
+   * Gets the actual shell working directory, not the script directory
+   */
+  private getCurrentWorkingDir(): string {
+    // PWD is more reliable than Deno.cwd() as it represents the shell's working directory
+    return Deno.env.get("PWD") || Deno.cwd();
   }
 }
