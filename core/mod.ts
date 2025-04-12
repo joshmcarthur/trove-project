@@ -6,6 +6,7 @@ import {
   EventId,
   EventQuery,
   HookContext,
+  HookResult,
   Logger,
   Plugin,
 } from "./types.ts";
@@ -122,7 +123,7 @@ export class Trove implements CoreSystem {
   executeHook(
     name: string,
     context: Partial<HookContext>,
-  ): Promise<unknown[]> {
+  ): Promise<HookResult[]> {
     return this.hooks.executeHook(name, context);
   }
 

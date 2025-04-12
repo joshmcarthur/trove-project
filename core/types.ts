@@ -41,8 +41,12 @@ export interface HookContext {
   request?: Request;
   response?: Response;
   schema?: EventSchema;
-  state: Map<string, unknown>;
-  logger: Logger;
+  state?: Record<string, unknown>;
+}
+
+export interface HookResult<T = unknown> {
+  pluginId: string;
+  result: T | null;
 }
 
 export interface Hook {
@@ -147,7 +151,10 @@ export interface CoreSystem {
   logger: Logger;
   registerPlugin(plugin: Plugin): Promise<void>;
   getPlugin(name: string): Promise<Plugin | undefined>;
-  executeHook(name: string, context: Partial<HookContext>): Promise<unknown[]>;
+  executeHook(
+    name: string,
+    context: Partial<HookContext>,
+  ): Promise<HookResult[]>;
   createEvent(
     schema: string,
     payload: Record<string, unknown>,
