@@ -76,6 +76,14 @@ export class Trove implements CoreSystem {
   ): Promise<Event> {
     this.ensureInitialized();
 
+    if (!schema) {
+      throw new Error("Schema is required");
+    }
+
+    if (!payload) {
+      throw new Error("Payload is required");
+    }
+
     const event: Event = {
       id: { id: crypto.randomUUID() },
       createdAt: new Date().toISOString(),
