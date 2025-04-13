@@ -57,9 +57,9 @@ Deno.test("http Service Plugin", async (t) => {
       version: "1.0.0",
       capabilities: [],
       hooks: {
-        "http:request": async (context) => {
+        "http:request": (context) => {
           const request = context.request;
-          if (!request) return null;
+          if (!request) return Promise.resolve();
 
           const url = new URL(request.url);
 
@@ -68,15 +68,17 @@ Deno.test("http Service Plugin", async (t) => {
             request.headers.get("X-Test-Intercept") === "true"
           ) {
             console.log("Intercepting request");
-            return new Response("Intercepted", {
-              status: 200,
-              headers: {
-                "Content-Type": "text/plain",
-              },
-            });
+            return Promise.resolve(
+              new Response("Intercepted", {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/plain",
+                },
+              }),
+            );
           }
           console.log("Not intercepting request");
-          return null;
+          return Promise.resolve();
         },
       },
     });

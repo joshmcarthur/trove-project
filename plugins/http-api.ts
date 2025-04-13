@@ -89,7 +89,7 @@ export default {
   version: "1.0.0",
   capabilities: [],
   hooks: {
-    "http:request": async (context) => {
+    "http:request": (context) => {
       const { request, core } = context;
       if (!request) {
         core.logger.warn("Received http:request hook with no request");
