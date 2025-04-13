@@ -1,4 +1,4 @@
-import { CoreSystem, Logger, Plugin, StorageCapability } from "./types.ts";
+import { CoreSystem, Logger, Plugin, PluginCapability } from "./types.ts";
 import { HookSystem } from "./hooks.ts";
 import { PluginLoader } from "./plugin_loader.ts";
 
@@ -77,7 +77,7 @@ export class PluginSystem {
 
   getPlugin(
     name: string,
-    requiredCapabilities?: StorageCapability[],
+    requiredCapabilities?: PluginCapability[],
   ): Plugin | undefined {
     const plugin = this.plugins.get(name);
     if (!plugin) return undefined;

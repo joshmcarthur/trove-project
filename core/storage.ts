@@ -8,7 +8,7 @@ import {
   LinkStorage,
   Logger,
   Plugin,
-  StorageCapability,
+  PluginCapability,
   StorageConfiguration,
 } from "./types.ts";
 
@@ -112,7 +112,7 @@ export class StorageManager {
 
   private loadPlugin(
     pluginName: string,
-    requiredCapabilities: StorageCapability[],
+    requiredCapabilities: PluginCapability[],
   ): Promise<Plugin> {
     const plugin = this.plugins.getPlugin(pluginName, requiredCapabilities);
 

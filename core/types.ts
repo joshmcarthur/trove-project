@@ -55,7 +55,7 @@ export interface Hook {
   handler: (context: HookContext) => Promise<unknown>;
 }
 
-export type StorageCapability =
+export type PluginCapability =
   | "storage:events"
   | "storage:files"
   | "storage:links";
@@ -63,7 +63,7 @@ export type StorageCapability =
 export interface Plugin {
   name: string;
   version: string;
-  capabilities: StorageCapability[];
+  capabilities: PluginCapability[];
   hooks?: Record<string, Hook | HookHandler>;
   initialize?: (core: CoreSystem) => Promise<void>;
   shutdown?: () => Promise<void>;
