@@ -41,8 +41,12 @@ export interface HookContext {
   request?: Request;
   response?: Response;
   schema?: EventSchema;
-  state: Map<string, unknown>;
-  logger: Logger;
+  state?: Record<string, unknown>;
+}
+
+export interface HookResult<T = unknown> {
+  pluginId: string;
+  result: T | null;
 }
 
 export interface Hook {
@@ -51,7 +55,7 @@ export interface Hook {
   handler: (context: HookContext) => Promise<unknown>;
 }
 
-export type StorageCapability =
+export type PluginCapability =
   | "storage:events"
   | "storage:files"
   | "storage:links";
@@ -59,7 +63,7 @@ export type StorageCapability =
 export interface Plugin {
   name: string;
   version: string;
-  capabilities: StorageCapability[];
+  capabilities: PluginCapability[];
   hooks?: Record<string, Hook | HookHandler>;
   initialize?: (core: CoreSystem) => Promise<void>;
   shutdown?: () => Promise<void>;
@@ -147,7 +151,10 @@ export interface CoreSystem {
   logger: Logger;
   registerPlugin(plugin: Plugin): Promise<void>;
   getPlugin(name: string): Promise<Plugin | undefined>;
-  executeHook(name: string, context: Partial<HookContext>): Promise<unknown[]>;
+  executeHook(
+    name: string,
+    context: Partial<HookContext>,
+  ): Promise<HookResult[]>;
   createEvent(
     schema: string,
     payload: Record<string, unknown>,

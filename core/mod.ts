@@ -6,6 +6,7 @@ import {
   EventId,
   EventQuery,
   HookContext,
+  HookResult,
   Logger,
   Plugin,
 } from "./types.ts";
@@ -75,6 +76,14 @@ export class Trove implements CoreSystem {
   ): Promise<Event> {
     this.ensureInitialized();
 
+    if (!schema) {
+      throw new Error("Schema is required");
+    }
+
+    if (!payload) {
+      throw new Error("Payload is required");
+    }
+
     const event: Event = {
       id: { id: crypto.randomUUID() },
       createdAt: new Date().toISOString(),
@@ -122,7 +131,7 @@ export class Trove implements CoreSystem {
   executeHook(
     name: string,
     context: Partial<HookContext>,
-  ): Promise<unknown[]> {
+  ): Promise<HookResult[]> {
     return this.hooks.executeHook(name, context);
   }
 

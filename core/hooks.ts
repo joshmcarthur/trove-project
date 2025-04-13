@@ -1,4 +1,4 @@
-import { Hook, HookContext, HookHandler, Logger } from "./types.ts";
+import { Hook, HookContext, HookHandler, HookResult, Logger } from "./types.ts";
 
 export class HookSystem {
   private hooks: Map<string, Set<Hook>> = new Map();
@@ -31,7 +31,7 @@ export class HookSystem {
   async executeHook(
     name: string,
     context: Partial<HookContext>,
-  ): Promise<unknown[]> {
+  ): Promise<HookResult[]> {
     const hooks = this.hooks.get(name);
     if (!hooks || hooks.size === 0) {
       this.logger.debug(`No handlers registered for hook ${name}`);
@@ -42,7 +42,7 @@ export class HookSystem {
     const sortedHooks = Array.from(hooks)
       .sort((a, b) => b.priority - a.priority);
 
-    const results = [];
+    const results: HookResult[] = [];
     for (const hook of sortedHooks) {
       try {
         this.logger.debug(`Executing hook ${name} for plugin ${hook.pluginId}`);
