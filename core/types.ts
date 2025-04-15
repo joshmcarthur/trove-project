@@ -71,6 +71,18 @@ export interface Plugin {
 
 export type HookHandler = (context: HookContext) => Promise<unknown>;
 
+export type ValidationError = {
+  path: string;
+  message: string;
+  extra?: Record<string, unknown>;
+};
+
+export interface ValidationResult<T = unknown> {
+  isValid: boolean;
+  data?: T;
+  errors?: ValidationError[];
+}
+
 export interface Logger {
   debug(message: string, ...args: unknown[]): void;
   info(message: string, ...args: unknown[]): void;
@@ -149,6 +161,7 @@ export interface EventCreationOptions {
 export interface CoreSystem {
   config: CoreConfig;
   logger: Logger;
+  validator: Validator;
   registerPlugin(plugin: Plugin): Promise<void>;
   getPlugin(name: string): Promise<Plugin | undefined>;
   executeHook(

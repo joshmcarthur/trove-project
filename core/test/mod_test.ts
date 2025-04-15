@@ -69,4 +69,63 @@ Deno.test("Trove", async (t) => {
     assertEquals(storingCalled, true, "event:storing hook should be called");
     assertEquals(storedCalled, true, "event:stored hook should be called");
   });
+
+  await t.step("validates event schema and payload", async () => {
+    const trove = await createTestCore();
+    const schema = {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        value: { type: "number" },
+      },
+    };
+
+    // Test with valid schema and payload
+    const validEvent = await trove.createEvent(schema, {
+      name: "Test Event",
+      value: 42,
+    });
+
+    assertEquals(validEvent.schema, schema);
+    assertEquals(validEvent.payload.name, "Test Event");
+    assertEquals(validEvent.payload.value, 42);
+
+    // Test with invalid payload (missing required field)
+    await assertRejects(
+      async () => {
+        await trove.createEvent(
+          {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              value: { type: "number" },
+            },
+            required: ["name", "value"],
+          },
+          { name: "Test Event" }, // missing required 'value' field
+        );
+      },
+      Error,
+      "validation failed",
+    );
+
+    // Test with invalid schema (wrong type)
+    await assertRejects(
+      async () => {
+        await trove.createEvent(
+          {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              value: { type: "number" },
+            },
+            required: ["name", "value"],
+          },
+          { name: "Test Event", value: "not a number" },
+        );
+      },
+      Error,
+      "validation failed",
+    );
+  });
 });
