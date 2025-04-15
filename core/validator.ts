@@ -1,4 +1,5 @@
 import Ajv from "https://esm.sh/ajv@8.12.0";
+export type { JSONSchemaType } from "https://esm.sh/ajv@8.12.0";
 import { ValidationError, ValidationResult } from "./types.ts";
 
 export class Validator {
