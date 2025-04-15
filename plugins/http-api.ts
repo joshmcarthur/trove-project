@@ -1,113 +1,229 @@
-import { CoreSystem, EventFile, EventLink, Plugin } from "@trove/core/types.ts";
+import {
+  CoreSystem,
+  EventFile,
+  EventLink,
+  Logger,
+  Plugin,
+} from "@trove/core/types.ts";
 
-interface RouteHandler {
-  method: string;
-  path: string;
-  handler: (request: Request, core: CoreSystem) => Promise<Response>;
-}
+class HttpApiPlugin {
+  logger?: Logger;
 
-const routes: RouteHandler[] = [
-  {
-    method: "POST",
-    path: "/api/events",
-    handler: async (request: Request, core: CoreSystem) => {
-      try {
-        // Check content type to determine how to parse the request
-        const contentType = request.headers.get("Content-Type") || "";
-        let body: Record<string, unknown>;
+  private static readonly requestSchema = {
+    type: "object",
+    properties: {
+      schema: {
+        type: "object",
+        additionalProperties: true,
+      },
+      payload: { type: "object", additionalProperties: true },
+      producer: { type: "string" },
+      metadata: { type: "object", additionalProperties: true },
+      files: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            contentType: { type: "string" },
+            filename: { type: "string" },
+            size: { type: "number" },
+            // Uint8Array or base64 encoded string - note that Uint8Array is a object type,
+            // not an array
+            data: { type: ["string", "object"] },
+          },
+          required: ["contentType", "data"],
+        },
+      },
+      links: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            type: { type: "string" },
+            targetEvent: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                version: { type: "number" },
+              },
+              required: ["id"],
+            },
+          },
+          required: ["type", "targetEvent"],
+        },
+      },
+    },
+    required: ["schema", "payload"],
+    additionalProperties: false,
+  };
 
-        if (contentType.includes("multipart/form-data")) {
-          // Handle multipart form data
-          const formData = await request.formData();
-          body = {
-            schema: formData.get("schema"),
-            payload: JSON.parse(formData.get("payload") as string),
-            producer: formData.get("producer"),
-            metadata: formData.get("metadata")
-              ? JSON.parse(formData.get("metadata") as string)
-              : undefined,
+  /**
+   * Parses a JSON value from a FormDataEntryValue.
+   * If the value is null, returns the missing value.
+   * If the value is not parseable as JSON, returns the invalid value.
+   * @param value - The value to parse.
+   * @param options - An object containing the missing and invalid values, defaults to undefined.
+   * @returns The parsed value, or the missing or invalid value if the value is null or not a string.
+   */
+  private safeParseJson(
+    value: FormDataEntryValue | null,
+    { missing = undefined, invalid = undefined }: Record<string, unknown> = {},
+  ): unknown | undefined {
+    if (!value) return missing;
+    try {
+      return JSON.parse(value as string);
+    } catch (e) {
+      this.logger?.debug(e as unknown as string);
+      return invalid;
+    }
+  }
+
+  private async parseRequestBody(
+    request: Request,
+  ): Promise<Record<string, unknown>> {
+    const contentType = request.headers.get("Content-Type") || "";
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      const body: Record<string, unknown> = {
+        schema: this.safeParseJson(formData.get("schema")),
+        payload: this.safeParseJson(formData.get("payload")),
+        producer: (formData.get("producer") as string) || undefined,
+        metadata: this.safeParseJson(formData.get("metadata"), { invalid: "" }),
+      };
+
+      // Handle file uploads if present
+      const files = [];
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          files.push({
+            id: key,
+            contentType: value.type,
+            filename: value.name,
+            size: value.size,
+            data: new Uint8Array(await value.arrayBuffer()),
+          });
+        }
+      }
+      if (files.length > 0) {
+        body.files = files;
+      }
+
+      return body;
+    }
+
+    // For JSON requests, wrap in try/catch to handle invalid JSON
+    try {
+      return await request.json();
+    } catch (e) {
+      this.logger?.debug(e as unknown as string);
+      return {};
+    }
+  }
+
+  private routes = [
+    {
+      method: "POST",
+      path: "/api/events",
+      handler: async (request: Request, core: CoreSystem) => {
+        this.logger = core.logger;
+
+        try {
+          // Parse request body
+          const body = (await this.parseRequestBody(request)) as {
+            schema: Record<string, unknown>;
+            payload: Record<string, unknown>;
+            producer?: string;
+            files?: EventFile[];
+            links?: EventLink[];
+            metadata?: Record<string, unknown>;
           };
 
-          // Handle file uploads if present
-          const files = [];
-          for (const [key, value] of formData.entries()) {
-            if (value instanceof File) {
-              files.push({
-                id: key,
-                contentType: value.type,
-                filename: value.name,
-                size: value.size,
-                data: new Uint8Array(await value.arrayBuffer()),
-              });
+          // Validate request format
+          const validationResult = core.validator.validate(
+            HttpApiPlugin.requestSchema,
+            body,
+          );
+
+          if (!validationResult.isValid) {
+            return new Response(
+              JSON.stringify({
+                error: "Invalid Request Format",
+                details: core.validator.formatErrors(
+                  validationResult.errors || [],
+                ),
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+
+          // Create the event
+          try {
+            const event = await core.createEvent(body.schema, body.payload, {
+              producer: body.producer,
+              files: body.files,
+              links: body.links,
+              metadata: body.metadata,
+            });
+
+            return new Response(JSON.stringify(event), {
+              status: 201,
+              headers: { "Content-Type": "application/json" },
+            });
+          } catch (error: unknown) {
+            // Handle validation errors from event creation
+            if (
+              error instanceof Error &&
+              error.message.includes("validation failed")
+            ) {
+              this.logger?.error(error as unknown as string);
+              return new Response(
+                JSON.stringify({
+                  error: "Invalid Event Payload",
+                  details: error.message,
+                }),
+                {
+                  status: 422,
+                  headers: { "Content-Type": "application/json" },
+                },
+              );
             }
+            throw error;
           }
-          if (files.length > 0) {
-            body.files = files;
-          }
-        } else {
-          // Handle JSON body
-          body = await request.json();
+        } catch (error: unknown) {
+          console.error(error);
+          core.logger.error("Error handling request:", error);
+          return new Response(
+            JSON.stringify({ error: "Internal Server Error" }),
+            { status: 500 },
+          );
         }
+      },
+    },
+  ];
 
-        // Validate required fields
-        if (!body.schema) {
-          return new Response("Schema is required", { status: 400 });
-        }
-        if (!body.payload) {
-          return new Response("Payload is required", { status: 400 });
-        }
+  public plugin: Plugin = {
+    name: "http-api",
+    version: "1.0.0",
+    capabilities: [],
+    hooks: {
+      "http:request": (context) => {
+        const { request, core } = context;
+        if (!request) return Promise.resolve();
 
-        // Create the event
-        const event = await core.createEvent(
-          body.schema as string,
-          body.payload as Record<string, unknown>,
-          {
-            producer: body.producer as string,
-            files: body.files as EventFile[],
-            links: body.links as EventLink[],
-            metadata: body.metadata as Record<string, unknown>,
-          },
+        const url = new URL(request.url);
+        const route = this.routes.find((r) =>
+          r.method === request.method && r.path === url.pathname
         );
 
-        // Return the created event
-        return new Response(JSON.stringify(event), {
-          status: 201,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-      } catch (error) {
-        core.logger.error("Error creating event:", error);
-        return new Response("Error creating event", { status: 500 });
-      }
+        return route ? route.handler(request, core) : Promise.resolve();
+      },
     },
-  },
-];
+  };
+}
 
-export default {
-  name: "http-api",
-  version: "1.0.0",
-  capabilities: [],
-  hooks: {
-    "http:request": (context) => {
-      const { request, core } = context;
-      if (!request) {
-        core.logger.warn("Received http:request hook with no request");
-        return Promise.resolve();
-      }
-
-      const url = new URL(request.url);
-
-      // Find matching route
-      const route = routes.find(
-        (r) => r.method === request.method && r.path === url.pathname,
-      );
-
-      if (route) {
-        return route.handler(request, core);
-      }
-
-      return Promise.resolve();
-    },
-  },
-} satisfies Plugin;
+const httpApiPlugin = new HttpApiPlugin();
+export default httpApiPlugin.plugin;
