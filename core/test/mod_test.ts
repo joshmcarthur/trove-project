@@ -32,9 +32,16 @@ Deno.test("Trove", async (t) => {
   await t.step("creates and retrieves events", async () => {
     const trove = await createTestCore();
 
-    const testEvent = await trove.createEvent("test.schema", {
-      test: "data",
-    });
+    const testEvent = await trove.createEvent(
+      {
+        type: "object",
+        properties: {
+          test: { type: "string" },
+        },
+        required: ["test"],
+      },
+      { test: "data" },
+    );
 
     const retrievedEvent = await trove.getEvent(testEvent.id);
     assertEquals(retrievedEvent?.payload, { test: "data" });
@@ -64,7 +71,16 @@ Deno.test("Trove", async (t) => {
 
     await trove.registerPlugin(testPlugin);
 
-    await trove.createEvent("test.schema", { test: "data" });
+    await trove.createEvent(
+      {
+        type: "object",
+        properties: {
+          test: { type: "string" },
+        },
+        required: ["test"],
+      },
+      { test: "data" },
+    );
 
     assertEquals(storingCalled, true, "event:storing hook should be called");
     assertEquals(storedCalled, true, "event:stored hook should be called");

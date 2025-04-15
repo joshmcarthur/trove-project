@@ -73,7 +73,7 @@ export class Trove implements CoreSystem {
   }
 
   async createEvent(
-    schema: string,
+    schema: Record<string, unknown>,
     payload: Record<string, unknown>,
     options: EventCreationOptions = {},
   ): Promise<Event> {

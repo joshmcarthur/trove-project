@@ -21,11 +21,13 @@ export class MemoryEventStorage implements EventStorage {
     let events = Array.from(this.events.values());
 
     // Apply filters
-    if (query.schema) {
-      const schemas = Array.isArray(query.schema)
-        ? query.schema
-        : [query.schema];
-      events = events.filter((event) => schemas.includes(event.schema.id));
+    if (query.schemaId) {
+      const schemaIds = Array.isArray(query.schemaId)
+        ? query.schemaId
+        : [query.schemaId];
+      events = events.filter((event) =>
+        schemaIds.includes(event.schema.id as string)
+      );
     }
 
     if (query.producer) {
