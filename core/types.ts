@@ -1,3 +1,5 @@
+import { Validator } from "./validator.ts";
+
 export interface EventId {
   id: string;
   version?: number;
@@ -28,7 +30,7 @@ export interface Event {
   id: EventId;
   createdAt: string;
   producer: string;
-  schema: EventSchema;
+  schema: Record<string, unknown>;
   payload: Record<string, unknown>;
   files: EventFile[];
   links: EventLink[];
@@ -39,8 +41,6 @@ export interface HookContext {
   core: CoreSystem;
   event?: Event;
   request?: Request;
-  response?: Response;
-  schema?: EventSchema;
   state?: Record<string, unknown>;
 }
 
@@ -70,6 +70,18 @@ export interface Plugin {
 }
 
 export type HookHandler = (context: HookContext) => Promise<unknown>;
+
+export type ValidationError = {
+  path: string;
+  message: string;
+  extra?: Record<string, unknown>;
+};
+
+export interface ValidationResult<T = unknown> {
+  isValid: boolean;
+  data?: T;
+  errors?: ValidationError[];
+}
 
 export interface Logger {
   debug(message: string, ...args: unknown[]): void;
@@ -120,7 +132,7 @@ export interface StorageConfiguration {
 }
 
 export interface EventQuery {
-  schema?: string | string[];
+  schemaId?: string | string[];
   producer?: string | string[];
   timeRange?: {
     start?: string;
@@ -149,6 +161,7 @@ export interface EventCreationOptions {
 export interface CoreSystem {
   config: CoreConfig;
   logger: Logger;
+  validator: Validator;
   registerPlugin(plugin: Plugin): Promise<void>;
   getPlugin(name: string): Promise<Plugin | undefined>;
   executeHook(
@@ -156,7 +169,7 @@ export interface CoreSystem {
     context: Partial<HookContext>,
   ): Promise<HookResult[]>;
   createEvent(
-    schema: string,
+    schema: Record<string, unknown>,
     payload: Record<string, unknown>,
     options?: EventCreationOptions,
   ): Promise<Event>;

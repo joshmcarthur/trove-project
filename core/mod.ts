@@ -13,10 +13,12 @@ import {
 import { HookSystem } from "./hooks.ts";
 import { PluginSystem } from "./plugins.ts";
 import { StorageManager } from "./storage.ts";
+import { Validator } from "./validator.ts";
 
 export class Trove implements CoreSystem {
   public readonly config: CoreConfig;
   public readonly logger: Logger;
+  public readonly validator: Validator;
 
   private readonly plugins: PluginSystem;
   private hooks: HookSystem;
@@ -26,6 +28,7 @@ export class Trove implements CoreSystem {
   constructor(config: CoreConfig) {
     this.config = config;
     this.logger = config.logger || console;
+    this.validator = new Validator();
 
     this.hooks = new HookSystem(this.logger);
     this.plugins = new PluginSystem(this, this.hooks, this.logger);
@@ -70,7 +73,7 @@ export class Trove implements CoreSystem {
   }
 
   async createEvent(
-    schema: string,
+    schema: Record<string, unknown>,
     payload: Record<string, unknown>,
     options: EventCreationOptions = {},
   ): Promise<Event> {
@@ -88,12 +91,34 @@ export class Trove implements CoreSystem {
       id: { id: crypto.randomUUID() },
       createdAt: new Date().toISOString(),
       producer: options.producer || "core",
-      schema: { id: schema, version: "1.0" },
+      schema,
       payload,
       files: options.files || [],
       links: options.links || [],
       metadata: options.metadata,
     };
+
+    await this.executeHook("event:validating", { core: this, event });
+    const validationResult = this.validator.validate(
+      event.schema,
+      event.payload,
+    );
+
+    if (!validationResult.isValid) {
+      throw new Error(
+        `Event validation failed: ${
+          this.validator.formatErrors(validationResult.errors || [])
+        }`,
+        {
+          cause: {
+            event,
+            errors: validationResult.errors,
+          },
+        },
+      );
+    }
+
+    await this.hooks.executeHook("event:validated", { core: this, event });
 
     // Execute pre-save hook
     await this.hooks.executeHook("event:storing", { core: this, event });
