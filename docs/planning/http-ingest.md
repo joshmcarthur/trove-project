@@ -6,7 +6,7 @@ nav_order: 3
 
 # HTTP ingest
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 1 — Journal + module core\
 **Spec:** [Sources §6](../spec.md#6-sources), [Build order §11.1](../spec.md#11-build-order--validation-plan)\
 **Package:** external source module + `internal/modules`
@@ -40,10 +40,10 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 
 ## Acceptance criteria
 
-- [ ] `POST /ingest/shortcuts` with JSON creates journal event
-- [ ] `source` field matches path segment
-- [ ] Invalid JSON returns 4xx without journal write
-- [ ] Module runs under go-plugin supervision
+- [x] `POST /ingest/shortcuts` with JSON creates journal event
+- [x] `source` field matches path segment
+- [x] Invalid JSON returns 4xx without journal write
+- [x] Module runs under go-plugin supervision
 
 ## Dependencies
 

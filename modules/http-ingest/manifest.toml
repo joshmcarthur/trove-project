@@ -1,0 +1,5 @@
+name     = "http-ingest"
+version  = "1.0"
+kind     = "source"
+provides = ["http.ingest.received"]
+listen   = ":8080"
