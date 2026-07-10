@@ -63,12 +63,26 @@ Content-Type: application/json
 ## Network and auth
 
 v0 HTTP ingest has **no authentication** — see
-[open items](../open-items.md). For a home server, common setups are:
+[open items](../open-items.md) and [network auth planning](../planning/auth.md). For a home server, common setups are:
 
 - **Local network** — `http://192.168.x.x:8080/ingest/shortcuts` (Wi‑Fi only;
   Shortcuts may block plain HTTP on cellular).
 - **Tailscale** — HTTPS via your tailnet hostname (recommended for phone capture).
 - **Public HTTPS** — reverse proxy with TLS in front of `:8080`.
+
+See [network auth planning](../planning/auth.md) for auth options once exposing
+beyond a trusted tailnet.
+
+## Photo attachments (Planned)
+
+Once the [blob store](../planning/blobs.md) lands, the share-sheet flow for
+photos will be:
+
+1. `PUT /blobs` with image bytes → receive `{ "blob_ref": "sha256-..." }`
+2. `POST /ingest/shortcuts` with JSON including `blob_ref` and metadata
+   (`type`, `title`, `content_type`, etc.)
+
+JSON-only capture works today. Binary inline upload is not supported.
 
 ## Event type conventions
 
@@ -118,12 +132,11 @@ Build your own Shortcut if you prefer full control.
 
 ## Limitations
 
-- **`blob_ref`** is accepted by ingest but there is no blob upload endpoint yet —
-  store metadata only for photos/audio until the [blob store](../planning/blobs.md)
-  lands.
+- **`blob_ref`** is accepted by ingest but blob upload is not implemented yet —
+  see [Photo attachments (Planned)](#photo-attachments-planned) above.
 - **10 MiB** request body limit (`max_body_bytes` in HTTP ingest manifest).
 - **Photos in Share Sheet** — importable Shortcut captures text/URL metadata;
-  binary inline upload is deferred.
+  full photo upload flow is Planned with the blob store.
 
 ## Verify capture
 
@@ -135,7 +148,8 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 # expect 204
 ```
 
-Once MCP is connected, use `search_events` to find captured notes.
+Once MCP is connected, use `search_events` to find captured notes. The MCP query
+server is **Supported** — see [MCP query planning](../planning/mcp-query.md).
 
 ## Next steps
 

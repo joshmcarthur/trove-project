@@ -14,14 +14,15 @@ out.
 > Capture broadly, store simply, converse to retrieve.
 
 The project is migrating from an earlier Deno prototype to Go. Today you can run
-`trove`, capture events via the HTTP ingest module, and query the journal through
-the MCP server. See the [roadmap](./roadmap.md) for status.
+`trove`, capture events via the HTTP ingest and MQTT source modules, and query
+the journal through the MCP server. See the [roadmap](./roadmap.md) for status.
 
 ## What's next
 
-Milestones 1 (journal, module runtime, HTTP ingest, config) and 3 (MCP query) are
-**Supported**. Current focus: [iOS Shortcuts](./getting-started/ios-shortcuts.md)
-capture and the two-week live test. Next feature build: [MQTT source](./planning/mqtt-source.md).
+Milestones 1, 2, and 3 (journal, module runtime, HTTP ingest, MQTT source,
+config, MCP query) are **Supported**. Current focus: [blob store](./planning/blobs.md)
+for photo/attachment capture and the two-week live test with
+[iOS Shortcuts](./getting-started/ios-shortcuts.md).
 
 ## Documentation
 

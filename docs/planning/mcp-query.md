@@ -32,12 +32,11 @@ MCP tools map 1:1 onto these methods.
 
 ## Implementation notes
 
-- Implement RPC layer first; MCP server is thin wrapper
-- `search_events`: FTS5 keyword search initially
-- `summarize_range`: counts by type, notable events — avoid dumping raw rows
-- Listen on `[mcp].listen` from config
-- `trove` starts the MCP HTTP server on startup; all four RPC methods and MCP
-  tools are implemented in `internal/query`. See [MCP client setup](../getting-started/mcp-client.md).
+- RPC layer and MCP server implemented in `internal/query`
+- `search_events`: FTS5 keyword search
+- `summarize_range`: counts by type, notable events — avoids dumping raw rows
+- Listens on `[mcp].listen` from config; `trove` starts the MCP HTTP server on
+  startup. See [MCP client setup](../getting-started/mcp-client.md).
 
 ## Acceptance criteria
 
@@ -54,5 +53,5 @@ MCP tools map 1:1 onto these methods.
 
 ## Open questions
 
-- Auth for MCP endpoint — [open-items.md](../open-items.md)
+- Auth for MCP endpoint — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - `summarize_range` write-time vs query-time aggregation — [open-items.md](../open-items.md)

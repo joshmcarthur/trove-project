@@ -78,6 +78,6 @@ Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339)
 
 ## Open questions
 
-- Auth model (Tailscale-only?) — [open-items.md](../open-items.md)
-- Blob upload path for HTTP ingest (dedicated `PUT /blobs` vs multipart) — depends on
-  [blob store](./blobs.md), which is deferred until after the live test
+- Auth model — [auth.md](./auth.md), [open-items.md](../open-items.md)
+- Blob upload: `PUT /blobs` endpoint returning `blob_ref`, consumed by ingest
+  POST — see [blobs](./blobs.md) (Planned)

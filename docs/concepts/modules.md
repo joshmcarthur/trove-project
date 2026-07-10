@@ -55,6 +55,9 @@ Sink      : core calls Handle(event) -> ack
 All kinds : core calls Healthcheck() periodically
 ```
 
+At runtime today, only **source** modules are started. Processor and sink kinds
+are accepted in manifests but not wired yet.
+
 ## Implementation
 
 - [Module runtime](../planning/module-runtime.md) — milestone 1

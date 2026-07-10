@@ -21,10 +21,11 @@ make build
 ```
 
 The config loader (`internal/config`), SQLite journal (`internal/journal`), module
-runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), and MCP
-query server (`internal/query`) are implemented. With a valid config file, `trove`
-opens the journal, discovers source modules, supervises them, and starts the MCP
-query server until interrupted:
+runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), MQTT
+source module (`modules/mqtt-source`), and MCP query server (`internal/query`)
+are implemented. With a valid config file, `trove` opens the journal, discovers
+source modules, supervises them, and starts the MCP query server until
+interrupted:
 
 ```bash
 make build
@@ -54,10 +55,18 @@ Connect Cursor (or another MCP client) to `[mcp].listen` — see
 [MCP client setup](./mcp-client.md). Four tools are available: `search_events`,
 `get_event`, `get_events_by_type`, and `summarize_range`.
 
+MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.toml`
+(default broker `tcp://localhost:1883`, topics `["home/#"]`). See
+[MQTT source planning](../planning/mqtt-source.md) and
+[building modules](../building-modules.md).
+
 ## What's coming
 
-The [MQTT source module](../planning/mqtt-source.md) and two-week live test are
-next on the [roadmap](../roadmap.md).
+- [Blob store](../planning/blobs.md) — photo/attachment upload for iOS Shortcuts
+  share sheet (`PUT /blobs` then ingest with `blob_ref`)
+- Two-week live test — capture recipes and conversational retrieval validation
+
+JSON-only capture works today. Photo attachments require the blob store (Planned).
 
 ## Capture events
 

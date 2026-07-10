@@ -6,10 +6,10 @@ nav_order: 5
 
 # MQTT source
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 2\
 **Spec:** [Sources §6](../spec.md#6-sources), [Build order §11.2](../spec.md#11-build-order--validation-plan)\
-**Package:** external source module
+**Package:** `modules/mqtt-source`
 
 ## Goal
 

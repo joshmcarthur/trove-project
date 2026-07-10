@@ -34,7 +34,8 @@ minimum.
 ## Why SQLite
 
 Single file, durable, queryable on a Pi without extra services. Fits the
-single-user, single-journal model.
+single-user, single-journal model. Alternative journal backends (Postgres, etc.)
+are a [non-goal](../non-goals.md).
 
 ## Implementation
 

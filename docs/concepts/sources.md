@@ -40,6 +40,6 @@ Realized as RPC over the module socket (§8), not an in-process Go interface.
 
 ## Planning pages
 
-- [HTTP ingest](../planning/http-ingest.md) — milestone 1
-- [MQTT source](../planning/mqtt-source.md) — milestone 2
+- [HTTP ingest](../planning/http-ingest.md) — milestone 1, **Supported**
+- [MQTT source](../planning/mqtt-source.md) — milestone 2, **Supported**
 - [HA source](../planning/ha-source.md) — later
