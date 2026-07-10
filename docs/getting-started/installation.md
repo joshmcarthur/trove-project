@@ -6,9 +6,10 @@ nav_order: 1
 
 # Installing Trove
 
-Trove ships as a single Go binary (and Docker image). The CLI scaffold is
-available today; full ingest and query features are on the
-[roadmap](../roadmap.md).
+Trove ships as a single Go binary (and Docker image). With a valid config file,
+`trove` opens the journal, discovers source modules, and supervises them. HTTP
+ingest capture works today — see [Quick Start](./quick-start.md) and
+[iOS Shortcuts](./ios-shortcuts.md).
 
 ## From releases
 

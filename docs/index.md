@@ -13,13 +13,16 @@ out.
 
 > Capture broadly, store simply, converse to retrieve.
 
-The project is migrating from an earlier Deno prototype to Go. The CLI scaffold
-exists today; feature work follows the [roadmap](./roadmap.md).
+The project is migrating from an earlier Deno prototype to Go. Today you can run
+`trove`, capture events via the HTTP ingest module, and query the journal through
+a partial MCP server. See the [roadmap](./roadmap.md) for status.
 
 ## What's next
 
-See the [roadmap](./roadmap.md) for what is **Supported** vs **Planned**. Milestone
-1 is the SQLite journal, module runtime, HTTP ingest, and TOML config.
+Milestone 1 (journal, module runtime, HTTP ingest, config) is **Supported**.
+Current focus: finish MCP query (`summarize_range`, client validation) and set up
+[iOS Shortcuts](./getting-started/ios-shortcuts.md) capture for the two-week live
+test.
 
 ## Documentation
 

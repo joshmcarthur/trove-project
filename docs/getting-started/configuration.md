@@ -10,6 +10,10 @@ Trove uses TOML (not YAML). Full detail is in [spec §10](../spec.md#10-configur
 
 **Status:** Supported — see [planning/config.md](../planning/config.md).
 
+> **Not yet active:** `[blobs]` and `[modules.remote]` are accepted by the config
+> loader but have no runtime effect until the [blob store](../planning/blobs.md)
+> and [remote modules](../planning/remote-modules.md) milestones land.
+
 ## Example
 
 ```toml

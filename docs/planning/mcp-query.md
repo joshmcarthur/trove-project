@@ -36,6 +36,8 @@ MCP tools map 1:1 onto these methods.
 - `search_events`: FTS5 keyword search initially
 - `summarize_range`: counts by type, notable events — avoid dumping raw rows
 - Listen on `[mcp].listen` from config
+- `trove` already starts the MCP HTTP server on startup; `search_events` and
+  `get_event` are implemented and tested in `internal/query`
 
 ## Acceptance criteria
 
