@@ -328,3 +328,197 @@ func openTestStore(t *testing.T) *Store {
 	t.Cleanup(func() { _ = store.Close() })
 	return store
 }
+
+func testEvent(id string, when time.Time, typ, source string) Event {
+	return Event{
+		ID:      id,
+		Time:    when,
+		Type:    typ,
+		Source:  source,
+		Payload: json.RawMessage(`{"v":1}`),
+	}
+}
+
+func recvEvent(t *testing.T, ch <-chan Event, timeout time.Duration) (Event, bool) {
+	t.Helper()
+
+	select {
+	case e, ok := <-ch:
+		return e, ok
+	case <-time.After(timeout):
+		return Event{}, false
+	}
+}
+
+func TestSubscribeReceivesMatchingEvent(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	ch, err := store.Subscribe(ctx, Filter{TypePrefix: "mqtt."})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	want := testEvent("01JEVT00000000000000000001", when, "mqtt.sensor.temp", "sensor-a")
+	if err := store.Append(ctx, want); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got, ok := recvEvent(t, ch, time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for subscribed event")
+	}
+	if got.ID != want.ID {
+		t.Errorf("ID = %q, want %q", got.ID, want.ID)
+	}
+}
+
+func TestSubscribeFiltersEvents(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	ch, err := store.Subscribe(ctx, Filter{
+		TypePrefix: "mqtt.",
+		Source:     "sensor-a",
+	})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	events := []Event{
+		testEvent("01JEVT00000000000000000001", when, "ha.light.on", "sensor-a"),
+		testEvent("01JEVT00000000000000000002", when, "mqtt.sensor.temp", "sensor-b"),
+		testEvent("01JEVT00000000000000000003", when, "mqtt.sensor.temp", "sensor-a"),
+	}
+	for _, e := range events {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	got, ok := recvEvent(t, ch, time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for filtered event")
+	}
+	if got.ID != events[2].ID {
+		t.Errorf("ID = %q, want %q", got.ID, events[2].ID)
+	}
+
+	if _, ok := recvEvent(t, ch, 100*time.Millisecond); ok {
+		t.Fatal("received unexpected extra event")
+	}
+}
+
+func TestSubscribeNoReplay(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	before := testEvent("01JEVT00000000000000000001", when, "mqtt.sensor.temp", "sensor-a")
+	if err := store.Append(ctx, before); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	ch, err := store.Subscribe(ctx, Filter{})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	after := testEvent("01JEVT00000000000000000002", when.Add(time.Minute), "mqtt.sensor.humidity", "sensor-a")
+	if err := store.Append(ctx, after); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got, ok := recvEvent(t, ch, time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for post-subscribe event")
+	}
+	if got.ID != after.ID {
+		t.Errorf("ID = %q, want %q", got.ID, after.ID)
+	}
+
+	if _, ok := recvEvent(t, ch, 100*time.Millisecond); ok {
+		t.Fatal("received replayed historical event")
+	}
+}
+
+func TestSubscribeContextCancel(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := store.Subscribe(ctx, Filter{})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	cancel()
+
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("channel still open after context cancellation")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for channel close")
+	}
+}
+
+func TestSubscribeMultipleSubscribers(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	chA, err := store.Subscribe(ctx, Filter{TypePrefix: "mqtt."})
+	if err != nil {
+		t.Fatalf("Subscribe(A) error = %v", err)
+	}
+	chB, err := store.Subscribe(ctx, Filter{Source: "sensor-b"})
+	if err != nil {
+		t.Fatalf("Subscribe(B) error = %v", err)
+	}
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	events := []Event{
+		testEvent("01JEVT00000000000000000001", when, "mqtt.sensor.temp", "sensor-a"),
+		testEvent("01JEVT00000000000000000002", when.Add(time.Minute), "ha.light.on", "sensor-b"),
+	}
+	for _, e := range events {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	gotA, ok := recvEvent(t, chA, time.Second)
+	if !ok {
+		t.Fatal("subscriber A timed out")
+	}
+	if gotA.ID != events[0].ID {
+		t.Errorf("subscriber A ID = %q, want %q", gotA.ID, events[0].ID)
+	}
+
+	gotB, ok := recvEvent(t, chB, time.Second)
+	if !ok {
+		t.Fatal("subscriber B timed out")
+	}
+	if gotB.ID != events[1].ID {
+		t.Errorf("subscriber B ID = %q, want %q", gotB.ID, events[1].ID)
+	}
+
+	if _, ok := recvEvent(t, chA, 100*time.Millisecond); ok {
+		t.Fatal("subscriber A received unexpected event")
+	}
+	if _, ok := recvEvent(t, chB, 100*time.Millisecond); ok {
+		t.Fatal("subscriber B received unexpected event")
+	}
+}
