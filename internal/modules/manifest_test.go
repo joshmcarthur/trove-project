@@ -10,9 +10,9 @@ func TestParseManifestValid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		file  string
-		want  Manifest
+		name string
+		file string
+		want Manifest
 	}{
 		{
 			name: "source spec example",
