@@ -17,7 +17,7 @@ Install under a configured search path:
 ```
 ~/.local/lib/trove/modules/my-source/
     manifest.toml
-    my-source          # executable
+    module               # executable
 ```
 
 ## Manifest
@@ -38,8 +38,8 @@ The module process speaks RPC to the core:
 - **Emit(event)** — stream events to the journal (sources)
 - **Healthcheck()** — periodic liveness
 
-Local modules use hashicorp/go-plugin; the core discovers the binary from
-`manifest.toml` and manages the subprocess.
+Local modules use hashicorp/go-plugin; the core discovers the binary named
+`module` from `manifest.toml` and manages the subprocess.
 
 ## Module-specific config
 

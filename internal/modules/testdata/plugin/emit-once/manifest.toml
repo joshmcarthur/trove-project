@@ -1,0 +1,4 @@
+name     = "emit-once"
+version  = "0.1.0"
+kind     = "source"
+provides = ["test.emit.once"]
