@@ -19,10 +19,7 @@ func Serve(ctx context.Context, listen string, svc *Service) error {
 		return fmt.Errorf("query: service is required")
 	}
 
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, nil)
+	handler := newMCPHandler(svc)
 
 	httpServer := &http.Server{
 		Addr:    listen,
@@ -43,6 +40,13 @@ func Serve(ctx context.Context, listen string, svc *Service) error {
 		return nil
 	}
 	return err
+}
+
+func newMCPHandler(svc *Service) http.Handler {
+	server := newMCPServer(svc)
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
 }
 
 func newMCPServer(svc *Service) *mcp.Server {

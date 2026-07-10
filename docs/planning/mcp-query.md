@@ -6,7 +6,7 @@ nav_order: 6
 
 # MCP query server
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 3\
 **Spec:** [Query §9](../spec.md#9-query-interface-mcp-over-rpc), [Build order §11.3](../spec.md#11-build-order--validation-plan)\
 **Package:** `internal/query`
@@ -36,8 +36,8 @@ MCP tools map 1:1 onto these methods.
 - `search_events`: FTS5 keyword search initially
 - `summarize_range`: counts by type, notable events — avoid dumping raw rows
 - Listen on `[mcp].listen` from config
-- `trove` already starts the MCP HTTP server on startup; `search_events` and
-  `get_event` are implemented and tested in `internal/query`
+- `trove` starts the MCP HTTP server on startup; all four RPC methods and MCP
+  tools are implemented in `internal/query`. See [MCP client setup](../getting-started/mcp-client.md).
 
 ## Acceptance criteria
 
@@ -45,7 +45,7 @@ MCP tools map 1:1 onto these methods.
 - [x] MCP `get_event` resolves by ULID
 - [x] `summarize_range` returns aggregated summary for a time window
 - [x] MCP `get_events_by_type` returns events matching exact type
-- [ ] OpenClaw or Cursor can connect as MCP client
+- [x] OpenClaw or Cursor can connect as MCP client
 
 ## Dependencies
 

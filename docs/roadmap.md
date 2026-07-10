@@ -9,11 +9,10 @@ Living plan for Trove development. Update this page when a feature lands.
 
 ## Current focus
 
-**Milestone 3 — MCP query + live-test capture.** Milestone 1 (journal, module
-runtime, HTTP ingest, config) is complete. Finish
-[MCP query](./planning/mcp-query.md) (`summarize_range`, client validation) and
-set up capture recipes — especially [iOS Shortcuts](./getting-started/ios-shortcuts.md)
-— for the two-week live test (spec §11.4).
+**Milestone 4 — live-test capture.** Milestones 1 (journal, module runtime,
+HTTP ingest, config) and 3 (MCP query) are complete. Set up capture recipes —
+especially [iOS Shortcuts](./getting-started/ios-shortcuts.md) — and run the
+two-week live test (spec §11.4). Next feature build: [MQTT source](./planning/mqtt-source.md).
 
 ## Milestone sequence
 
@@ -23,7 +22,7 @@ Build order from spec §11:
 |-------|-------|--------|
 | 1 | SQLite journal + module-loading core + HTTP ingest | Supported |
 | 2 | MQTT source module | Planned |
-| 3 | Minimal MCP query server | Planned |
+| 3 | Minimal MCP query server | Supported |
 | 4 | Two-week live test | Planned |
 | 5 | Blob store, HA tap, embeddings, remote modules, processors/sinks | Later |
 
@@ -36,7 +35,7 @@ Build order from spec §11:
 | Generic HTTP ingest | Supported | §6, §11.1 | [http-ingest](./planning/http-ingest.md) | module + `internal/modules` |
 | Module discovery (go-plugin) | Supported | §8 | [module-runtime](./planning/module-runtime.md) | `internal/modules` |
 | MQTT source | Planned (subscribe + emit) | §6, §11.2 | [mqtt-source](./planning/mqtt-source.md) | `modules/mqtt-source` |
-| MCP query server | Planned | §9, §11.3 | [mcp-query](./planning/mcp-query.md) | `internal/query` |
+| MCP query server | Supported | §9, §11.3 | [mcp-query](./planning/mcp-query.md) | `internal/query` |
 | TOML config | Supported | §10 | [config](./planning/config.md) | `internal/config` |
 | Blob store (filesystem) | Later | §5 | [blobs](./planning/blobs.md) | `internal/blob` |
 | HA WebSocket tap | Later | §6 | [ha-source](./planning/ha-source.md) | external module |

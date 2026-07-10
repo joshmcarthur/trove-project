@@ -15,14 +15,13 @@ out.
 
 The project is migrating from an earlier Deno prototype to Go. Today you can run
 `trove`, capture events via the HTTP ingest module, and query the journal through
-a partial MCP server. See the [roadmap](./roadmap.md) for status.
+the MCP server. See the [roadmap](./roadmap.md) for status.
 
 ## What's next
 
-Milestone 1 (journal, module runtime, HTTP ingest, config) is **Supported**.
-Current focus: finish MCP query (`summarize_range`, client validation) and set up
-[iOS Shortcuts](./getting-started/ios-shortcuts.md) capture for the two-week live
-test.
+Milestones 1 (journal, module runtime, HTTP ingest, config) and 3 (MCP query) are
+**Supported**. Current focus: [iOS Shortcuts](./getting-started/ios-shortcuts.md)
+capture and the two-week live test. Next feature build: [MQTT source](./planning/mqtt-source.md).
 
 ## Documentation
 

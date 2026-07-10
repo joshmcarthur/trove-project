@@ -31,4 +31,4 @@ embeddings land.
 
 ## Implementation
 
-**Status:** Planned — [planning/mcp-query.md](../planning/mcp-query.md) (milestone 3)
+**Status:** Supported — [planning/mcp-query.md](../planning/mcp-query.md) (milestone 3)
