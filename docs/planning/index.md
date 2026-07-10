@@ -17,11 +17,11 @@ listed package, update the [roadmap](./roadmap.md).
 | [HTTP ingest](./http-ingest.md) | external module |
 | [Config loader](./config.md) | `internal/config` |
 
-## Milestone 2 — MQTT + blob storage
+## Milestone 2 — MQTT (complete) + blob storage
 
 | Page | Package |
 |------|---------|
-| [MQTT source](./mqtt-source.md) | external module |
+| [MQTT source](./mqtt-source.md) | `modules/mqtt-source` |
 | [Blob store](./blobs.md) | `internal/blob` |
 
 ## Milestone 3 — MCP query (complete)

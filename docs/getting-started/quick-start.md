@@ -21,10 +21,11 @@ make build
 ```
 
 The config loader (`internal/config`), SQLite journal (`internal/journal`), module
-runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), and MCP
-query server (`internal/query`) are implemented. With a valid config file,
-`trove` opens the journal, discovers source modules, supervises them, and starts
-the MCP query server until interrupted:
+runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), MQTT
+source module (`modules/mqtt-source`), and MCP query server (`internal/query`)
+are implemented. With a valid config file, `trove` opens the journal, discovers
+source modules, supervises them, and starts the MCP query server until
+interrupted:
 
 ```bash
 make build
@@ -52,9 +53,13 @@ The MCP server listens on `[mcp].listen` (default `:8081`) and exposes four tool
 `search_events`, `get_event`, `get_events_by_type`, and `summarize_range`. See
 [MCP query planning](../planning/mcp-query.md).
 
+MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.toml`
+(default broker `tcp://localhost:1883`, topics `["home/#"]`). See
+[MQTT source planning](../planning/mqtt-source.md) and
+[building modules](../building-modules.md).
+
 ## What's coming
 
-- [MQTT source](../planning/mqtt-source.md) — subscribe to Mosquitto topics
 - [Blob store](../planning/blobs.md) — photo/attachment upload for iOS Shortcuts
   share sheet (`PUT /blobs` then ingest with `blob_ref`)
 - Two-week live test — capture recipes and conversational retrieval validation

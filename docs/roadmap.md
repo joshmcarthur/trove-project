@@ -9,11 +9,10 @@ Living plan for Trove development. Update this page when a feature lands.
 
 ## Current focus
 
-**Milestone 2 — MQTT source, blob storage, and live-test capture.** Milestones 1
-and 3 are complete. Build [MQTT source](./planning/mqtt-source.md) and
-[blob store](./planning/blobs.md) (filesystem backend + HTTP upload for photos
-from [iOS Shortcuts](./getting-started/ios-shortcuts.md)), then run the
-two-week live test (spec §11.4).
+**Milestone 2b — blob storage and live-test capture.** Milestones 1, 2, and 3
+are complete. Build [blob store](./planning/blobs.md) (filesystem backend + HTTP
+upload for photos from [iOS Shortcuts](./getting-started/ios-shortcuts.md)), then
+run the two-week live test (spec §11.4).
 
 ## Milestone sequence
 
@@ -22,7 +21,7 @@ Build order from spec §11:
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | SQLite journal + module-loading core + HTTP ingest | Supported |
-| 2 | MQTT source module | Planned |
+| 2 | MQTT source module | Supported |
 | 2b | Blob store (filesystem + HTTP upload) | Planned |
 | 3 | Minimal MCP query server | Supported |
 | 4 | Two-week live test | Planned |
@@ -36,10 +35,10 @@ Build order from spec §11:
 | SQLite journal | Supported | §4 | [journal](./planning/journal.md) | `internal/journal` |
 | Generic HTTP ingest | Supported | §6, §11.1 | [http-ingest](./planning/http-ingest.md) | module + `internal/modules` |
 | Module discovery (go-plugin) | Supported | §8 | [module-runtime](./planning/module-runtime.md) | `internal/modules` |
+| MQTT source | Supported | §6, §11.2 | [mqtt-source](./planning/mqtt-source.md) | `modules/mqtt-source` |
 | MCP query server | Supported | §9, §11.3 | [mcp-query](./planning/mcp-query.md) | `internal/query` |
 | TOML config | Supported | §10 | [config](./planning/config.md) | `internal/config` |
 | iOS Shortcuts capture recipes | Supported | §6 | [iOS Shortcuts](./getting-started/ios-shortcuts.md) | `examples/ios-shortcuts/` |
-| MQTT source | Planned | §6, §11.2 | [mqtt-source](./planning/mqtt-source.md) | external module |
 | Blob store (filesystem) | Planned | §5 | [blobs](./planning/blobs.md) | `internal/blob` |
 | Network auth (HTTP ingest + MCP) | Open | §13 | [auth](./planning/auth.md) | `internal/config` + modules |
 | Journal retention / pruning | Open | §13 | [journal](./planning/journal.md) | `internal/journal` |

@@ -22,8 +22,9 @@ Install under a configured search path:
 ```
 
 For local development, `make build` also builds the first-party HTTP ingest
-module into `modules/http-ingest/`. Point `[modules].paths` at the repo `modules/`
-directory (the parent of each module folder).
+and MQTT source modules into `modules/http-ingest/` and `modules/mqtt-source/`.
+Point `[modules].paths` at the repo `modules/` directory (the parent of each
+module folder).
 
 ## Manifest
 
@@ -58,7 +59,7 @@ own config (alongside or inside `manifest.toml`), not in the core TOML.
 | Module | Location | Planning page |
 |--------|----------|---------------|
 | HTTP ingest | `modules/http-ingest/` | [http-ingest](./planning/http-ingest.md) |
-| MQTT | external | [mqtt-source](./planning/mqtt-source.md) |
+| MQTT source | `modules/mqtt-source/` | [mqtt-source](./planning/mqtt-source.md) |
 | Home Assistant | external | [ha-source](./planning/ha-source.md) |
 
 ### HTTP ingest
@@ -75,6 +76,16 @@ ingest payload.
 
 See [iOS Shortcuts](../getting-started/ios-shortcuts.md) for importable capture
 Shortcuts that POST to this endpoint.
+
+### MQTT source
+
+After `make build`, configure broker and topics in
+`modules/mqtt-source/manifest.toml` (default broker `tcp://localhost:1883`,
+topics `["home/#"]`). Add `modules/` to `[modules].paths` and start `trove`.
+Each MQTT message becomes a journal event with `type`
+`mqtt.<topic>.received` (slashes become dots), `source` set to the topic, and
+`payload.metadata.topic` preserving the original MQTT topic, with the MQTT
+body in `payload.message` (JSON) or `payload.raw` (non-JSON).
 
 ## Publishing
 
