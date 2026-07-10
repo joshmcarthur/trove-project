@@ -141,8 +141,8 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 	if events[0].Source != "home/sensor/temp" {
 		t.Errorf("Source = %q, want home/sensor/temp", events[0].Source)
 	}
-	if string(events[0].Payload) != `{"metadata":{"topic":"home/sensor/temp"},"v":21.5}` {
-		t.Errorf("Payload = %s, want metadata.topic and v", events[0].Payload)
+	if string(events[0].Payload) != `{"message":{"v":21.5},"metadata":{"topic":"home/sensor/temp"}}` {
+		t.Errorf("Payload = %s, want message and metadata.topic", events[0].Payload)
 	}
 
 	cancel()
