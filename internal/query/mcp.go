@@ -105,6 +105,34 @@ func newMCPServer(svc *Service) *mcp.Server {
 		}, nil, nil
 	})
 
+	type summarizeRangeParams struct {
+		TimeFrom string `json:"time_from" jsonschema:"required,RFC3339 start of time range"`
+		TimeTo   string `json:"time_to" jsonschema:"required,RFC3339 end of time range"`
+	}
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "summarize_range",
+		Description: "Return aggregated event counts by type and notable events for a time window",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, params summarizeRangeParams) (*mcp.CallToolResult, any, error) {
+		timeFrom, timeTo, err := parseRequiredTimeRange(params.TimeFrom, params.TimeTo)
+		if err != nil {
+			return nil, nil, err
+		}
+		summary, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+		if err != nil {
+			return nil, nil, err
+		}
+		data, err := json.Marshal(summary)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: string(data)},
+			},
+		}, nil, nil
+	})
+
 	return server
 }
 
@@ -135,4 +163,28 @@ func parseOptionalRFC3339(s string) (*time.Time, error) {
 		return nil, fmt.Errorf("query: parse time %q: %w", s, err)
 	}
 	return &t, nil
+}
+
+func parseRequiredRFC3339(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, fmt.Errorf("query: time is required")
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("query: parse time %q: %w", s, err)
+	}
+	return t, nil
+}
+
+func parseRequiredTimeRange(timeFrom, timeTo string) (time.Time, time.Time, error) {
+	from, err := parseRequiredRFC3339(timeFrom)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	to, err := parseRequiredRFC3339(timeTo)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return from, to, nil
 }

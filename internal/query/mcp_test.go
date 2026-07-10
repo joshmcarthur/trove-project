@@ -219,3 +219,109 @@ func TestMCPSearchEventsEmptyQuery(t *testing.T) {
 		t.Fatalf("CallTool() = %#v, want tool error", result)
 	}
 }
+
+func TestMCPSummarizeRange(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	want := journal.Event{
+		ID:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		Time:    when,
+		Type:    "http.ingest.received",
+		Source:  "shortcuts",
+		Payload: json.RawMessage(`{"text":"hello"}`),
+	}
+	if err := store.Append(ctx, want); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	svc := &Service{Journal: store}
+	server := newMCPServer(svc)
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	timeFrom := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	timeTo := time.Date(2026, 7, 10, 23, 59, 59, 0, time.UTC).Format(time.RFC3339)
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "summarize_range",
+		Arguments: map[string]any{
+			"time_from": timeFrom,
+			"time_to":   timeTo,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("CallTool() returned tool error: %#v", result)
+	}
+
+	var got Summary
+	for _, content := range result.Content {
+		text, ok := content.(*mcp.TextContent)
+		if !ok {
+			continue
+		}
+		if err := json.Unmarshal([]byte(text.Text), &got); err != nil {
+			t.Fatalf("unmarshal tool output: %v", err)
+		}
+		break
+	}
+	if got.Total != 1 {
+		t.Errorf("Total = %d, want 1", got.Total)
+	}
+	if got.ByType["http.ingest.received"] != 1 {
+		t.Errorf("ByType[http.ingest.received] = %d, want 1", got.ByType["http.ingest.received"])
+	}
+	if len(got.Notable) != 1 || got.Notable[0].ID != want.ID {
+		t.Errorf("Notable = %#v, want event %q", got.Notable, want.ID)
+	}
+}
+
+func TestMCPSummarizeRangeInvalidRange(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc := &Service{Journal: openTestJournal(t)}
+	server := newMCPServer(svc)
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "summarize_range",
+		Arguments: map[string]any{
+			"time_from": time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC).Format(time.RFC3339),
+			"time_to":   time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if !result.IsError {
+		t.Fatalf("CallTool() = %#v, want tool error", result)
+	}
+}
