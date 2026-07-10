@@ -84,7 +84,8 @@ After `make build`, configure broker and topics in
 topics `["home/#"]`). Add `modules/` to `[modules].paths` and start `trove`.
 Each MQTT message becomes a journal event with `type`
 `mqtt.<topic>.received` (slashes become dots), `source` set to the topic, and
-`payload.metadata.topic` preserving the original MQTT topic.
+`payload.metadata.topic` preserving the original MQTT topic, with the MQTT
+body in `payload.message` (JSON) or `payload.raw` (non-JSON).
 
 ## Publishing
 

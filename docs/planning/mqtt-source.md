@@ -25,8 +25,8 @@ becomes `mqtt.home.sensor.temp.received`.
 ## Implementation notes
 
 - Module config: broker URL, client id, topics, QoS, credentials
-- Payload: raw message bytes as JSON string or parsed JSON when valid; always
-  includes `metadata.topic` with the original MQTT topic
+- Payload: envelope with `metadata.topic` (original MQTT topic) and either
+  `message` (valid JSON) or `raw` (non-JSON bytes)
 - `source`: topic or configured device id
 - Reconnect with backoff
 

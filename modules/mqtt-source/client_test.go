@@ -40,12 +40,12 @@ func TestBuildPayload(t *testing.T) {
 		{
 			name:    "valid json object",
 			payload: []byte(`{"v":21.5}`),
-			want:    `{"metadata":{"topic":"home/sensor/temp"},"v":21.5}`,
+			want:    `{"message":{"v":21.5},"metadata":{"topic":"home/sensor/temp"}}`,
 		},
 		{
-			name:    "valid json object preserves existing metadata",
+			name:    "valid json object preserves original content",
 			payload: []byte(`{"metadata":{"device":"node-1"},"v":21.5}`),
-			want:    `{"metadata":{"device":"node-1","topic":"home/sensor/temp"},"v":21.5}`,
+			want:    `{"message":{"metadata":{"device":"node-1"},"v":21.5},"metadata":{"topic":"home/sensor/temp"}}`,
 		},
 		{
 			name:    "valid json array",
@@ -91,8 +91,8 @@ func TestBuildEvent(t *testing.T) {
 	if event.Source != "home/sensor/temp" {
 		t.Errorf("Source = %q, want home/sensor/temp", event.Source)
 	}
-	if string(event.Payload) != `{"metadata":{"topic":"home/sensor/temp"},"v":21.5}` {
-		t.Errorf("Payload = %s, want metadata.topic and v", event.Payload)
+	if string(event.Payload) != `{"message":{"v":21.5},"metadata":{"topic":"home/sensor/temp"}}` {
+		t.Errorf("Payload = %s, want message and metadata.topic", event.Payload)
 	}
 }
 
