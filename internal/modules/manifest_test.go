@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -133,6 +134,91 @@ func TestParseManifestInvalid(t *testing.T) {
 				t.Errorf("ParseManifestFile() error = %q, want substring %q", err.Error(), tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestParseManifestHTTPRoutes(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name = "http-ingest"
+version = "1.0"
+kind = "source"
+provides = ["http.ingest.received"]
+
+[[http.routes]]
+method = "POST"
+path = "/ingest/{source}"
+`)
+	got, err := ParseManifest(data)
+	if err != nil {
+		t.Fatalf("ParseManifest() error = %v", err)
+	}
+	if len(got.HTTPRoutes()) != 1 {
+		t.Fatalf("HTTPRoutes len = %d, want 1", len(got.HTTPRoutes()))
+	}
+	if got.HTTPRoutes()[0].Method != "POST" || got.HTTPRoutes()[0].Path != "/ingest/{source}" {
+		t.Errorf("route = %#v, want POST /ingest/{source}", got.HTTPRoutes()[0])
+	}
+}
+
+func TestParseManifestRejectsListen(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name = "old"
+version = "1.0"
+kind = "source"
+provides = ["x"]
+listen = ":8080"
+`)
+	_, err := ParseManifest(data)
+	if err == nil || !strings.Contains(err.Error(), "listen must not be set") {
+		t.Fatalf("ParseManifest() error = %v, want listen rejection", err)
+	}
+}
+
+func TestCollectHTTPRoutesDuplicate(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeManifest := func(name, body string) {
+		sub := filepath.Join(dir, name)
+		if err := os.Mkdir(sub, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(sub, "manifest.toml"), []byte(body), 0o644); err != nil {
+			t.Fatalf("write manifest: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(sub, "module"), []byte{0}, 0o755); err != nil {
+			t.Fatalf("write module binary: %v", err)
+		}
+	}
+
+	writeManifest("a", `name = "a"
+version = "1.0"
+kind = "source"
+provides = ["x"]
+
+[[http.routes]]
+method = "POST"
+path = "/same"
+`)
+	writeManifest("b", `name = "b"
+version = "1.0"
+kind = "source"
+provides = ["y"]
+
+[[http.routes]]
+method = "POST"
+path = "/same"
+`)
+
+	mods, err := Discover([]string{dir})
+	if err != nil {
+		t.Fatalf("Discover() error = %v", err)
+	}
+	_, err = CollectHTTPRoutes(mods)
+	if err == nil || !strings.Contains(err.Error(), "duplicate http route") {
+		t.Fatalf("CollectHTTPRoutes() error = %v, want duplicate", err)
 	}
 }
 

@@ -14,7 +14,7 @@ nav_order: 4
 ## Goal
 
 Load and validate Trove TOML configuration: journal path, blob settings, module
-paths, remote listener, MCP listen address.
+paths, remote listener, and HTTP gateway listen address.
 
 ## Interfaces
 
@@ -32,9 +32,11 @@ paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
 [modules.remote]
 listen = "tailscale:trove"
 
-[mcp]
-listen = ":8081"
+[http]
+listen = ":8080"
 ```
+
+`[mcp].listen` is deprecated; MCP is served at `POST /mcp` on `[http].listen`.
 
 Go struct with sensible defaults for development.
 

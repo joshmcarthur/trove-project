@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
@@ -20,20 +21,29 @@ var healthcheckInterval = 30 * time.Second
 // SourceHandle supervises a running source module subprocess.
 type SourceHandle struct {
 	client *plugin.Client
+	cancel context.CancelFunc
+	done   chan struct{}
 }
 
 // Close stops the supervised module subprocess.
 func (h *SourceHandle) Close() error {
-	if h == nil || h.client == nil {
+	if h == nil {
 		return nil
 	}
-	h.client.Kill()
+	if h.cancel != nil {
+		h.cancel()
+	}
+	if h.done != nil {
+		<-h.done
+	}
+	if h.client != nil {
+		h.client.Kill()
+	}
 	return nil
 }
 
 // StartSource launches mod and routes Emit RPC calls into journal.
-// blobsPath is passed to the module subprocess as TROVE_BLOBS_PATH when non-empty.
-func StartSource(ctx context.Context, j journal.Journal, mod Module, blobsPath string) (*SourceHandle, error) {
+func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) (*SourceHandle, error) {
 	if mod.Manifest.Kind != KindSource {
 		return nil, fmt.Errorf("modules: start source: %q is kind %q, want %q", mod.Manifest.Name, mod.Manifest.Kind, KindSource)
 	}
@@ -48,14 +58,16 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobsPath s
 		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
 	}
 
-	cmd, err := moduleExecCmd(mod, blobsPath)
+	cmd, err := moduleExecCmd(mod)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
 	}
 
+	hasHTTP := len(manifest.HTTPRoutes()) > 0
+
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j, policy, manifest.Name),
+		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),
@@ -73,31 +85,45 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobsPath s
 		return nil, fmt.Errorf("modules: start source %q: dispense: %w", mod.Manifest.Name, err)
 	}
 
-	sourceModule, ok := raw.(SourceModule)
+	sourceModule, ok := raw.(*sourceModuleClient)
 	if !ok {
 		client.Kill()
 		return nil, fmt.Errorf("modules: start source %q: unexpected plugin type %T", mod.Manifest.Name, raw)
 	}
 
 	runCtx, cancelRun := context.WithCancel(ctx)
-	defer cancelRun()
+	done := make(chan struct{})
 
-	hcDone := make(chan struct{})
-	go func() {
-		defer close(hcDone)
-		runHealthchecks(runCtx, mod.Manifest.Name, sourceModule)
-	}()
-
-	err = sourceModule.Run(runCtx)
-	cancelRun()
-	<-hcDone
-
-	if err != nil {
-		client.Kill()
-		return nil, fmt.Errorf("modules: start source %q: run: %w", mod.Manifest.Name, err)
+	if hasHTTP && registry != nil {
+		registry.Register(manifest.Name, sourceModule)
 	}
 
-	return &SourceHandle{client: client}, nil
+	go func() {
+		defer close(done)
+		if hasHTTP && registry != nil {
+			defer registry.Unregister(manifest.Name)
+		}
+
+		hcDone := make(chan struct{})
+		go func() {
+			defer close(hcDone)
+			runHealthchecks(runCtx, mod.Manifest.Name, sourceModule)
+		}()
+
+		err := sourceModule.Run(runCtx)
+		cancelRun()
+		<-hcDone
+
+		if err != nil && runCtx.Err() == nil {
+			log.Printf("modules: source %q run: %v", mod.Manifest.Name, err)
+		}
+	}()
+
+	return &SourceHandle{
+		client: client,
+		cancel: cancelRun,
+		done:   done,
+	}, nil
 }
 
 func loadModuleManifest(mod Module) (Manifest, error) {

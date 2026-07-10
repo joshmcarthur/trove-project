@@ -11,5 +11,8 @@ paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
 [modules.remote]
 listen = "tailscale:trove"
 
+[http]
+listen = ":8080"
+
 [mcp]
 listen = ":8081"

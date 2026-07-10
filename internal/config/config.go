@@ -13,6 +13,7 @@ type Config struct {
 	Journal JournalConfig `toml:"journal"`
 	Blobs   BlobsConfig   `toml:"blobs"`
 	Modules ModulesConfig `toml:"modules"`
+	HTTP    HTTPConfig    `toml:"http"`
 	MCP     MCPConfig     `toml:"mcp"`
 }
 
@@ -38,7 +39,13 @@ type RemoteConfig struct {
 	Listen string `toml:"listen"`
 }
 
-// MCPConfig holds MCP query server settings.
+// HTTPConfig holds the core HTTP gateway listener settings.
+type HTTPConfig struct {
+	Listen       string `toml:"listen"`
+	MaxBodyBytes int64  `toml:"max_body_bytes"`
+}
+
+// MCPConfig holds legacy MCP listen settings (deprecated when HTTP gateway is used).
 type MCPConfig struct {
 	Listen string `toml:"listen"`
 }
@@ -86,8 +93,11 @@ func applyDefaults(cfg *Config) {
 	if cfg.Blobs.Path == "" {
 		cfg.Blobs.Path = "./blobs"
 	}
-	if cfg.MCP.Listen == "" {
-		cfg.MCP.Listen = ":8081"
+	if cfg.HTTP.Listen == "" {
+		cfg.HTTP.Listen = ":8080"
+	}
+	if cfg.HTTP.MaxBodyBytes == 0 {
+		cfg.HTTP.MaxBodyBytes = 10 << 20
 	}
 	if cfg.Modules.Paths == nil {
 		cfg.Modules.Paths = []string{}
@@ -148,9 +158,14 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("config: blobs.backend %q is not supported (want filesystem)", cfg.Blobs.Backend)
 	}
 
-	if cfg.MCP.Listen == "" {
-		return fmt.Errorf("config: mcp.listen is required")
+	if cfg.HTTP.Listen == "" {
+		return fmt.Errorf("config: http.listen is required")
 	}
 
 	return nil
+}
+
+// UseSeparateMCPListen reports whether trove should bind a standalone MCP listener.
+func (cfg Config) UseSeparateMCPListen() bool {
+	return strings.TrimSpace(cfg.MCP.Listen) != ""
 }

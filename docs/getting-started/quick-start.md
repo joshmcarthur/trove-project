@@ -24,7 +24,7 @@ The config loader (`internal/config`), SQLite journal (`internal/journal`), modu
 runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), MQTT
 source module (`modules/mqtt-source`), and MCP query server (`internal/query`)
 are implemented. With a valid config file, `trove` opens the journal, discovers
-source modules, supervises them, and starts the MCP query server until
+source modules, supervises them, and starts the HTTP gateway (ingest + MCP) until
 interrupted:
 
 ```bash
@@ -34,7 +34,7 @@ trove -config /path/to/trove.toml
 
 Point `[modules].paths` at the parent directory containing module installs (for
 example, the repo `modules/` directory after `make build`). Then POST JSON to
-`POST /ingest/:source` on the HTTP ingest listen address (default `:8080`).
+`POST /ingest/:source` on the HTTP gateway listen address (default `:8080`).
 
 ### Example config
 
@@ -45,14 +45,14 @@ path = "./trove.db"
 [modules]
 paths = ["./modules"]
 
-[mcp]
-listen = ":8081"
+[http]
+listen = ":8080"
 ```
 
 ### Query the journal
 
-Connect Cursor (or another MCP client) to `[mcp].listen` — see
-[MCP client setup](./mcp-client.md). Four tools are available: `search_events`,
+Connect Cursor (or another MCP client) to `http://<host>:8080/mcp` on the HTTP
+gateway — see [MCP client setup](./mcp-client.md). Four tools are available: `search_events`,
 `get_event`, `get_events_by_type`, and `summarize_range`.
 
 MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.toml`

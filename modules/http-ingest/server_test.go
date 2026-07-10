@@ -5,17 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/joshmcarthur/trove/internal/blob"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc/codes"
@@ -35,6 +30,19 @@ func (m *mockEmitter) Emit(_ context.Context, event *troverpc.Event) error {
 	return nil
 }
 
+type mockBlobPutter struct {
+	refs map[string][]byte
+}
+
+func (m *mockBlobPutter) Put(_ context.Context, data []byte) (string, error) {
+	if m.refs == nil {
+		m.refs = make(map[string][]byte)
+	}
+	ref := "sha256-" + string(data)
+	m.refs[ref] = append([]byte(nil), data...)
+	return ref, nil
+}
+
 func defaultTestConfig() config {
 	return config{
 		MaxBodyBytes: defaultMaxBodyBytes,
@@ -42,14 +50,23 @@ func defaultTestConfig() config {
 	}
 }
 
-func openTestBlobStore(t *testing.T) blob.Store {
-	t.Helper()
-
-	store, err := blob.OpenFilesystem(t.TempDir())
-	if err != nil {
-		t.Fatalf("OpenFilesystem() error = %v", err)
+func ingestRequest(source, body string) *troverpc.HTTPRequest {
+	return &troverpc.HTTPRequest{
+		Method:         http.MethodPost,
+		Path:           "/ingest/" + source,
+		MatchedPattern: "/ingest/{source}",
+		PathValues:     map[string]string{"source": source},
+		Body:           []byte(body),
 	}
-	return store
+}
+
+func putBlobRequest(body string) *troverpc.HTTPRequest {
+	return &troverpc.HTTPRequest{
+		Method:         http.MethodPut,
+		Path:           "/blobs",
+		MatchedPattern: "/blobs",
+		Body:           []byte(body),
+	}
 }
 
 func TestHandlePutBlob(t *testing.T) {
@@ -59,7 +76,6 @@ func TestHandlePutBlob(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		method     string
 		body       string
 		maxBytes   int64
 		wantStatus int
@@ -67,7 +83,6 @@ func TestHandlePutBlob(t *testing.T) {
 	}{
 		{
 			name:       "valid body",
-			method:     http.MethodPut,
 			body:       string(blobData),
 			maxBytes:   defaultMaxBodyBytes,
 			wantStatus: http.StatusCreated,
@@ -75,14 +90,12 @@ func TestHandlePutBlob(t *testing.T) {
 		},
 		{
 			name:       "empty body",
-			method:     http.MethodPut,
 			body:       "",
 			maxBytes:   defaultMaxBodyBytes,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "oversize body",
-			method:     http.MethodPut,
 			body:       strings.Repeat("x", 2049),
 			maxBytes:   2048,
 			wantStatus: http.StatusBadRequest,
@@ -93,42 +106,32 @@ func TestHandlePutBlob(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store := openTestBlobStore(t)
+			blobs := &mockBlobPutter{}
 			cfg := defaultTestConfig()
 			cfg.MaxBodyBytes = tt.maxBytes
 
-			req := httptest.NewRequest(tt.method, "/blobs", strings.NewReader(tt.body))
-			rec := httptest.NewRecorder()
-			handlePutBlob(rec, req, store, cfg)
+			resp, err := handlePutBlob(context.Background(), blobs, cfg, putBlobRequest(tt.body))
+			if err != nil {
+				t.Fatalf("handlePutBlob() error = %v", err)
+			}
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("status = %d, want %d; body = %q", rec.Code, tt.wantStatus, rec.Body.String())
+			if int(resp.Status) != tt.wantStatus {
+				t.Errorf("status = %d, want %d; body = %q", resp.Status, tt.wantStatus, resp.Body)
 			}
 
 			if !tt.wantRef {
 				return
 			}
 
-			var resp putBlobResponse
-			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			var putResp putBlobResponse
+			if err := json.Unmarshal(resp.Body, &putResp); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			if !strings.HasPrefix(resp.BlobRef, "sha256-") {
-				t.Errorf("BlobRef = %q, want sha256- prefix", resp.BlobRef)
+			if !strings.HasPrefix(putResp.BlobRef, "sha256-") {
+				t.Errorf("BlobRef = %q, want sha256- prefix", putResp.BlobRef)
 			}
-
-			rc, err := store.Get(context.Background(), resp.BlobRef)
-			if err != nil {
-				t.Fatalf("Get() error = %v", err)
-			}
-			defer rc.Close()
-
-			got, err := io.ReadAll(rc)
-			if err != nil {
-				t.Fatalf("ReadAll() error = %v", err)
-			}
-			if !bytes.Equal(got, blobData) {
-				t.Errorf("stored data = %q, want %q", got, blobData)
+			if !bytes.Equal(blobs.refs[putResp.BlobRef], blobData) {
+				t.Errorf("stored data = %q, want %q", blobs.refs[putResp.BlobRef], blobData)
 			}
 		})
 	}
@@ -137,28 +140,28 @@ func TestHandlePutBlob(t *testing.T) {
 func TestHandlePutBlobDedup(t *testing.T) {
 	t.Parallel()
 
-	store := openTestBlobStore(t)
+	blobs := &mockBlobPutter{}
 	cfg := defaultTestConfig()
 	body := []byte("same-content")
 
 	var ref1, ref2 string
 	for i := 0; i < 2; i++ {
-		req := httptest.NewRequest(http.MethodPut, "/blobs", bytes.NewReader(body))
-		rec := httptest.NewRecorder()
-		handlePutBlob(rec, req, store, cfg)
-
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+		resp, err := handlePutBlob(context.Background(), blobs, cfg, putBlobRequest(string(body)))
+		if err != nil {
+			t.Fatalf("handlePutBlob() error = %v", err)
+		}
+		if int(resp.Status) != http.StatusCreated {
+			t.Fatalf("status = %d, want %d", resp.Status, http.StatusCreated)
 		}
 
-		var resp putBlobResponse
-		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		var putResp putBlobResponse
+		if err := json.Unmarshal(resp.Body, &putResp); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
 		if i == 0 {
-			ref1 = resp.BlobRef
+			ref1 = putResp.BlobRef
 		} else {
-			ref2 = resp.BlobRef
+			ref2 = putResp.BlobRef
 		}
 	}
 
@@ -167,77 +170,44 @@ func TestHandlePutBlobDedup(t *testing.T) {
 	}
 }
 
-func TestBlobRouteMethodNotAllowed(t *testing.T) {
-	t.Parallel()
-
-	mux := http.NewServeMux()
-	store := openTestBlobStore(t)
-	mux.HandleFunc("PUT /blobs", func(w http.ResponseWriter, r *http.Request) {
-		handlePutBlob(w, r, store, defaultTestConfig())
-	})
-	mux.HandleFunc("/blobs", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/blobs", nil)
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
-	}
-}
-
 func TestPutBlobIngestRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	store := openTestBlobStore(t)
+	blobs := &mockBlobPutter{}
 	cfg := defaultTestConfig()
 	emit := &mockEmitter{}
 	blobData := []byte("round-trip-bytes")
 
-	putReq := httptest.NewRequest(http.MethodPut, "/blobs", bytes.NewReader(blobData))
-	putRec := httptest.NewRecorder()
-	handlePutBlob(putRec, putReq, store, cfg)
-
-	if putRec.Code != http.StatusCreated {
-		t.Fatalf("PUT status = %d, want %d", putRec.Code, http.StatusCreated)
+	putResp, err := handlePutBlob(context.Background(), blobs, cfg, putBlobRequest(string(blobData)))
+	if err != nil {
+		t.Fatalf("handlePutBlob() error = %v", err)
+	}
+	if int(putResp.Status) != http.StatusCreated {
+		t.Fatalf("PUT status = %d, want %d", putResp.Status, http.StatusCreated)
 	}
 
-	var putResp putBlobResponse
-	if err := json.NewDecoder(putRec.Body).Decode(&putResp); err != nil {
+	var putBody putBlobResponse
+	if err := json.Unmarshal(putResp.Body, &putBody); err != nil {
 		t.Fatalf("decode PUT response: %v", err)
 	}
 
-	ingestBody := `{"blob_ref":"` + putResp.BlobRef + `","title":"photo note"}`
-	ingestReq := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(ingestBody))
-	ingestReq.Header.Set("Content-Type", "application/json")
-	ingestReq.SetPathValue("source", "shortcuts")
-	ingestRec := httptest.NewRecorder()
-	handleIngest(ingestRec, ingestReq, emit, cfg)
+	ingestBody := `{"blob_ref":"` + putBody.BlobRef + `","title":"photo note"}`
+	ingestResp, err := handleIngest(context.Background(), emit, cfg, ingestRequest("shortcuts", ingestBody))
+	if err != nil {
+		t.Fatalf("handleIngest() error = %v", err)
+	}
 
-	if ingestRec.Code != http.StatusNoContent {
-		t.Fatalf("POST status = %d, want %d; body = %q", ingestRec.Code, http.StatusNoContent, ingestRec.Body.String())
+	if int(ingestResp.Status) != http.StatusNoContent {
+		t.Fatalf("POST status = %d, want %d; body = %q", ingestResp.Status, http.StatusNoContent, ingestResp.Body)
 	}
 	if len(emit.events) != 1 {
 		t.Fatalf("Emit calls = %d, want 1", len(emit.events))
 	}
-	if emit.events[0].BlobRef != putResp.BlobRef {
-		t.Errorf("BlobRef = %q, want %q", emit.events[0].BlobRef, putResp.BlobRef)
+	if emit.events[0].BlobRef != putBody.BlobRef {
+		t.Errorf("BlobRef = %q, want %q", emit.events[0].BlobRef, putBody.BlobRef)
 	}
-
-	rc, err := store.Get(context.Background(), putResp.BlobRef)
-	if err != nil {
-		t.Fatalf("Get() error = %v", err)
-	}
-	defer rc.Close()
-
-	got, err := io.ReadAll(rc)
-	if err != nil {
-		t.Fatalf("ReadAll() error = %v", err)
-	}
-	if !bytes.Equal(got, blobData) {
-		t.Errorf("stored data = %q, want %q", got, blobData)
+	if !bytes.Equal(blobs.refs[putBody.BlobRef], blobData) {
+		t.Errorf("stored data = %q, want %q", blobs.refs[putBody.BlobRef], blobData)
 	}
 }
 
@@ -246,7 +216,6 @@ func TestHandleIngest(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		method     string
 		source     string
 		body       string
 		emitErr    error
@@ -256,7 +225,6 @@ func TestHandleIngest(t *testing.T) {
 	}{
 		{
 			name:       "valid object",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"title":"test"}`,
 			wantStatus: http.StatusNoContent,
@@ -276,7 +244,6 @@ func TestHandleIngest(t *testing.T) {
 		},
 		{
 			name:       "custom type and time",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"type":"note.created","time":"2026-07-10T12:00:00Z","title":"test"}`,
 			wantStatus: http.StatusNoContent,
@@ -296,7 +263,6 @@ func TestHandleIngest(t *testing.T) {
 		},
 		{
 			name:       "array payload",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `["a","b"]`,
 			wantStatus: http.StatusNoContent,
@@ -310,7 +276,6 @@ func TestHandleIngest(t *testing.T) {
 		},
 		{
 			name:       "blob_ref field",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"blob_ref":"sha256-deadbeef","title":"photo note"}`,
 			wantStatus: http.StatusNoContent,
@@ -327,48 +292,41 @@ func TestHandleIngest(t *testing.T) {
 		},
 		{
 			name:       "invalid blob_ref field",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"blob_ref":123}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{not-json`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "empty body",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       ``,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "invalid type field",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"type":123}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "invalid time field",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"time":"not-a-time"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "disallowed type",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"type":"mqtt.sensor.temp","title":"test"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "emit invalid argument",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"title":"test"}`,
 			emitErr:    status.Error(codes.InvalidArgument, "payload does not match schema for type \"http.ingest.received\": missing title"),
@@ -376,7 +334,6 @@ func TestHandleIngest(t *testing.T) {
 		},
 		{
 			name:       "emit failure",
-			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{"title":"test"}`,
 			emitErr:    errors.New("emit failed"),
@@ -389,17 +346,13 @@ func TestHandleIngest(t *testing.T) {
 			t.Parallel()
 
 			emit := &mockEmitter{err: tt.emitErr}
-			req := httptest.NewRequest(tt.method, "/ingest/"+tt.source, strings.NewReader(tt.body))
-			if tt.body != "" {
-				req.Header.Set("Content-Type", "application/json")
+			resp, err := handleIngest(context.Background(), emit, defaultTestConfig(), ingestRequest(tt.source, tt.body))
+			if err != nil {
+				t.Fatalf("handleIngest() error = %v", err)
 			}
-			req.SetPathValue("source", tt.source)
 
-			rec := httptest.NewRecorder()
-			handleIngest(rec, req, emit, defaultTestConfig())
-
-			if rec.Code != tt.wantStatus {
-				t.Errorf("status = %d, want %d; body = %q", rec.Code, tt.wantStatus, rec.Body.String())
+			if int(resp.Status) != tt.wantStatus {
+				t.Errorf("status = %d, want %d; body = %q", resp.Status, tt.wantStatus, resp.Body)
 			}
 
 			if tt.wantEmit {
@@ -416,27 +369,6 @@ func TestHandleIngest(t *testing.T) {
 	}
 }
 
-func TestIngestRouteMethodNotAllowed(t *testing.T) {
-	t.Parallel()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		handleIngest(w, r, &mockEmitter{}, defaultTestConfig())
-	})
-	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/ingest/shortcuts", nil)
-	req.SetPathValue("source", "shortcuts")
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
-	}
-}
-
 func TestLoadConfigDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -449,9 +381,6 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadConfigFromDir() error = %v", err)
 	}
-	if cfg.Listen != defaultListen {
-		t.Errorf("Listen = %q, want %q", cfg.Listen, defaultListen)
-	}
 	if cfg.MaxBodyBytes != defaultMaxBodyBytes {
 		t.Errorf("MaxBodyBytes = %d, want %d", cfg.MaxBodyBytes, defaultMaxBodyBytes)
 	}
@@ -461,8 +390,7 @@ func TestLoadConfigCustomMaxBody(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	manifest := `listen = ":9090"
-max_body_bytes = 2048
+	manifest := `max_body_bytes = 2048
 `
 	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
 		t.Fatalf("write manifest: %v", err)
@@ -477,67 +405,5 @@ max_body_bytes = 2048
 	}
 }
 
-func TestRunHTTPServerShutdown(t *testing.T) {
-	t.Parallel()
-
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Listen() error = %v", err)
-	}
-	addr := ln.Addr().String()
-	ln.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	emit := &mockEmitter{}
-	blobs := openTestBlobStore(t)
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- runHTTPServer(ctx, emit, config{Listen: addr, MaxBodyBytes: defaultMaxBodyBytes, Provides: defaultTestConfig().Provides}, blobs)
-	}()
-
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	cancel()
-	if err := <-errCh; err != nil {
-		t.Fatalf("runHTTPServer() error = %v", err)
-	}
-}
-
-func TestReadBodyTooLarge(t *testing.T) {
-	t.Parallel()
-
-	const limit = 1024
-	body := strings.Repeat("a", limit+1)
-	req := httptest.NewRequest(http.MethodPost, "/ingest/test", strings.NewReader(body))
-	_, err := readBody(httptest.NewRecorder(), req, limit)
-	if err == nil {
-		t.Fatal("readBody() error = nil, want error")
-	}
-	if !strings.Contains(err.Error(), "too large") {
-		t.Fatalf("readBody() error = %v, want body too large", err)
-	}
-}
-
-func TestReadBodyUsesLimitedReader(t *testing.T) {
-	t.Parallel()
-
-	req := httptest.NewRequest(http.MethodPost, "/ingest/test", io.NopCloser(bytes.NewReader([]byte(`{"ok":true}`))))
-	body, err := readBody(httptest.NewRecorder(), req, defaultMaxBodyBytes)
-	if err != nil {
-		t.Fatalf("readBody() error = %v", err)
-	}
-	if string(body) != `{"ok":true}` {
-		t.Fatalf("body = %s, want payload", body)
-	}
-}
-
 var _ trovemodule.Emitter = (*mockEmitter)(nil)
+var _ trovemodule.BlobPutter = (*mockBlobPutter)(nil)

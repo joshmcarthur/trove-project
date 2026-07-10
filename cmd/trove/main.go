@@ -12,6 +12,7 @@ import (
 
 	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/config"
+	"github.com/joshmcarthur/trove/internal/gateway"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
 	"github.com/joshmcarthur/trove/internal/query"
@@ -41,6 +42,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.UseSeparateMCPListen() {
+		log.Printf("trove: config: [mcp].listen is deprecated; MCP is served at POST /mcp on [http].listen")
+	}
+
 	store, err := journal.Open(cfg.Journal.Path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -48,7 +53,8 @@ func main() {
 	}
 	defer store.Close()
 
-	if _, err := blob.OpenFilesystem(cfg.Blobs.Path); err != nil {
+	blobStore, err := blob.OpenFilesystem(cfg.Blobs.Path)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -70,16 +76,45 @@ func main() {
 		log.Printf("trove: no source modules discovered")
 	}
 
+	routes, err := modules.CollectHTTPRoutes(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	querySvc := &query.Service{Journal: store}
+	builtins := []gateway.BuiltinRoute{{
+		Method:  "POST",
+		Pattern: "/mcp",
+		Handler: query.MCPHandler(querySvc),
+	}}
+
+	if err := gateway.ValidateRoutes(routes, builtins); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	registry := modules.NewHTTPRegistry()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	querySvc := &query.Service{Journal: store}
+	go modules.RunSources(ctx, store, mods, blobStore, registry)
+
+	gw, err := gateway.New(gateway.Config{
+		Listen:       cfg.HTTP.Listen,
+		MaxBodyBytes: cfg.HTTP.MaxBodyBytes,
+	}, routes, registry, builtins)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	go func() {
-		if err := query.Serve(ctx, cfg.MCP.Listen, querySvc); err != nil && ctx.Err() == nil {
-			log.Printf("trove: mcp server: %v", err)
+		if err := gw.Serve(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("trove: http gateway: %v", err)
 		}
 	}()
 
-	go modules.RunSources(ctx, store, mods, cfg.Blobs.Path)
 	<-ctx.Done()
 }

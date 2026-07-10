@@ -13,13 +13,18 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// MCPHandler returns the MCP streamable HTTP handler for svc.
+func MCPHandler(svc *Service) http.Handler {
+	return newMCPHandler(svc)
+}
+
 // Serve starts the MCP query server on listen until ctx is cancelled.
 func Serve(ctx context.Context, listen string, svc *Service) error {
 	if svc == nil {
 		return fmt.Errorf("query: service is required")
 	}
 
-	handler := newMCPHandler(svc)
+	handler := MCPHandler(svc)
 
 	httpServer := &http.Server{
 		Addr:    listen,

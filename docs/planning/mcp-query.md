@@ -35,8 +35,9 @@ MCP tools map 1:1 onto these methods.
 - RPC layer and MCP server implemented in `internal/query`
 - `search_events`: FTS5 keyword search
 - `summarize_range`: counts by type, notable events — avoids dumping raw rows
-- Listens on `[mcp].listen` from config; `trove` starts the MCP HTTP server on
-  startup. See [MCP client setup](../getting-started/mcp-client.md).
+- MCP streamable HTTP served at `POST /mcp` on the core HTTP gateway
+  (`[http].listen`). See [MCP client setup](../getting-started/mcp-client.md).
+- Legacy `[mcp].listen` is deprecated (warn + ignore when `[http].listen` is set)
 
 ## Acceptance criteria
 
@@ -55,4 +56,4 @@ MCP tools map 1:1 onto these methods.
 
 - Auth for MCP endpoint — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - `summarize_range` write-time vs query-time aggregation — [open-items.md](../open-items.md)
-- HTTP gateway migration — [http-gateway.md](./http-gateway.md) (Planned)
+- HTTP gateway migration — [http-gateway.md](./http-gateway.md) (Supported)

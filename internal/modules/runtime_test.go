@@ -2,14 +2,9 @@ package modules
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -44,17 +39,20 @@ func TestStartSourceInvokesHealthcheck(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod, "")
-		if handle != nil {
-			_ = handle.Close()
-		}
+		handle, err := StartSource(ctx, store, mod, nil, nil)
 		if err != nil && ctx.Err() == nil {
 			t.Errorf("StartSource() error = %v", err)
+		}
+		if handle != nil {
+			<-ctx.Done()
+			_ = handle.Close()
 		}
 		close(done)
 	}()
 
-	deadline := time.Now().Add(2 * time.Second)
+	time.Sleep(200 * time.Millisecond)
+
+	deadline := time.Now().Add(5 * time.Second)
 	var count string
 	for time.Now().Before(deadline) {
 		data, err := os.ReadFile(counterFile)
@@ -97,15 +95,23 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 		},
 	}
 
-	handle, err := StartSource(context.Background(), store, mod, "")
+	handle, err := StartSource(context.Background(), store, mod, nil, nil)
 	if err != nil {
 		t.Fatalf("StartSource() error = %v", err)
 	}
 	t.Cleanup(func() { _ = handle.Close() })
 
-	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "test.emit.once"})
-	if err != nil {
-		t.Fatalf("Query() error = %v", err)
+	var events []journal.Event
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		events, err = store.Query(context.Background(), journal.Filter{TypePrefix: "test.emit.once"})
+		if err != nil {
+			t.Fatalf("Query() error = %v", err)
+		}
+		if len(events) == 1 {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
 	if len(events) != 1 {
 		t.Fatalf("Query() len = %d, want 1", len(events))
@@ -123,82 +129,6 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 	}
 	if got.ID == "" {
 		t.Error("ID is empty, want generated ULID")
-	}
-}
-
-func TestStartSourceHTTPIngest(t *testing.T) {
-	t.Parallel()
-
-	store := openTestJournal(t)
-	t.Cleanup(func() { _ = store.Close() })
-
-	modDir, listenAddr, blobsPath := buildHTTPIngestModule(t)
-	mod := Module{
-		Dir:    modDir,
-		Binary: filepath.Join(modDir, "module"),
-		Manifest: Manifest{
-			Name:    "http-ingest",
-			Version: "1.0",
-			Kind:    KindSource,
-		},
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() {
-		handle, err := StartSource(ctx, store, mod, blobsPath)
-		if handle != nil {
-			_ = handle.Close()
-		}
-		if err != nil && ctx.Err() == nil {
-			t.Errorf("StartSource() error = %v", err)
-		}
-		close(done)
-	}()
-
-	waitForTCP(t, listenAddr)
-
-	resp, err := http.Post(
-		"http://"+listenAddr+"/ingest/shortcuts",
-		"application/json",
-		strings.NewReader(`{"title":"test"}`),
-	)
-	if err != nil {
-		t.Fatalf("POST /ingest/shortcuts: %v", err)
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
-
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("POST status = %d, want %d", resp.StatusCode, http.StatusNoContent)
-	}
-
-	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "http.ingest.received"})
-	if err != nil {
-		t.Fatalf("Query() error = %v", err)
-	}
-	if len(events) != 1 {
-		t.Fatalf("Query() len = %d, want 1", len(events))
-	}
-
-	got := events[0]
-	if got.Source != "shortcuts" {
-		t.Errorf("Source = %q, want shortcuts", got.Source)
-	}
-	if string(got.Payload) != `{"title":"test"}` {
-		t.Errorf("Payload = %s, want %s", got.Payload, `{"title":"test"}`)
-	}
-	if got.ID == "" {
-		t.Error("ID is empty, want generated ULID")
-	}
-
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("StartSource did not return after context cancellation")
 	}
 }
 
@@ -247,56 +177,6 @@ func openTestJournal(t *testing.T) *journal.Store {
 		t.Fatalf("journal.Open() error = %v", err)
 	}
 	return store
-}
-
-func buildHTTPIngestModule(t *testing.T) (string, string, string) {
-	t.Helper()
-
-	dir := t.TempDir()
-	binary := filepath.Join(dir, "module")
-
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Listen() error = %v", err)
-	}
-	listenAddr := ln.Addr().String()
-	ln.Close()
-
-	manifest := fmt.Sprintf(`name = "http-ingest"
-version = "1.0"
-kind = "source"
-provides = ["http.ingest.received", "note.*", "shortcut.*"]
-listen = %q
-`, listenAddr)
-	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
-		t.Fatalf("write manifest: %v", err)
-	}
-
-	cmd := exec.Command("go", "build", "-o", binary, "./modules/http-ingest")
-	cmd.Dir = moduleRoot(t)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("build http-ingest module: %v\n%s", err, out)
-	}
-	if err := os.Chmod(binary, 0o755); err != nil {
-		t.Fatalf("chmod module binary: %v", err)
-	}
-	return dir, listenAddr, filepath.Join(t.TempDir(), "blobs")
-}
-
-func waitForTCP(t *testing.T, addr string) {
-	t.Helper()
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("server at %s did not become ready", addr)
 }
 
 func moduleRoot(t *testing.T) string {

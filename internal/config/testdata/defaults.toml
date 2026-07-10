@@ -1,2 +1,5 @@
-[mcp]
+[http]
 listen = ":9090"
+
+[mcp]
+listen = ":8081"

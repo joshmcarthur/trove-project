@@ -30,14 +30,17 @@ paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
 [modules.remote]
 listen = "tailscale:trove"
 
-[mcp]
-listen = ":8081"
+[http]
+listen = ":8080"
 ```
 
 ## Principles
 
-- Core config covers journal path, blob backend, module search paths, and MCP
-  listen address.
+- Core config covers journal path, blob backend, module search paths, and the HTTP
+  gateway listen address (`[http].listen`).
+- MCP is served at `POST /mcp` on the same HTTP listener. The legacy `[mcp].listen`
+  setting is deprecated: if set, Trove logs a warning and does not start a
+  separate MCP server.
 - Per-module settings (broker URLs, topics, tokens) live in each module's own
   `manifest.toml` — the core does not need to know module-specific shapes.
 
@@ -50,7 +53,7 @@ trove -config /path/to/trove.toml
 ```
 
 With a valid config, `trove` opens the journal database, discovers source modules
-from `[modules].paths`, starts the MCP query server on `[mcp].listen`, and
-supervises modules until interrupted. Invalid or missing config fails fast with a
+from `[modules].paths`, starts the HTTP gateway on `[http].listen` (ingest routes
+and MCP), and supervises modules until interrupted. Invalid or missing config fails fast with a
 clear error. Journal open failures (e.g. unwritable path) are reported before
 exit. Use `trove -version` without a config file.

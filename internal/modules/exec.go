@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func moduleExecCmd(mod Module, blobsPath string) (*exec.Cmd, error) {
+func moduleExecCmd(mod Module) (*exec.Cmd, error) {
 	if mod.Dir == "" {
 		return nil, fmt.Errorf("modules: module dir is required")
 	}
@@ -30,10 +30,7 @@ func moduleExecCmd(mod Module, blobsPath string) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("modules: module binary is not executable")
 	}
 
-	// Binary path is resolved from the module directory and verified above.
 	cmd := exec.Command(binary) //nolint:gosec // G204: path is not taken from untrusted input
-	if blobsPath != "" {
-		cmd.Env = append(os.Environ(), EnvBlobsPath+"="+blobsPath)
-	}
+	cmd.Env = os.Environ()
 	return cmd, nil
 }

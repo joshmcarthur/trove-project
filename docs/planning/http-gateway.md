@@ -6,7 +6,7 @@ nav_order: 10
 
 # HTTP gateway
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** After two-week live test\
 **Spec:** [Module architecture §8](../spec.md#8-module-architecture-dynamic-socket-based), [Query §9](../spec.md#9-query-interface-mcp-over-rpc), [Configuration §10](../spec.md#10-configuration)\
 **Package:** `internal/gateway` (new), `internal/modules`, `internal/query`, `modules/http-ingest`
@@ -280,16 +280,16 @@ Rejected requests never reach module `HandleHTTP`.
 
 ## Acceptance criteria
 
-- [ ] Core listens on `[http].listen` only; no separate `[mcp].listen` in default config
-- [ ] `http-ingest` routes declared in manifest; module does not bind its own port
-- [ ] `POST /ingest/{source}` behaviour unchanged (ingest tests pass)
-- [ ] `PUT /blobs` stores via core `BlobPut`; no `TROVE_BLOBS_PATH` env
-- [ ] MCP streamable HTTP served at declared path (e.g. `POST /mcp`)
-- [ ] MCP tools unchanged (`search_events`, `get_event`, etc.)
-- [ ] Duplicate route registration fails at startup with clear error
-- [ ] Unknown routes return `404`; wrong method returns `405`
-- [ ] Module crash does not take down gateway listener
-- [ ] iOS Shortcuts docs use single base URL for ingest and blob upload
+- [x] Core listens on `[http].listen` only; no separate `[mcp].listen` in default config
+- [x] `http-ingest` routes declared in manifest; module does not bind its own port
+- [x] `POST /ingest/{source}` behaviour unchanged (ingest tests pass)
+- [x] `PUT /blobs` stores via core `BlobPut`; no `TROVE_BLOBS_PATH` env
+- [x] MCP streamable HTTP served at declared path (e.g. `POST /mcp`)
+- [x] MCP tools unchanged (`search_events`, `get_event`, etc.)
+- [x] Duplicate route registration fails at startup with clear error
+- [x] Unknown routes return `404`; wrong method returns `405`
+- [x] Module crash does not take down gateway listener
+- [x] iOS Shortcuts docs use single base URL for ingest and blob upload
 
 ## Dependencies
 
