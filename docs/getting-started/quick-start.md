@@ -11,7 +11,7 @@ comes next.
 
 ## What works today
 
-Build and run the CLI scaffold:
+Build and run the CLI:
 
 ```bash
 git clone https://github.com/joshmcarthur/trove.git
@@ -20,20 +20,32 @@ make build
 ./bin/trove -version
 ```
 
-Running `trove` without `-version` prints `not yet implemented` and exits — that
-is expected until milestone 1 lands.
+The config loader (`internal/config`) and SQLite journal (`internal/journal`) are
+implemented. With a valid config file, `trove` validates settings and opens the
+journal database:
+
+```bash
+trove -config /path/to/trove.toml
+```
+
+Module runtime and HTTP ingest are not wired up yet — the process exits after
+opening the journal.
 
 ## What's coming (milestone 1)
 
-Once journal, config, and HTTP ingest are implemented:
+To finish milestone 1:
+
+1. Module discovery and go-plugin runtime (see
+   [planning/module-runtime.md](../planning/module-runtime.md)).
+2. HTTP ingest module — `POST /ingest/:source` (see
+   [planning/http-ingest.md](../planning/http-ingest.md)).
+3. MCP query server (milestone 3).
+
+When milestone 1 is complete:
 
 1. Configure paths in TOML (see [configuration](./configuration.md)).
 2. Start `trove` — core loads modules from configured paths.
 3. POST JSON to `POST /ingest/:source` to append events.
-4. Query via MCP tools (milestone 3).
-
-Follow [planning/journal.md](../planning/journal.md) for the first implementation
-task.
 
 ## iOS Shortcuts (after HTTP ingest)
 
@@ -52,4 +64,4 @@ The `:source` path segment becomes the event `source` field.
 
 - [Roadmap](../roadmap.md) — what to build and in what order
 - [Configuration](./configuration.md) — TOML shape (§10)
-- [Planning: HTTP ingest](../planning/http-ingest.md) — milestone 1 ingest module
+- [Planning: module runtime](../planning/module-runtime.md) — next milestone 1 task

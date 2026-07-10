@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/joshmcarthur/trove/internal/config"
+	"github.com/joshmcarthur/trove/internal/journal"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -26,11 +27,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if _, err := config.Load(*configPath); err != nil {
+	cfg, err := config.Load(*configPath)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	fmt.Fprintln(os.Stderr, "trove: not yet implemented")
+	store, err := journal.Open(cfg.Journal.Path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	fmt.Fprintln(os.Stderr, "trove: journal ready; module runtime not yet implemented")
 	os.Exit(1)
 }

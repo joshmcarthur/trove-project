@@ -1,0 +1,129 @@
+package main
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func troveBin(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "trove")
+	cmd := exec.Command("go", "build", "-o", bin, ".")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, stderr.String())
+	}
+	return bin
+}
+
+func runTrove(t *testing.T, bin string, args ...string) (stderr string, exitCode int) {
+	t.Helper()
+
+	cmd := exec.Command(bin, args...)
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	if err == nil {
+		return errBuf.String(), 0
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("run trove %v: %v", args, err)
+	}
+	return errBuf.String(), exitErr.ExitCode()
+}
+
+func writeConfig(t *testing.T, journalPath string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "trove.toml")
+	content := fmt.Sprintf(`[journal]
+path = %q
+
+[mcp]
+listen = ":8081"
+`, journalPath)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	return path
+}
+
+func TestCLI(t *testing.T) {
+	t.Parallel()
+
+	bin := troveBin(t)
+
+	t.Run("version", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := exec.Command(bin, "-version")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("run -version: %v", err)
+		}
+		if len(out) == 0 {
+			t.Fatal("expected version output")
+		}
+	})
+
+	tests := []struct {
+		name       string
+		args       func(t *testing.T) []string
+		wantExit   int
+		wantStderr string
+	}{
+		{
+			name: "missing config",
+			args: func(t *testing.T) []string {
+				return nil
+			},
+			wantExit:   1,
+			wantStderr: "-config is required",
+		},
+		{
+			name: "invalid config",
+			args: func(t *testing.T) []string {
+				path := filepath.Join(t.TempDir(), "bad.toml")
+				if err := os.WriteFile(path, []byte("not valid toml [[[["), 0o644); err != nil {
+					t.Fatalf("write config: %v", err)
+				}
+				return []string{"-config", path}
+			},
+			wantExit:   1,
+			wantStderr: "config:",
+		},
+		{
+			name: "valid config opens journal",
+			args: func(t *testing.T) []string {
+				journalPath := filepath.Join(t.TempDir(), "trove.db")
+				return []string{"-config", writeConfig(t, journalPath)}
+			},
+			wantExit:   1,
+			wantStderr: "journal ready",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stderr, code := runTrove(t, bin, tt.args(t)...)
+			if code != tt.wantExit {
+				t.Errorf("exit code = %d, want %d\nstderr: %s", code, tt.wantExit, stderr)
+			}
+			if !strings.Contains(stderr, tt.wantStderr) {
+				t.Errorf("stderr = %q, want substring %q", stderr, tt.wantStderr)
+			}
+		})
+	}
+}

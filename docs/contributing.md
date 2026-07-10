@@ -18,8 +18,6 @@ nav_order: 10
 - Go 1.26+ ([mise](https://mise.jdx.dev/) + `.mise.toml` recommended)
 - `golangci-lint` 2.12+ for `make lint`
 - Deno 2.9+ (only under `./docs` for the documentation site)
-- `golangci-lint` for `make lint`
-- Deno (only for docs under `./docs`)
 
 ## Commands
 
