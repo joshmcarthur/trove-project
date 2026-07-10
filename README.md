@@ -1,84 +1,29 @@
 # Trove
 
-Trove is an event-driven data storage and processing system built with Deno. It
-provides a flexible plugin architecture for storing, processing, and serving
-events with their associated files and relationships.
+Trove is a personal event journal: a single Go binary that captures typed
+events from the sources in your life into one durable, queryable store, with a
+conversational MCP interface as the primary way to get information back out.
 
-## Features
+> Capture broadly, store simply, converse to retrieve.
 
-- Plugin-based architecture
-- Flexible storage backends
-- Event-driven processing
-- File attachment support
-- Event linking and relationships
-- API support
-- Type-safe with TypeScript
-
-## Quick Start
-
-```ts
-import { Trove } from "trove/core/mod.ts";
-
-const trove = new Trove({
-  plugins: {
-    sources: ["./plugins"],
-  },
-  storage: {
-    events: {
-      plugin: "storage-json-file",
-      options: {
-        directory: "./data/events",
-      },
-    },
-    files: {
-      plugin: "storage-file-system",
-      options: {
-        directory: "./data/files",
-      },
-    },
-  },
-});
-
-await trove.initialize();
-
-// Create an event
-const event = await trove.createEvent({
-  schema: "bookmark.created",
-  payload: {
-    url: "https://example.com",
-    title: "Example Website",
-  },
-});
-
-// Shutdown
-await trove.shutdown();
-```
-
-## Documentation
-
-Visit our [documentation site](https://trove-project.app) for:
-
-- Getting Started Guide
-- Concepts and Architecture
-- Plugin Development
-- API Reference
-- Examples
+- **Documentation:** [trove docs site](https://joshmcarthur.github.io/trove/) (or `make docs-serve` locally)
+- **Specification:** [docs/spec.md](docs/spec.md)
+- **Agent guide:** [AGENTS.md](AGENTS.md)
+- **Roadmap:** [docs/roadmap.md](docs/roadmap.md)
 
 ## Development
 
-Trove requires Deno v2.0 or later.
+Requires Go 1.23+ (recommended: [mise](https://mise.jdx.dev/) with the
+project `.mise.toml`).
 
 ```bash
-# Run tests
-deno test
-
-# Check types
-deno check
-
-# Format code
-deno fmt
+make check        # fmt, lint, test
+make build        # bin/trove
+make docs-serve   # local docs site (requires Deno in ./docs)
 ```
+
+Recommended VS Code extension: [Go](https://marketplace.visualstudio.com/items?itemName=golang.go).
 
 ## License
 
-GNU GPLv3 License - See LICENSE file for details
+GNU GPLv3 — see [LICENSE](LICENSE).

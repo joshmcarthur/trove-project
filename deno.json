@@ -1,6 +1,0 @@
-{
-  "imports": {
-    "@trove/core/": "./core/",
-    "@trove/plugins/": "./plugins/"
-  }
-}

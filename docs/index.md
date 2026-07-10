@@ -5,55 +5,35 @@ nav_order: 0
 
 # Welcome to Trove
 
-Trove is for holding onto your stuff. Whatever that stuff may be.
+Trove is a small, self-contained personal data store: a single binary that
+captures typed events from the sources in your life — Meshtastic, Home Assistant,
+MQTT, iOS Shortcuts, webhooks, and more — into one durable, queryable journal,
+with a conversational MCP interface as the primary way to get information back
+out.
 
-Technically speaking, Trove is an event-driven data storage and processing
-system built with Deno. The core project provides a flexible plugin architecture
-for storing, processing, and serving events with their associated files and
-relationships.
+> Capture broadly, store simply, converse to retrieve.
 
-## Key Features
+The project is migrating from an earlier Deno prototype to Go. The CLI scaffold
+exists today; feature work follows the [roadmap](./roadmap.md).
 
-- **Plugin-based Architecture**: Extend Trove's functionality through a powerful
-  plugin system
-- **Flexible Storage**: Choose from multiple storage backends for events and
-  files
-- **Event-driven Processing**: Process and transform events in real-time
-- **File Management**: Attach and manage files alongside your events
-- **Event Relationships**: Create rich relationships between events
-- **Type Safety**: Built with TypeScript for a great developer experience
-- **API Support**: Access your data through a comprehensive API. Use plugins to
-  extend the API.
+## What's next
 
-## Getting Started
+See the [roadmap](./roadmap.md) for what is **Supported** vs **Planned**. Milestone
+1 is the SQLite journal, module runtime, HTTP ingest, and TOML config.
 
-New to Trove? Start with our
-[Quick Start Guide](./getting-started/quick-start.md) to create your first event
-processing system.
+## Documentation
 
-## Documentation Structure
-
-- **Getting Started**
-  - [Installation](./getting-started/installation.md)
-  - [Quick Start](./getting-started/quick-start.md)
-
-- **Core Concepts**
-  - [Events and Schemas](./concepts/events.md)
-  - [Plugins](./concepts/plugins.md)
-  - [Storage](./concepts/storage.md)
-
-- **Plugin Development**
-  - [Creating Plugins](./plugins/creating-plugins.md)
-  - [Storage Plugins](./plugins/storage-plugins.md)
-  - [Processing Plugins](./plugins/processing-plugins.md)
+- [Roadmap](./roadmap.md) — status matrix and build order
+- [Getting started](./getting-started/installation.md) — install and build
+- [Concepts](./concepts.md) — architecture reference
+- [Planning](./planning/index.md) — per-feature implementation briefs
+- [Specification](./spec.md) — full canonical spec
 
 ## Development
 
-Trove requires Deno v2.0 or later. For development instructions, see our
-[GitHub repository](https://github.com/joshmcarthur/trove).
+See [contributing](./contributing.md) and [AGENTS.md](https://github.com/joshmcarthur/trove/blob/main/AGENTS.md)
+for local commands and agent workflow.
 
 ## License
 
-Trove is licensed under the GNU GPLv3 License. See the
-[LICENSE](https://github.com/joshmcarthur/trove/blob/main/LICENSE) file for
-details.
+GNU GPLv3 — see the [LICENSE](https://github.com/joshmcarthur/trove/blob/main/LICENSE).

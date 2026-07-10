@@ -1,120 +1,55 @@
 ---
 title: Quick Start
+parent: Getting started
 nav_order: 2
 ---
 
-# Quick Start Guide
+# Quick Start
 
-This guide will help you get started with Trove by creating a simple event
-processing system.
+Trove is not yet feature-complete. This page describes what works today and what
+comes next.
 
-## Basic Setup
+## What works today
 
-Create a new directory for your project:
-
-```bash
-mkdir my-trove-project
-cd my-trove-project
-```
-
-Create a `main.ts` file:
-
-```ts
-import { Trove } from "https://deno.land/x/trove/core/mod.ts";
-
-const trove = new Trove({
-  plugins: {
-    sources: ["./plugins"],
-  },
-  storage: {
-    events: {
-      plugin: "storage-json-file",
-      options: {
-        directory: "./data/events",
-      },
-    },
-    files: {
-      plugin: "storage-file-system",
-      options: {
-        directory: "./data/files",
-      },
-    },
-  },
-});
-
-await trove.initialize();
-
-// Create an event schema
-await trove.registerSchema({
-  id: "note.created",
-  version: "1.0",
-  schema: {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      content: { type: "string" },
-    },
-    required: ["title", "content"],
-  },
-});
-
-// Create an event
-const event = await trove.createEvent({
-  schema: "note.created",
-  payload: {
-    title: "My First Note",
-    content: "Hello, Trove!",
-  },
-});
-
-console.log("Created event:", event.id);
-
-await trove.shutdown();
-```
-
-Run your application:
+Build and run the CLI scaffold:
 
 ```bash
-deno run --allow-read --allow-write main.ts
+git clone https://github.com/joshmcarthur/trove.git
+cd trove
+make build
+./bin/trove -version
 ```
 
-## Adding a Plugin
+Running `trove` without `-version` prints `not yet implemented` and exits — that
+is expected until milestone 1 lands.
 
-Create a simple plugin that processes note events. Create
-`plugins/note-processor.ts`:
+## What's coming (milestone 1)
 
-```ts
-export default {
-  name: "note-processor",
-  version: "1.0.0",
+Once journal, config, and HTTP ingest are implemented:
 
-  hooks: {
-    "event:received": async (context) => {
-      const { event } = context;
+1. Configure paths in TOML (see [configuration](./configuration.md)).
+2. Start `trove` — core loads modules from configured paths.
+3. POST JSON to `POST /ingest/:source` to append events.
+4. Query via MCP tools (milestone 3).
 
-      if (event.schema.id === "note.created") {
-        console.log(`Processing note: ${event.payload.title}`);
+Follow [planning/journal.md](../planning/journal.md) for the first implementation
+task.
 
-        // Create a processed event
-        await context.core.createEvent({
-          schema: "note.processed",
-          payload: {
-            originalId: event.id.id,
-            wordCount: event.payload.content.split(/\s+/).length,
-          },
-          links: [{
-            type: "parent",
-            targetEvent: event.id,
-          }],
-        });
-      }
-    },
-  },
-};
+## iOS Shortcuts (after HTTP ingest)
+
+When generic HTTP ingest is live, point an iOS Shortcut at your Trove instance:
+
+```
+POST https://your-host/ingest/shortcuts
+Content-Type: application/json
+
+{ "title": "...", "body": "..." }
 ```
 
-## Next Steps
+The `:source` path segment becomes the event `source` field.
 
-- Learn more about [Events and Schemas](../concepts/events.md)
-- Explore [Plugin Development](../plugins/creating-plugins.md)
-- Set up [Storage Backends](../plugins/storage-plugins.md)
+## Next steps
+
+- [Roadmap](../roadmap.md) — what to build and in what order
+- [Configuration](./configuration.md) — TOML shape (§10)
+- [Planning: HTTP ingest](../planning/http-ingest.md) — milestone 1 ingest module

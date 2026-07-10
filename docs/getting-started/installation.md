@@ -1,47 +1,60 @@
 ---
 title: Installation
+parent: Getting started
 nav_order: 1
 ---
 
 # Installing Trove
 
-Trove is built with Deno and can be used either as a library in your Deno
-applications or as a standalone binary.
+Trove ships as a single Go binary (and Docker image). The CLI scaffold is
+available today; full ingest and query features are on the
+[roadmap](../roadmap.md).
 
-## Using Trove in a Deno Project
+## From releases
 
-```ts
-import { Trove } from "https://deno.land/x/trove/core/mod.ts";
-```
-
-## Installing the Binary
-
-### From Releases
-
-Download the latest release for your platform from our
-[GitHub Releases page](https://github.com/joshmcarthur/trove-project/releases).
+Download the latest build for your platform from
+[GitHub Releases](https://github.com/joshmcarthur/trove/releases).
 
 ```bash
-# MacOS
-curl -L https://github.com/joshmcarthur/trove-project/releases/latest/download/trove-macos -o trove
-chmod +x trove
+# Linux amd64
+curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/trove-linux-amd64
+chmod +x trove-linux-amd64
 
-# Linux
-curl -L https://github.com/joshmcarthur/trove-project/releases/latest/download/trove-linux -o trove
-chmod +x trove
+# macOS arm64
+curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/trove-darwin-arm64
+chmod +x trove-darwin-arm64
+
+# Windows amd64
+# Download trove-windows-amd64.exe from the release page
 ```
 
-### Using Docker
+Verify:
 
 ```bash
-docker pull ghcr.io/joshmcarthur/trove-project:latest
-
-docker run -p 3000:3000 ghcr.io/joshmcarthur/trove-project:latest
+./trove-darwin-arm64 -version
 ```
 
-## System Requirements
+## Build from source
 
-- For docker: None (self-contained)
-- For binary: None (self-contained)
-- For library: Deno 1.37 or later
-- For development: Deno 1.37 or later
+Requires Go 1.23+ ([mise](https://mise.jdx.dev/) recommended — see `.mise.toml`).
+
+```bash
+git clone https://github.com/joshmcarthur/trove.git
+cd trove
+make build
+./bin/trove -version
+```
+
+## Docker
+
+```bash
+docker pull ghcr.io/joshmcarthur/trove:latest
+docker run --rm ghcr.io/joshmcarthur/trove:latest -version
+```
+
+## System requirements
+
+- **Binary:** none beyond the platform itself (static Go build)
+- **Docker:** any OCI runtime
+- **Development:** Go 1.23+, `golangci-lint` for `make lint`; Deno only under
+  `./docs` for the documentation site

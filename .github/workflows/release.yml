@@ -12,7 +12,6 @@ env:
 
 jobs:
   update-latest:
-    # Only run this job when pushing to main, not during manual releases
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -45,32 +44,39 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'release'
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
-          - os: ubuntu-latest
-            platform: x86_64-unknown-linux-gnu
-          - os: windows-latest
-            platform: x86_64-pc-windows-msvc
-          - os: macos-latest
-            platform: aarch64-apple-darwin
+          - goos: linux
+            goarch: amd64
+            suffix: trove-linux-amd64
+          - goos: windows
+            goarch: amd64
+            suffix: trove-windows-amd64.exe
+          - goos: darwin
+            goarch: arm64
+            suffix: trove-darwin-arm64
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
+      - uses: actions/setup-go@v5
         with:
-          deno-version: v2.x
+          go-version: "1.23"
+          cache: true
 
       - name: Build binary
-        run: deno compile --allow-read --allow-write --allow-net --target ${{ matrix.platform }} -o trove-${{ matrix.platform }} core/cli.ts
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.event_name == 'push' && 'latest' || github.ref_name }}
+        run: |
+          go build -ldflags "-X main.version=${VERSION}" -o ${{ matrix.suffix }} ./cmd/trove
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v2
         with:
-          files: trove-${{ matrix.platform }}*
+          files: ${{ matrix.suffix }}
           tag_name: ${{ github.event_name == 'push' && 'latest' || github.ref }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -5,66 +5,59 @@ nav_order: 3
 
 # Core Concepts
 
-Trove is built around a few key concepts that work together to provide a
-flexible and powerful system for storing and processing your data.
+Trove is built around a few ideas that work together: immutable events in an
+append-only journal, optional blob attachments, dynamically loaded source
+modules, and conversational retrieval via MCP.
 
 ## Events
 
-Events are the fundamental building blocks of Trove. They represent something
-that happened, along with its associated data, files, and relationships to other
-events.
+The fundamental unit of data — an immutable fact with a ULID, timestamp, typed
+namespace, source identifier, and JSON payload. No schema registry.
 
-Key aspects of events:
+[Events](./concepts/events.md)
 
-- **Immutable**: Once created, events cannot be modified
-- **Schema-based**: Every event must conform to a defined schema
-- **File attachments**: Can include files or references to files
-- **Relationships**: Can be linked to other events to create a graph of data
+## Journal
 
-Learn more about [Events](./concepts/events.md)
+Append-only SQLite store. Single source of truth for all captured events.
 
-## Plugins
+[Journal](./concepts/journal.md)
 
-Trove's plugin system allows you to extend and customize its functionality.
-Plugins can:
+## Blobs
 
-- Process events
-- Provide storage backends
-- Add web endpoints
-- Register new event types
-- Extend core functionality
+Content-addressed storage for large attachments, referenced from events by hash.
 
-Plugins are the primary way to add new capabilities to Trove without modifying
-the core system.
+[Blobs](./concepts/blobs.md)
 
-Learn more about [Plugins](./concepts/plugins.md)
+## Sources
 
-## Hooks
+Modules that emit events — HTTP ingest, MQTT, Home Assistant, and others.
 
-The hook system is how plugins interact with Trove and each other. Hooks are
-named events that plugins can listen for and respond to, enabling:
+[Sources](./concepts/sources.md)
 
-- Event processing
-- HTTP request handling
-- System lifecycle management
-- Custom plugin interactions
+## Modules
 
-Hooks provide a flexible way to extend Trove's behavior at key points in its
-operation.
+Discovery, manifests, and the go-plugin runtime for local modules; gRPC for
+remote edge devices.
 
-Learn more about [Hooks](./concepts/hooks.md)
+[Modules](./concepts/modules.md)
 
-## How It All Works Together
+## Query
 
-1. **Events** represent your data and its relationships
-2. **Plugins** extend Trove's capabilities
-3. **Hooks** enable plugins to interact with the system
+Internal RPC API and MCP tools for conversational retrieval.
 
-For example:
+[Query](./concepts/query.md)
 
-- A storage plugin might listen for `event:received` hooks to store events
-- A processing plugin might listen for `event:stored` hooks to transform data
-- A web plugin might handle `http:request` hooks to serve your data
+## Processors and sinks
 
-This architecture allows you to build complex systems while keeping the core
-simple and focused.
+Derived events and side-effect handlers — deliberately minimal in v0.
+
+[Processors and sinks](./concepts/processors-and-sinks.md)
+
+## How it fits together
+
+1. **Source modules** capture facts and call `Emit(event)` into the core.
+2. The **journal** persists events append-only in SQLite.
+3. Large payloads go to the **blob store**; events hold a `blob_ref`.
+4. **MCP query tools** search and summarize the journal for conversational use.
+
+For implementation order, see the [roadmap](./roadmap.md).
