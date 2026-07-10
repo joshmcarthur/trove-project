@@ -35,7 +35,10 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 
 - Implement as a **module**, not wired directly into core — proves module boundary
 - Listen on configurable port (module config, not core)
-- Parse JSON body as `payload`; optional `time` and `type` fields in body
+- Parse JSON body as `payload`; optional `time`, `type`, and `blob_ref` fields in body
+- `max_body_bytes` in module manifest (default 10 MiB); raise for larger JSON payloads
+- Large binary content (photos, audio) should **not** be inlined — use `blob_ref` on the
+  event and store bytes in the blob store once that lands ([blobs](./blobs.md))
 - Even in v0, keep behind go-plugin per spec §11
 
 ## Acceptance criteria
@@ -53,3 +56,5 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 ## Open questions
 
 - Auth model (Tailscale-only?) — [open-items.md](../open-items.md)
+- Blob upload path for HTTP ingest (dedicated `PUT /blobs` vs multipart) — depends on
+  [blob store](./blobs.md), which is deferred until after the live test

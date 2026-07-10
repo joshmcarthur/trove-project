@@ -66,7 +66,12 @@ own config (alongside or inside `manifest.toml`), not in the core TOML.
 After `make build`, add the repo `modules/` directory to `[modules].paths` and
 start `trove`. POST JSON to `http://localhost:8080/ingest/shortcuts` (default
 listen address). The `:source` path segment becomes the event `source` field;
-optional `type` and `time` keys in the JSON body override event metadata.
+optional `type`, `time`, and `blob_ref` keys in the JSON body override event
+metadata. Default request body limit is 10 MiB (`max_body_bytes` in manifest).
+
+For large attachments, do not inline bytes in JSON. Once the blob store is
+implemented, upload content separately and reference it with `blob_ref` on the
+ingest payload.
 
 ## Publishing
 

@@ -8,10 +8,14 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-const defaultListen = ":8080"
+const (
+	defaultListen       = ":8080"
+	defaultMaxBodyBytes = 10 << 20 // 10 MiB
+)
 
 type config struct {
-	Listen string `toml:"listen"`
+	Listen       string `toml:"listen"`
+	MaxBodyBytes int64  `toml:"max_body_bytes"`
 }
 
 func loadConfig() (config, error) {
@@ -37,6 +41,9 @@ func loadConfigFromDir(dir string) (config, error) {
 
 	if cfg.Listen == "" {
 		cfg.Listen = defaultListen
+	}
+	if cfg.MaxBodyBytes <= 0 {
+		cfg.MaxBodyBytes = defaultMaxBodyBytes
 	}
 
 	return cfg, nil
