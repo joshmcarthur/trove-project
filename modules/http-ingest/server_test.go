@@ -99,7 +99,30 @@ func TestHandleIngest(t *testing.T) {
 			},
 		},
 		{
-			name:       "invalid json",
+			name:       "blob_ref field",
+			method:     http.MethodPost,
+			source:     "shortcuts",
+			body:       `{"blob_ref":"sha256-deadbeef","title":"photo note"}`,
+			wantStatus: http.StatusNoContent,
+			wantEmit:   true,
+			checkEvent: func(t *testing.T, event *troverpc.Event) {
+				t.Helper()
+				if event.BlobRef != "sha256-deadbeef" {
+					t.Errorf("BlobRef = %q, want sha256-deadbeef", event.BlobRef)
+				}
+				if string(event.Payload) != `{"title":"photo note"}` {
+					t.Errorf("Payload = %s, want %s", event.Payload, `{"title":"photo note"}`)
+				}
+			},
+		},
+		{
+			name:       "invalid blob_ref field",
+			method:     http.MethodPost,
+			source:     "shortcuts",
+			body:       `{"blob_ref":123}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
 			method:     http.MethodPost,
 			source:     "shortcuts",
 			body:       `{not-json`,
@@ -148,7 +171,7 @@ func TestHandleIngest(t *testing.T) {
 			req.SetPathValue("source", tt.source)
 
 			rec := httptest.NewRecorder()
-			handleIngest(rec, req, emit)
+			handleIngest(rec, req, emit, defaultMaxBodyBytes)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d; body = %q", rec.Code, tt.wantStatus, rec.Body.String())
@@ -173,7 +196,7 @@ func TestIngestRouteMethodNotAllowed(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		handleIngest(w, r, &mockEmitter{})
+		handleIngest(w, r, &mockEmitter{}, defaultMaxBodyBytes)
 	})
 	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -204,6 +227,29 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.Listen != defaultListen {
 		t.Errorf("Listen = %q, want %q", cfg.Listen, defaultListen)
 	}
+	if cfg.MaxBodyBytes != defaultMaxBodyBytes {
+		t.Errorf("MaxBodyBytes = %d, want %d", cfg.MaxBodyBytes, defaultMaxBodyBytes)
+	}
+}
+
+func TestLoadConfigCustomMaxBody(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	manifest := `listen = ":9090"
+max_body_bytes = 2048
+`
+	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	cfg, err := loadConfigFromDir(dir)
+	if err != nil {
+		t.Fatalf("loadConfigFromDir() error = %v", err)
+	}
+	if cfg.MaxBodyBytes != 2048 {
+		t.Errorf("MaxBodyBytes = %d, want 2048", cfg.MaxBodyBytes)
+	}
 }
 
 func TestRunHTTPServerShutdown(t *testing.T) {
@@ -221,7 +267,7 @@ func TestRunHTTPServerShutdown(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runHTTPServer(ctx, emit, addr)
+		errCh <- runHTTPServer(ctx, emit, config{Listen: addr, MaxBodyBytes: defaultMaxBodyBytes})
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)
@@ -243,9 +289,10 @@ func TestRunHTTPServerShutdown(t *testing.T) {
 func TestReadBodyTooLarge(t *testing.T) {
 	t.Parallel()
 
-	body := strings.Repeat("a", maxBodyBytes+1)
+	const limit = 1024
+	body := strings.Repeat("a", limit+1)
 	req := httptest.NewRequest(http.MethodPost, "/ingest/test", strings.NewReader(body))
-	_, err := readBody(httptest.NewRecorder(), req)
+	_, err := readBody(httptest.NewRecorder(), req, limit)
 	if err == nil {
 		t.Fatal("readBody() error = nil, want error")
 	}
@@ -258,7 +305,7 @@ func TestReadBodyUsesLimitedReader(t *testing.T) {
 	t.Parallel()
 
 	req := httptest.NewRequest(http.MethodPost, "/ingest/test", io.NopCloser(bytes.NewReader([]byte(`{"ok":true}`))))
-	body, err := readBody(httptest.NewRecorder(), req)
+	body, err := readBody(httptest.NewRecorder(), req, defaultMaxBodyBytes)
 	if err != nil {
 		t.Fatalf("readBody() error = %v", err)
 	}

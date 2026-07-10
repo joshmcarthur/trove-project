@@ -13,22 +13,19 @@ import (
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
-const (
-	defaultEventType = "http.ingest.received"
-	maxBodyBytes     = 1 << 20 // 1 MiB
-)
+const defaultEventType = "http.ingest.received"
 
-func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, listen string) error {
+func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		handleIngest(w, r, emit)
+		handleIngest(w, r, emit, cfg.MaxBodyBytes)
 	})
 	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
 	srv := &http.Server{
-		Addr:    listen,
+		Addr:    cfg.Listen,
 		Handler: mux,
 	}
 
@@ -50,14 +47,14 @@ func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, listen string)
 	}
 }
 
-func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitter) {
+func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitter, maxBodyBytes int64) {
 	source := r.PathValue("source")
 	if source == "" {
 		http.Error(w, "source is required", http.StatusBadRequest)
 		return
 	}
 
-	body, err := readBody(w, r)
+	body, err := readBody(w, r, maxBodyBytes)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -77,7 +74,7 @@ func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitt
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+func readBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {
 	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	defer limited.Close()
 
@@ -129,6 +126,12 @@ func buildEvent(source string, body []byte) (*troverpc.Event, error) {
 				return nil, fmt.Errorf("invalid time field")
 			}
 			event.Time = timeStr
+		case "blob_ref":
+			var blobRef string
+			if err := json.Unmarshal(value, &blobRef); err != nil || blobRef == "" {
+				return nil, fmt.Errorf("invalid blob_ref field")
+			}
+			event.BlobRef = blobRef
 		default:
 			payload[key] = value
 		}

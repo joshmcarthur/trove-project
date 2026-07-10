@@ -12,6 +12,6 @@ func main() {
 		if err != nil {
 			return err
 		}
-		return runHTTPServer(ctx, emit, cfg.Listen)
+		return runHTTPServer(ctx, emit, cfg)
 	}))
 }
