@@ -1,0 +1,9 @@
+name     = "mqtt-source"
+version  = "1.0"
+kind     = "source"
+provides = ["mqtt.message.received"]
+
+broker    = "tcp://localhost:1883"
+client_id = "trove-mqtt-source"
+topics    = ["home/#"]
+qos       = 0
