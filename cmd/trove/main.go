@@ -13,6 +13,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/config"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
+	"github.com/joshmcarthur/trove/internal/query"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -65,6 +66,13 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	querySvc := &query.Service{Journal: store}
+	go func() {
+		if err := query.Serve(ctx, cfg.MCP.Listen, querySvc); err != nil && ctx.Err() == nil {
+			log.Printf("trove: mcp server: %v", err)
+		}
+	}()
 
 	modules.RunSources(ctx, store, mods)
 }

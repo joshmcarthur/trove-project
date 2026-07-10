@@ -153,5 +153,8 @@ func TestCLI(t *testing.T) {
 		if !strings.Contains(stderr, "no source modules discovered") {
 			t.Errorf("stderr = %q, want substring %q", stderr, "no source modules discovered")
 		}
+		if !strings.Contains(stderr, "mcp listening on :8081") {
+			t.Errorf("stderr = %q, want substring %q", stderr, "mcp listening on :8081")
+		}
 	})
 }
