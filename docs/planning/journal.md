@@ -38,7 +38,7 @@ type Journal interface {
 ## Acceptance criteria
 
 - [x] Append persists event with ULID
-- [ ] Query by type prefix, source, time range
+- [x] Query by type prefix, source, time range
 - [x] Get by id
 - [ ] Subscribe streams new events
 

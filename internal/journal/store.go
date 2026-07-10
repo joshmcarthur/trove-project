@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/oklog/ulid"
@@ -25,6 +26,8 @@ CREATE INDEX IF NOT EXISTS idx_events_time ON events(time);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_source ON events(source);
 `
+
+var _ Journal = (*Store)(nil)
 
 // Store is a SQLite-backed journal.
 type Store struct {
@@ -55,10 +58,7 @@ func (s *Store) Close() error {
 }
 
 // Append persists e, generating ID and Time when unset.
-func (s *Store) Append(ctx context.Context, e *Event) error {
-	if e == nil {
-		return fmt.Errorf("journal: append: event is nil")
-	}
+func (s *Store) Append(ctx context.Context, e Event) error {
 	if e.Type == "" {
 		return fmt.Errorf("journal: append: type is required")
 	}
@@ -101,26 +101,69 @@ func (s *Store) Append(ctx context.Context, e *Event) error {
 	return nil
 }
 
-// Get returns the event with id.
-func (s *Store) Get(ctx context.Context, id string) (Event, error) {
+// Query returns events matching f, ordered by time ascending.
+func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
+	query := `
+		SELECT id, time, type, source, payload, blob_ref
+		FROM events`
+
 	var (
-		e       Event
-		timeStr string
-		payload string
-		blobRef sql.NullString
+		predicates []string
+		args       []any
 	)
 
-	err := s.db.QueryRowContext(ctx, `
+	if f.TypePrefix != "" {
+		predicates = append(predicates, "type LIKE ?")
+		args = append(args, f.TypePrefix+"%")
+	}
+	if f.Source != "" {
+		predicates = append(predicates, "source = ?")
+		args = append(args, f.Source)
+	}
+	if f.TimeFrom != nil {
+		predicates = append(predicates, "time >= ?")
+		args = append(args, f.TimeFrom.UTC().Format(time.RFC3339))
+	}
+	if f.TimeTo != nil {
+		predicates = append(predicates, "time <= ?")
+		args = append(args, f.TimeTo.UTC().Format(time.RFC3339))
+	}
+
+	if len(predicates) > 0 {
+		// Predicates are fixed fragments; user input is passed only via args.
+		query += " WHERE " + strings.Join(predicates, " AND ") //nolint:gosec // G202
+	}
+	query += " ORDER BY time ASC"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("journal: query: %w", err)
+	}
+	defer rows.Close()
+
+	var events []Event
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, fmt.Errorf("journal: query: %w", err)
+		}
+		events = append(events, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("journal: query: %w", err)
+	}
+
+	return events, nil
+}
+
+// Get returns the event with id.
+func (s *Store) Get(ctx context.Context, id string) (Event, error) {
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, time, type, source, payload, blob_ref
 		FROM events
-		WHERE id = ?`, id).Scan(
-		&e.ID,
-		&timeStr,
-		&e.Type,
-		&e.Source,
-		&payload,
-		&blobRef,
-	)
+		WHERE id = ?`, id)
+
+	e, err := scanEvent(row)
 	if err == sql.ErrNoRows {
 		return Event{}, ErrNotFound
 	}
@@ -128,9 +171,41 @@ func (s *Store) Get(ctx context.Context, id string) (Event, error) {
 		return Event{}, fmt.Errorf("journal: get %q: %w", id, err)
 	}
 
+	return e, nil
+}
+
+// Subscribe streams new events matching f. Not yet implemented.
+func (s *Store) Subscribe(ctx context.Context, f Filter) (<-chan Event, error) {
+	return nil, fmt.Errorf("journal: subscribe: not implemented")
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanEvent(row rowScanner) (Event, error) {
+	var (
+		e       Event
+		timeStr string
+		payload string
+		blobRef sql.NullString
+	)
+
+	if err := row.Scan(
+		&e.ID,
+		&timeStr,
+		&e.Type,
+		&e.Source,
+		&payload,
+		&blobRef,
+	); err != nil {
+		return Event{}, err
+	}
+
+	var err error
 	e.Time, err = time.Parse(time.RFC3339, timeStr)
 	if err != nil {
-		return Event{}, fmt.Errorf("journal: get %q: parse time: %w", id, err)
+		return Event{}, fmt.Errorf("parse time %q: %w", timeStr, err)
 	}
 
 	e.Payload = json.RawMessage(payload)
