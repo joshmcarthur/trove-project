@@ -32,7 +32,7 @@ func (h *SourceHandle) Close() error {
 }
 
 // StartSource launches mod and routes Emit RPC calls into journal.
-func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHandle, error) {
+func StartSource(ctx context.Context, j journal.Journal, blobsPath string, mod Module) (*SourceHandle, error) {
 	if mod.Manifest.Kind != KindSource {
 		return nil, fmt.Errorf("modules: start source: %q is kind %q, want %q", mod.Manifest.Name, mod.Manifest.Kind, KindSource)
 	}
@@ -47,7 +47,7 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHan
 		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
 	}
 
-	cmd, err := moduleExecCmd(mod)
+	cmd, err := moduleExecCmd(mod, blobsPath)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
 	}

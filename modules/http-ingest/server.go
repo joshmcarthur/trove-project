@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/joshmcarthur/trove/internal/blob"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc/codes"
@@ -17,12 +20,22 @@ import (
 
 const defaultEventType = "http.ingest.received"
 
-func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
+type blobUploadResponse struct {
+	BlobRef string `json:"blob_ref"`
+}
+
+func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config, blobs blob.Store) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
 		handleIngest(w, r, emit, cfg)
 	})
 	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+	mux.HandleFunc("PUT /blobs", func(w http.ResponseWriter, r *http.Request) {
+		handleBlobPut(w, r, blobs, cfg.MaxBodyBytes)
+	})
+	mux.HandleFunc("/blobs", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
@@ -83,6 +96,63 @@ func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitt
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func handleBlobPut(w http.ResponseWriter, r *http.Request, blobs blob.Store, maxBodyBytes int64) {
+	if blobs == nil {
+		http.Error(w, "blob store not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	body, err := readRawBody(w, r, maxBodyBytes)
+	if err != nil {
+		if errors.Is(err, errBodyTooLarge) {
+			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ref, err := blobs.Put(r.Context(), bytes.NewReader(body))
+	if err != nil {
+		http.Error(w, "failed to store blob", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(blobUploadResponse{BlobRef: ref}); err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+var errBodyTooLarge = errors.New("request body too large")
+
+func readRawBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {
+	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	defer limited.Close()
+
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return nil, errBodyTooLarge
+		}
+		return nil, fmt.Errorf("read body")
+	}
+	if len(body) == 0 {
+		return nil, fmt.Errorf("request body is required")
+	}
+	return body, nil
+}
+
+func openBlobStore() (blob.Store, error) {
+	path := os.Getenv(trovemodule.BlobsPathEnv)
+	if path == "" {
+		return nil, nil
+	}
+	return blob.OpenFilesystem(path)
 }
 
 func readBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {

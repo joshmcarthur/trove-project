@@ -17,9 +17,13 @@ func (m *httpIngestModule) Run(ctx context.Context, emit trovemodule.Emitter) er
 	if err != nil {
 		return err
 	}
+	blobs, err := openBlobStore()
+	if err != nil {
+		return err
+	}
 	m.ready.Store(true)
 	defer m.ready.Store(false)
-	return runHTTPServer(ctx, emit, cfg)
+	return runHTTPServer(ctx, emit, cfg, blobs)
 }
 
 func (m *httpIngestModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {

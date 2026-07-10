@@ -10,9 +10,9 @@ Trove uses TOML (not YAML). Full detail is in [spec §10](../spec.md#10-configur
 
 **Status:** Supported — see [planning/config.md](../planning/config.md).
 
-> **Not yet active:** `[blobs]` and `[modules.remote]` are accepted by the config
-> loader but have no runtime effect until the [blob store](../planning/blobs.md)
-> and [remote modules](../planning/remote-modules.md) milestones land.
+> **Not yet active:** `[modules.remote]` is accepted by the config loader but has
+> no runtime effect until the [remote modules](../planning/remote-modules.md)
+> milestone lands.
 
 ## Example
 
@@ -49,8 +49,8 @@ Pass the config file path with `-config`:
 trove -config /path/to/trove.toml
 ```
 
-With a valid config, `trove` opens the journal database, discovers source modules
-from `[modules].paths`, starts the MCP query server on `[mcp].listen`, and
-supervises modules until interrupted. Invalid or missing config fails fast with a
+With a valid config, `trove` opens the journal database and blob store, discovers
+source modules from `[modules].paths`, starts the MCP query server on `[mcp].listen`,
+and supervises modules until interrupted. Invalid or missing config fails fast with a
 clear error. Journal open failures (e.g. unwritable path) are reported before
 exit. Use `trove -version` without a config file.

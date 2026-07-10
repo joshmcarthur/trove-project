@@ -1,7 +1,9 @@
 package modules
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/journal"
 )
 
@@ -44,7 +47,7 @@ func TestStartSourceInvokesHealthcheck(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod)
+		handle, err := StartSource(ctx, store, "", mod)
 		if handle != nil {
 			_ = handle.Close()
 		}
@@ -97,7 +100,7 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 		},
 	}
 
-	handle, err := StartSource(context.Background(), store, mod)
+	handle, err := StartSource(context.Background(), store, "", mod)
 	if err != nil {
 		t.Fatalf("StartSource() error = %v", err)
 	}
@@ -148,7 +151,7 @@ func TestStartSourceHTTPIngest(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod)
+		handle, err := StartSource(ctx, store, "", mod)
 		if handle != nil {
 			_ = handle.Close()
 		}
@@ -192,6 +195,121 @@ func TestStartSourceHTTPIngest(t *testing.T) {
 	}
 	if got.ID == "" {
 		t.Error("ID is empty, want generated ULID")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("StartSource did not return after context cancellation")
+	}
+}
+
+func TestStartSourceHTTPIngestBlobUpload(t *testing.T) {
+	t.Parallel()
+
+	store := openTestJournal(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	blobsDir := t.TempDir()
+	modDir, listenAddr := buildHTTPIngestModule(t)
+	mod := Module{
+		Dir:    modDir,
+		Binary: filepath.Join(modDir, "module"),
+		Manifest: Manifest{
+			Name:    "http-ingest",
+			Version: "1.0",
+			Kind:    KindSource,
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		handle, err := StartSource(ctx, store, blobsDir, mod)
+		if handle != nil {
+			_ = handle.Close()
+		}
+		if err != nil && ctx.Err() == nil {
+			t.Errorf("StartSource() error = %v", err)
+		}
+		close(done)
+	}()
+
+	waitForTCP(t, listenAddr)
+
+	blobData := []byte("integration test photo bytes")
+	putReq, err := http.NewRequest(http.MethodPut, "http://"+listenAddr+"/blobs", bytes.NewReader(blobData))
+	if err != nil {
+		t.Fatalf("NewRequest(PUT /blobs): %v", err)
+	}
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		t.Fatalf("PUT /blobs: %v", err)
+	}
+	defer putResp.Body.Close()
+
+	if putResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(putResp.Body)
+		t.Fatalf("PUT status = %d, want %d; body = %s", putResp.StatusCode, http.StatusOK, body)
+	}
+
+	var upload struct {
+		BlobRef string `json:"blob_ref"`
+	}
+	if err := json.NewDecoder(putResp.Body).Decode(&upload); err != nil {
+		t.Fatalf("decode PUT response: %v", err)
+	}
+	if upload.BlobRef == "" {
+		t.Fatal("blob_ref is empty")
+	}
+
+	ingestBody := fmt.Sprintf(`{"blob_ref":%q,"title":"photo note"}`, upload.BlobRef)
+	postResp, err := http.Post(
+		"http://"+listenAddr+"/ingest/shortcuts",
+		"application/json",
+		strings.NewReader(ingestBody),
+	)
+	if err != nil {
+		t.Fatalf("POST /ingest/shortcuts: %v", err)
+	}
+	defer postResp.Body.Close()
+	io.Copy(io.Discard, postResp.Body)
+
+	if postResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("POST status = %d, want %d", postResp.StatusCode, http.StatusNoContent)
+	}
+
+	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "http.ingest.received"})
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("Query() len = %d, want 1", len(events))
+	}
+
+	got := events[0]
+	if got.BlobRef == nil || *got.BlobRef != upload.BlobRef {
+		t.Fatalf("BlobRef = %v, want %q", got.BlobRef, upload.BlobRef)
+	}
+
+	blobStore, err := blob.OpenFilesystem(blobsDir)
+	if err != nil {
+		t.Fatalf("blob.OpenFilesystem() error = %v", err)
+	}
+	rc, err := blobStore.Get(context.Background(), upload.BlobRef)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	defer rc.Close()
+	stored, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if !bytes.Equal(stored, blobData) {
+		t.Fatalf("stored bytes = %q, want %q", stored, blobData)
 	}
 
 	cancel()

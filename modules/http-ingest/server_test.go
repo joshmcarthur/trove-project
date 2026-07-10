@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joshmcarthur/trove/internal/blob"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc/codes"
@@ -291,7 +293,7 @@ func TestRunHTTPServerShutdown(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runHTTPServer(ctx, emit, config{Listen: addr, MaxBodyBytes: defaultMaxBodyBytes, Provides: defaultTestConfig().Provides})
+		errCh <- runHTTPServer(ctx, emit, config{Listen: addr, MaxBodyBytes: defaultMaxBodyBytes, Provides: defaultTestConfig().Provides}, nil)
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)
@@ -339,3 +341,155 @@ func TestReadBodyUsesLimitedReader(t *testing.T) {
 }
 
 var _ trovemodule.Emitter = (*mockEmitter)(nil)
+
+func openTestBlobStore(t *testing.T) blob.Store {
+	t.Helper()
+
+	store, err := blob.OpenFilesystem(t.TempDir())
+	if err != nil {
+		t.Fatalf("blob.OpenFilesystem() error = %v", err)
+	}
+	return store
+}
+
+func TestHandleBlobPut(t *testing.T) {
+	t.Parallel()
+
+	blobData := []byte("test image bytes")
+
+	tests := []struct {
+		name       string
+		method     string
+		body       []byte
+		maxBytes   int64
+		wantStatus int
+		wantRef    bool
+	}{
+		{
+			name:       "successful upload",
+			method:     http.MethodPut,
+			body:       blobData,
+			maxBytes:   defaultMaxBodyBytes,
+			wantStatus: http.StatusOK,
+			wantRef:    true,
+		},
+		{
+			name:       "empty body",
+			method:     http.MethodPut,
+			body:       nil,
+			maxBytes:   defaultMaxBodyBytes,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "body too large",
+			method:     http.MethodPut,
+			body:       bytes.Repeat([]byte("a"), 1025),
+			maxBytes:   1024,
+			wantStatus: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:       "blob store not configured",
+			method:     http.MethodPut,
+			body:       blobData,
+			maxBytes:   defaultMaxBodyBytes,
+			wantStatus: http.StatusServiceUnavailable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var blobs blob.Store
+			if tt.name != "blob store not configured" {
+				blobs = openTestBlobStore(t)
+			}
+
+			var bodyReader io.Reader
+			if tt.body != nil {
+				bodyReader = bytes.NewReader(tt.body)
+			} else {
+				bodyReader = strings.NewReader("")
+			}
+
+			req := httptest.NewRequest(tt.method, "/blobs", bodyReader)
+			rec := httptest.NewRecorder()
+			handleBlobPut(rec, req, blobs, tt.maxBytes)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d; body = %q", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+
+			if !tt.wantRef {
+				return
+			}
+
+			var resp blobUploadResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if !strings.HasPrefix(resp.BlobRef, "sha256-") {
+				t.Fatalf("BlobRef = %q, want sha256- prefix", resp.BlobRef)
+			}
+
+			rc, err := blobs.Get(req.Context(), resp.BlobRef)
+			if err != nil {
+				t.Fatalf("Get() error = %v", err)
+			}
+			defer rc.Close()
+			got, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatalf("ReadAll() error = %v", err)
+			}
+			if !bytes.Equal(got, blobData) {
+				t.Fatalf("stored bytes = %q, want %q", got, blobData)
+			}
+		})
+	}
+}
+
+func TestHandleBlobPutDedup(t *testing.T) {
+	t.Parallel()
+
+	blobs := openTestBlobStore(t)
+	data := []byte("dedup me")
+
+	var firstRef string
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPut, "/blobs", bytes.NewReader(data))
+		rec := httptest.NewRecorder()
+		handleBlobPut(rec, req, blobs, defaultMaxBodyBytes)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("upload %d status = %d, want %d", i, rec.Code, http.StatusOK)
+		}
+		var resp blobUploadResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if i == 0 {
+			firstRef = resp.BlobRef
+		} else if resp.BlobRef != firstRef {
+			t.Fatalf("second BlobRef = %q, want %q", resp.BlobRef, firstRef)
+		}
+	}
+}
+
+func TestBlobRouteMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("PUT /blobs", func(w http.ResponseWriter, r *http.Request) {
+		handleBlobPut(w, r, openTestBlobStore(t), defaultMaxBodyBytes)
+	})
+	mux.HandleFunc("/blobs", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/blobs", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
