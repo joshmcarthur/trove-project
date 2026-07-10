@@ -40,7 +40,7 @@ MCP tools map 1:1 onto these methods.
 ## Acceptance criteria
 
 - [ ] MCP `search_events` returns matching journal events
-- [ ] MCP `get_event` resolves by ULID
+- [x] MCP `get_event` resolves by ULID
 - [ ] `summarize_range` returns aggregated summary for a time window
 - [ ] OpenClaw or Cursor can connect as MCP client
 
