@@ -1,0 +1,5 @@
+[journal]
+path = "~/trove-data/journal.db"
+
+[modules]
+paths = ["~/modules"]

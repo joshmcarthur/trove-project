@@ -6,7 +6,7 @@ nav_order: 4
 
 # Config loader
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 1 — Journal + module core\
 **Spec:** [Configuration §10](../spec.md#10-configuration)\
 **Package:** `internal/config`
@@ -47,9 +47,9 @@ Go struct with sensible defaults for development.
 
 ## Acceptance criteria
 
-- [ ] Parses example config from spec
-- [ ] Returns clear errors on missing/invalid fields
-- [ ] `main` loads config before starting journal/modules
+- [x] Parses example config from spec
+- [x] Returns clear errors on missing/invalid fields
+- [x] `main` loads config before starting journal/modules
 
 ## Dependencies
 

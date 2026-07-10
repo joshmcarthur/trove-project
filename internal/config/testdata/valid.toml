@@ -1,0 +1,15 @@
+[journal]
+path = "/data/trove.db"
+
+[blobs]
+backend = "filesystem"
+path = "/data/blobs"
+
+[modules]
+paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
+
+[modules.remote]
+listen = "tailscale:trove"
+
+[mcp]
+listen = ":8081"
