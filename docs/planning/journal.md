@@ -30,7 +30,7 @@ type Journal interface {
 ## Implementation notes
 
 - Schema DDL from spec §4 (`events` table + indexes on time, type, source)
-- FTS5 virtual table for `search_events` placeholder
+- FTS5 virtual table (`events_fts`) for keyword search via `Filter.Text`
 - SQLite driver: `modernc.org/sqlite` (pure Go, no CGO) vs `mattn/go-sqlite3` —
   prefer pure Go for Pi cross-compile unless FTS5/vec needs CGO
 - ULID generation at append time
@@ -39,6 +39,7 @@ type Journal interface {
 
 - [x] Append persists event with ULID
 - [x] Query by type prefix, source, time range
+- [x] Query with `Filter.Text` performs FTS5 keyword search
 - [x] Get by id
 - [x] Subscribe streams new events
 
