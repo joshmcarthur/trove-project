@@ -36,7 +36,7 @@ Verify:
 
 ## Build from source
 
-Requires Go 1.23+ ([mise](https://mise.jdx.dev/) recommended — see `.mise.toml`).
+Requires Go 1.26+ ([mise](https://mise.jdx.dev/) recommended — see `.mise.toml`).
 
 ```bash
 git clone https://github.com/joshmcarthur/trove.git
@@ -56,5 +56,5 @@ docker run --rm ghcr.io/joshmcarthur/trove:latest -version
 
 - **Binary:** none beyond the platform itself (static Go build)
 - **Docker:** any OCI runtime
-- **Development:** Go 1.23+, `golangci-lint` for `make lint`; Deno only under
+- **Development:** Go 1.26+, `golangci-lint` for `make lint`; Deno 2.9+ only under
   `./docs` for the documentation site

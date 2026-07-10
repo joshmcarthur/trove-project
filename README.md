@@ -13,7 +13,7 @@ conversational MCP interface as the primary way to get information back out.
 
 ## Development
 
-Requires Go 1.23+ (recommended: [mise](https://mise.jdx.dev/) with the
+Requires Go 1.26+ (recommended: [mise](https://mise.jdx.dev/) with the
 project `.mise.toml`).
 
 ```bash

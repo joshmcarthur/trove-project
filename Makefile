@@ -1,6 +1,6 @@
 .PHONY: fmt lint test build docs docs-serve check
 
-GOIMPORTS := go run golang.org/x/tools/cmd/goimports@latest
+GOIMPORTS := go run golang.org/x/tools/cmd/goimports
 
 fmt:
 	go fmt ./...
