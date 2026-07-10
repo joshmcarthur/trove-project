@@ -31,12 +31,24 @@ directory (the parent of each module folder).
 name     = "my-source"
 version  = "1.0"
 kind     = "source"
-provides = ["my-source.event.received"]
+provides = ["my-source.event.received", "my-source.*"]
 listen   = ":8080"   # optional module-specific setting (ignored by core)
+
+[schemas]
+"my-source.event.received" = "schemas/received.json"
 ```
 
-`kind` is `source`, `processor`, or `sink`. Module-specific keys such as `listen`
-are read by the module binary; the core parser ignores unknown fields.
+`kind` is `source`, `processor`, or `sink`. **`provides` is required for source
+modules** — each entry is an exact event type or a glob pattern (`note.*`,
+`mqtt.*.received`). The core rejects `Emit` calls for types outside this list.
+Bare `*` is not allowed.
+
+Optional `[schemas]` maps a type or pattern to a JSON Schema file (relative to
+the module directory). When present, the core validates the payload before append.
+Types without a schema entry are allowlisted but not payload-validated.
+
+Module-specific keys such as `listen` are read by the module binary; the core
+parser ignores unknown fields.
 
 ## Source module contract
 
@@ -68,6 +80,9 @@ start `trove`. POST JSON to `http://localhost:8080/ingest/shortcuts` (default
 listen address). The `:source` path segment becomes the event `source` field;
 optional `type`, `time`, and `blob_ref` keys in the JSON body override event
 metadata. Default request body limit is 10 MiB (`max_body_bytes` in manifest).
+Allowed client `type` values are controlled by `provides` in the module manifest
+(for example `note.*` for Shortcuts). Disallowed types and schema validation
+failures return **400 Bad Request** with an error message.
 
 For large attachments, do not inline bytes in JSON. Once the blob store is
 implemented, upload content separately and reference it with `blob_ref` on the

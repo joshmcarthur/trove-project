@@ -12,7 +12,8 @@ modules, and conversational retrieval via MCP.
 ## Events
 
 The fundamental unit of data — an immutable fact with a ULID, timestamp, typed
-namespace, source identifier, and JSON payload. No schema registry.
+namespace, source identifier, and JSON payload. Modules declare allowed types and
+optional JSON Schema in the manifest; no central registry.
 
 [Events](./concepts/events.md)
 

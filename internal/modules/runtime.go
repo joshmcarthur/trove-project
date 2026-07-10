@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -35,6 +37,16 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHan
 		return nil, fmt.Errorf("modules: start source: %q is kind %q, want %q", mod.Manifest.Name, mod.Manifest.Kind, KindSource)
 	}
 
+	manifest, err := loadModuleManifest(mod)
+	if err != nil {
+		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
+	}
+
+	policy, err := LoadIngestPolicy(manifest, mod.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
+	}
+
 	cmd, err := moduleExecCmd(mod)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
@@ -42,7 +54,7 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHan
 
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j),
+		Plugins:          hostPluginSet(j, policy, manifest.Name),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),
@@ -85,6 +97,18 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHan
 	}
 
 	return &SourceHandle{client: client}, nil
+}
+
+func loadModuleManifest(mod Module) (Manifest, error) {
+	manifestPath := filepath.Join(mod.Dir, manifestFileName)
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return mod.Manifest, nil
+		}
+		return Manifest{}, fmt.Errorf("read manifest: %w", err)
+	}
+	return ParseManifest(data)
 }
 
 func runHealthchecks(ctx context.Context, name string, mod SourceModule) {

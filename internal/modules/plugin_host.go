@@ -20,13 +20,14 @@ type sourceModuleClient struct {
 	client  troverpc.SourceModuleClient
 	broker  *plugin.GRPCBroker
 	journal journal.Journal
+	policy  IngestPolicy
 }
 
 func (c *sourceModuleClient) Run(ctx context.Context) error {
 	brokerID := c.broker.NextId()
 	go c.broker.AcceptAndServe(brokerID, func(opts []grpc.ServerOption) *grpc.Server {
 		s := grpc.NewServer(opts...)
-		troverpc.RegisterSourceServer(s, &ingestServer{journal: c.journal})
+		troverpc.RegisterSourceServer(s, &ingestServer{journal: c.journal, policy: c.policy})
 		return s
 	})
 
@@ -40,7 +41,9 @@ func (c *sourceModuleClient) Healthcheck(ctx context.Context) (*troverpc.Healthc
 
 type sourceModuleGRPCPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	journal journal.Journal
+	journal    journal.Journal
+	policy     IngestPolicy
+	moduleName string
 }
 
 func (p *sourceModuleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (any, error) {
@@ -48,6 +51,7 @@ func (p *sourceModuleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.
 		client:  troverpc.NewSourceModuleClient(c),
 		broker:  broker,
 		journal: p.journal,
+		policy:  p.policy,
 	}, nil
 }
 
@@ -55,9 +59,13 @@ func (p *sourceModuleGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.S
 	return nil
 }
 
-func hostPluginSet(j journal.Journal) map[string]plugin.Plugin {
+func hostPluginSet(j journal.Journal, policy IngestPolicy, moduleName string) map[string]plugin.Plugin {
 	return map[string]plugin.Plugin{
-		trovemodule.PluginName: &sourceModuleGRPCPlugin{journal: j},
+		trovemodule.PluginName: &sourceModuleGRPCPlugin{
+			journal:    j,
+			policy:     policy,
+			moduleName: moduleName,
+		},
 	}
 }
 

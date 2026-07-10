@@ -12,11 +12,15 @@ import (
 type ingestServer struct {
 	troverpc.UnimplementedSourceServer
 	journal journal.Journal
+	policy  IngestPolicy
 }
 
 func (s *ingestServer) Emit(ctx context.Context, e *troverpc.Event) (*troverpc.EmitResponse, error) {
 	event, err := rpcEventToJournal(e)
 	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := s.policy.ValidateEvent(event); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	if err := s.journal.Append(ctx, event); err != nil {

@@ -32,9 +32,10 @@ func TestStartSourceInvokesHealthcheck(t *testing.T) {
 		Dir:    filepath.Dir(binary),
 		Binary: binary,
 		Manifest: Manifest{
-			Name:    "healthcheck-loop",
-			Version: "0.1.0",
-			Kind:    KindSource,
+			Name:     "healthcheck-loop",
+			Version:  "0.1.0",
+			Kind:     KindSource,
+			Provides: []string{"health.ping"},
 		},
 	}
 
@@ -89,9 +90,10 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 		Dir:    filepath.Dir(binary),
 		Binary: binary,
 		Manifest: Manifest{
-			Name:    "emit-once",
-			Version: "0.1.0",
-			Kind:    KindSource,
+			Name:     "emit-once",
+			Version:  "0.1.0",
+			Kind:     KindSource,
+			Provides: []string{"test.emit.once"},
 		},
 	}
 
@@ -263,7 +265,7 @@ func buildHTTPIngestModule(t *testing.T) (string, string) {
 	manifest := fmt.Sprintf(`name = "http-ingest"
 version = "1.0"
 kind = "source"
-provides = ["http.ingest.received"]
+provides = ["http.ingest.received", "note.*", "shortcut.*"]
 listen = %q
 `, listenAddr)
 	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o644); err != nil {

@@ -26,9 +26,10 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 		Dir:    filepath.Dir(binary),
 		Binary: binary,
 		Manifest: Manifest{
-			Name:    "crash-restart",
-			Version: "0.1.0",
-			Kind:    KindSource,
+			Name:     "crash-restart",
+			Version:  "0.1.0",
+			Kind:     KindSource,
+			Provides: []string{"test.crash.restart"},
 		},
 	}
 

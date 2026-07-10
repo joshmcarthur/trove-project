@@ -16,6 +16,8 @@ import (
 
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type mockEmitter struct {
@@ -29,6 +31,13 @@ func (m *mockEmitter) Emit(_ context.Context, event *troverpc.Event) error {
 	}
 	m.events = append(m.events, event)
 	return nil
+}
+
+func defaultTestConfig() config {
+	return config{
+		MaxBodyBytes: defaultMaxBodyBytes,
+		Provides:     []string{"http.ingest.received", "note.*", "shortcut.*"},
+	}
 }
 
 func TestHandleIngest(t *testing.T) {
@@ -150,6 +159,21 @@ func TestHandleIngest(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
+			name:       "disallowed type",
+			method:     http.MethodPost,
+			source:     "shortcuts",
+			body:       `{"type":"mqtt.sensor.temp","title":"test"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "emit invalid argument",
+			method:     http.MethodPost,
+			source:     "shortcuts",
+			body:       `{"title":"test"}`,
+			emitErr:    status.Error(codes.InvalidArgument, "payload does not match schema for type \"http.ingest.received\": missing title"),
+			wantStatus: http.StatusBadRequest,
+		},
+		{
 			name:       "emit failure",
 			method:     http.MethodPost,
 			source:     "shortcuts",
@@ -171,7 +195,7 @@ func TestHandleIngest(t *testing.T) {
 			req.SetPathValue("source", tt.source)
 
 			rec := httptest.NewRecorder()
-			handleIngest(rec, req, emit, defaultMaxBodyBytes)
+			handleIngest(rec, req, emit, defaultTestConfig())
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d; body = %q", rec.Code, tt.wantStatus, rec.Body.String())
@@ -196,7 +220,7 @@ func TestIngestRouteMethodNotAllowed(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		handleIngest(w, r, &mockEmitter{}, defaultMaxBodyBytes)
+		handleIngest(w, r, &mockEmitter{}, defaultTestConfig())
 	})
 	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -267,7 +291,7 @@ func TestRunHTTPServerShutdown(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runHTTPServer(ctx, emit, config{Listen: addr, MaxBodyBytes: defaultMaxBodyBytes})
+		errCh <- runHTTPServer(ctx, emit, config{Listen: addr, MaxBodyBytes: defaultMaxBodyBytes, Provides: defaultTestConfig().Provides})
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)
