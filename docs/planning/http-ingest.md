@@ -84,3 +84,4 @@ Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339)
 
 - Auth model — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - Blob upload: `PUT /blobs` — see [blobs](./blobs.md) (Supported)
+- HTTP gateway migration — [http-gateway.md](./http-gateway.md) (Planned)

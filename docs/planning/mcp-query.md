@@ -55,3 +55,4 @@ MCP tools map 1:1 onto these methods.
 
 - Auth for MCP endpoint — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - `summarize_range` write-time vs query-time aggregation — [open-items.md](../open-items.md)
+- HTTP gateway migration — [http-gateway.md](./http-gateway.md) (Planned)

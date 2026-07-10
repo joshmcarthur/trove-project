@@ -40,6 +40,7 @@ listed package, update the [roadmap](./roadmap.md).
 
 | Page | Package |
 |------|---------|
+| [HTTP gateway](./http-gateway.md) | `internal/gateway` + modules |
 | [HA WebSocket source](./ha-source.md) | external module |
 | [Remote modules](./remote-modules.md) | `internal/modules` |
 | [Embeddings / semantic search](./embeddings.md) | `internal/journal` |
