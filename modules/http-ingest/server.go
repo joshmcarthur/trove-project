@@ -1,0 +1,143 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
+	"github.com/joshmcarthur/trove/pkg/trovemodule"
+)
+
+const (
+	defaultEventType = "http.ingest.received"
+	maxBodyBytes     = 1 << 20 // 1 MiB
+)
+
+func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, listen string) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
+		handleIngest(w, r, emit)
+	})
+	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+
+	srv := &http.Server{
+		Addr:    listen,
+		Handler: mux,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	case err := <-errCh:
+		return err
+	}
+}
+
+func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitter) {
+	source := r.PathValue("source")
+	if source == "" {
+		http.Error(w, "source is required", http.StatusBadRequest)
+		return
+	}
+
+	body, err := readBody(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	event, err := buildEvent(source, body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := emit.Emit(r.Context(), event); err != nil {
+		http.Error(w, "failed to ingest event", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	defer limited.Close()
+
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return nil, fmt.Errorf("request body too large")
+		}
+		return nil, fmt.Errorf("read body")
+	}
+	if len(body) == 0 {
+		return nil, fmt.Errorf("request body is required")
+	}
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("invalid JSON")
+	}
+	return body, nil
+}
+
+func buildEvent(source string, body []byte) (*troverpc.Event, error) {
+	event := &troverpc.Event{
+		Type:    defaultEventType,
+		Source:  source,
+		Payload: body,
+	}
+
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		// Arrays and primitives use the entire body as payload.
+		return event, nil
+	}
+
+	payload := make(map[string]json.RawMessage, len(obj))
+	for key, value := range obj {
+		switch key {
+		case "type":
+			var eventType string
+			if err := json.Unmarshal(value, &eventType); err != nil || eventType == "" {
+				return nil, fmt.Errorf("invalid type field")
+			}
+			event.Type = eventType
+		case "time":
+			var timeStr string
+			if err := json.Unmarshal(value, &timeStr); err != nil {
+				return nil, fmt.Errorf("invalid time field")
+			}
+			if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
+				return nil, fmt.Errorf("invalid time field")
+			}
+			event.Time = timeStr
+		default:
+			payload[key] = value
+		}
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal payload")
+	}
+	event.Payload = payloadBytes
+	return event, nil
+}

@@ -45,8 +45,7 @@ Pass the config file path with `-config`:
 trove -config /path/to/trove.toml
 ```
 
-With a valid config, `trove` opens the journal database and exits with
-`trove: journal ready; module runtime not yet implemented` until module startup
-lands. Invalid or missing config fails fast with a clear error. Journal open
-failures (e.g. unwritable path) are reported before exit. Use `trove -version`
-without a config file.
+With a valid config, `trove` opens the journal database, discovers source modules
+from `[modules].paths`, and supervises them until interrupted. Invalid or missing
+config fails fast with a clear error. Journal open failures (e.g. unwritable path)
+are reported before exit. Use `trove -version` without a config file.

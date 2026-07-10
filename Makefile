@@ -1,4 +1,4 @@
-.PHONY: fmt lint test build docs docs-serve check proto
+.PHONY: fmt lint test build build-http-ingest docs docs-serve check proto
 
 GOIMPORTS := go run golang.org/x/tools/cmd/goimports
 
@@ -18,8 +18,12 @@ lint:
 test:
 	go test -race -cover ./...
 
-build:
+build: build-http-ingest
 	go build -o bin/trove ./cmd/trove
+
+build-http-ingest:
+	go build -o modules/http-ingest/module ./modules/http-ingest
+	chmod +x modules/http-ingest/module
 
 docs:
 	cd docs && deno task build

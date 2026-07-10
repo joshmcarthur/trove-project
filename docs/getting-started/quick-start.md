@@ -20,36 +20,33 @@ make build
 ./bin/trove -version
 ```
 
-The config loader (`internal/config`) and SQLite journal (`internal/journal`) are
-implemented. With a valid config file, `trove` validates settings and opens the
-journal database:
+The config loader (`internal/config`), SQLite journal (`internal/journal`), module
+runtime (`internal/modules`), and HTTP ingest module (`modules/http-ingest`) are
+implemented. With a valid config file, `trove` opens the journal, discovers
+source modules, and supervises them until interrupted:
 
 ```bash
+make build
 trove -config /path/to/trove.toml
 ```
 
-Module runtime and HTTP ingest are not wired up yet — the process exits after
-opening the journal.
+Point `[modules].paths` at the parent directory containing module installs (for
+example, the repo `modules/` directory after `make build`). Then POST JSON to
+`POST /ingest/:source` on the HTTP ingest listen address (default `:8080`).
 
-## What's coming (milestone 1)
+## What's coming
 
-To finish milestone 1:
+To finish milestone 1 validation:
 
-1. Module discovery and go-plugin runtime (see
-   [planning/module-runtime.md](../planning/module-runtime.md)).
-2. HTTP ingest module — `POST /ingest/:source` (see
-   [planning/http-ingest.md](../planning/http-ingest.md)).
-3. MCP query server (milestone 3).
+1. MCP query server (milestone 3).
 
-When milestone 1 is complete:
+## Capture events
 
 1. Configure paths in TOML (see [configuration](./configuration.md)).
 2. Start `trove` — core loads modules from configured paths.
 3. POST JSON to `POST /ingest/:source` to append events.
 
-## iOS Shortcuts (after HTTP ingest)
-
-When generic HTTP ingest is live, point an iOS Shortcut at your Trove instance:
+## iOS Shortcuts
 
 ```
 POST https://your-host/ingest/shortcuts
@@ -64,4 +61,4 @@ The `:source` path segment becomes the event `source` field.
 
 - [Roadmap](../roadmap.md) — what to build and in what order
 - [Configuration](./configuration.md) — TOML shape (§10)
-- [Planning: module runtime](../planning/module-runtime.md) — next milestone 1 task
+- [Planning: HTTP ingest](../planning/http-ingest.md) — generic webhook capture
