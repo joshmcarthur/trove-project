@@ -126,7 +126,8 @@ var Source_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	SourceModule_Run_FullMethodName = "/trove.v1.SourceModule/Run"
+	SourceModule_Run_FullMethodName         = "/trove.v1.SourceModule/Run"
+	SourceModule_Healthcheck_FullMethodName = "/trove.v1.SourceModule/Healthcheck"
 )
 
 // SourceModuleClient is the client API for SourceModule service.
@@ -136,6 +137,7 @@ const (
 // SourceModule is implemented by source modules; the core calls Run to start emission.
 type SourceModuleClient interface {
 	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunResponse, error)
+	Healthcheck(ctx context.Context, in *HealthcheckRequest, opts ...grpc.CallOption) (*HealthcheckResponse, error)
 }
 
 type sourceModuleClient struct {
@@ -156,6 +158,16 @@ func (c *sourceModuleClient) Run(ctx context.Context, in *RunRequest, opts ...gr
 	return out, nil
 }
 
+func (c *sourceModuleClient) Healthcheck(ctx context.Context, in *HealthcheckRequest, opts ...grpc.CallOption) (*HealthcheckResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthcheckResponse)
+	err := c.cc.Invoke(ctx, SourceModule_Healthcheck_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SourceModuleServer is the server API for SourceModule service.
 // All implementations must embed UnimplementedSourceModuleServer
 // for forward compatibility.
@@ -163,6 +175,7 @@ func (c *sourceModuleClient) Run(ctx context.Context, in *RunRequest, opts ...gr
 // SourceModule is implemented by source modules; the core calls Run to start emission.
 type SourceModuleServer interface {
 	Run(context.Context, *RunRequest) (*RunResponse, error)
+	Healthcheck(context.Context, *HealthcheckRequest) (*HealthcheckResponse, error)
 	mustEmbedUnimplementedSourceModuleServer()
 }
 
@@ -175,6 +188,9 @@ type UnimplementedSourceModuleServer struct{}
 
 func (UnimplementedSourceModuleServer) Run(context.Context, *RunRequest) (*RunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Run not implemented")
+}
+func (UnimplementedSourceModuleServer) Healthcheck(context.Context, *HealthcheckRequest) (*HealthcheckResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Healthcheck not implemented")
 }
 func (UnimplementedSourceModuleServer) mustEmbedUnimplementedSourceModuleServer() {}
 func (UnimplementedSourceModuleServer) testEmbeddedByValue()                      {}
@@ -215,6 +231,24 @@ func _SourceModule_Run_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SourceModule_Healthcheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthcheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SourceModuleServer).Healthcheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SourceModule_Healthcheck_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SourceModuleServer).Healthcheck(ctx, req.(*HealthcheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SourceModule_ServiceDesc is the grpc.ServiceDesc for SourceModule service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -225,6 +259,10 @@ var SourceModule_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Run",
 			Handler:    _SourceModule_Run_Handler,
+		},
+		{
+			MethodName: "Healthcheck",
+			Handler:    _SourceModule_Healthcheck_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

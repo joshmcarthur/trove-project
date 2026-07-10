@@ -57,4 +57,11 @@ func (s *sourceModuleServer) Run(ctx context.Context, req *troverpc.RunRequest) 
 	return &troverpc.RunResponse{}, nil
 }
 
+func (s *sourceModuleServer) Healthcheck(ctx context.Context, _ *troverpc.HealthcheckRequest) (*troverpc.HealthcheckResponse, error) {
+	if hc, ok := s.runner.(HealthChecker); ok {
+		return hc.Healthcheck(ctx)
+	}
+	return &troverpc.HealthcheckResponse{Ok: true}, nil
+}
+
 var _ plugin.GRPCPlugin = (*sourceGRPCPlugin)(nil)

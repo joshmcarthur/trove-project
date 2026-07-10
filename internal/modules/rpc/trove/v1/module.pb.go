@@ -223,6 +223,94 @@ func (*RunResponse) Descriptor() ([]byte, []int) {
 	return file_trove_v1_module_proto_rawDescGZIP(), []int{3}
 }
 
+type HealthcheckRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthcheckRequest) Reset() {
+	*x = HealthcheckRequest{}
+	mi := &file_trove_v1_module_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthcheckRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthcheckRequest) ProtoMessage() {}
+
+func (x *HealthcheckRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthcheckRequest.ProtoReflect.Descriptor instead.
+func (*HealthcheckRequest) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{4}
+}
+
+type HealthcheckResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthcheckResponse) Reset() {
+	*x = HealthcheckResponse{}
+	mi := &file_trove_v1_module_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthcheckResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthcheckResponse) ProtoMessage() {}
+
+func (x *HealthcheckResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthcheckResponse.ProtoReflect.Descriptor instead.
+func (*HealthcheckResponse) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *HealthcheckResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *HealthcheckResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_trove_v1_module_proto protoreflect.FileDescriptor
 
 const file_trove_v1_module_proto_rawDesc = "" +
@@ -239,11 +327,16 @@ const file_trove_v1_module_proto_rawDesc = "" +
 	"\n" +
 	"RunRequest\x12(\n" +
 	"\x10ingest_broker_id\x18\x01 \x01(\rR\x0eingestBrokerId\"\r\n" +
-	"\vRunResponse29\n" +
+	"\vRunResponse\"\x14\n" +
+	"\x12HealthcheckRequest\"?\n" +
+	"\x13HealthcheckResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage29\n" +
 	"\x06Source\x12/\n" +
-	"\x04Emit\x12\x0f.trove.v1.Event\x1a\x16.trove.v1.EmitResponse2B\n" +
+	"\x04Emit\x12\x0f.trove.v1.Event\x1a\x16.trove.v1.EmitResponse2\x8e\x01\n" +
 	"\fSourceModule\x122\n" +
-	"\x03Run\x12\x14.trove.v1.RunRequest\x1a\x15.trove.v1.RunResponseB=Z;github.com/joshmcarthur/trove/internal/modules/rpc;troverpcb\x06proto3"
+	"\x03Run\x12\x14.trove.v1.RunRequest\x1a\x15.trove.v1.RunResponse\x12J\n" +
+	"\vHealthcheck\x12\x1c.trove.v1.HealthcheckRequest\x1a\x1d.trove.v1.HealthcheckResponseB=Z;github.com/joshmcarthur/trove/internal/modules/rpc;troverpcb\x06proto3"
 
 var (
 	file_trove_v1_module_proto_rawDescOnce sync.Once
@@ -257,20 +350,24 @@ func file_trove_v1_module_proto_rawDescGZIP() []byte {
 	return file_trove_v1_module_proto_rawDescData
 }
 
-var file_trove_v1_module_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_trove_v1_module_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_trove_v1_module_proto_goTypes = []any{
-	(*Event)(nil),        // 0: trove.v1.Event
-	(*EmitResponse)(nil), // 1: trove.v1.EmitResponse
-	(*RunRequest)(nil),   // 2: trove.v1.RunRequest
-	(*RunResponse)(nil),  // 3: trove.v1.RunResponse
+	(*Event)(nil),               // 0: trove.v1.Event
+	(*EmitResponse)(nil),        // 1: trove.v1.EmitResponse
+	(*RunRequest)(nil),          // 2: trove.v1.RunRequest
+	(*RunResponse)(nil),         // 3: trove.v1.RunResponse
+	(*HealthcheckRequest)(nil),  // 4: trove.v1.HealthcheckRequest
+	(*HealthcheckResponse)(nil), // 5: trove.v1.HealthcheckResponse
 }
 var file_trove_v1_module_proto_depIdxs = []int32{
 	0, // 0: trove.v1.Source.Emit:input_type -> trove.v1.Event
 	2, // 1: trove.v1.SourceModule.Run:input_type -> trove.v1.RunRequest
-	1, // 2: trove.v1.Source.Emit:output_type -> trove.v1.EmitResponse
-	3, // 3: trove.v1.SourceModule.Run:output_type -> trove.v1.RunResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	4, // 2: trove.v1.SourceModule.Healthcheck:input_type -> trove.v1.HealthcheckRequest
+	1, // 3: trove.v1.Source.Emit:output_type -> trove.v1.EmitResponse
+	3, // 4: trove.v1.SourceModule.Run:output_type -> trove.v1.RunResponse
+	5, // 5: trove.v1.SourceModule.Healthcheck:output_type -> trove.v1.HealthcheckResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -287,7 +384,7 @@ func file_trove_v1_module_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_trove_v1_module_proto_rawDesc), len(file_trove_v1_module_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

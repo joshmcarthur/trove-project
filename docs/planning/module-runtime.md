@@ -6,7 +6,7 @@ nav_order: 2
 
 # Module runtime
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 1 — Journal + module core\
 **Spec:** [Module architecture §8](../spec.md#8-module-architecture-dynamic-socket-based)\
 **Package:** `internal/modules`
@@ -42,7 +42,7 @@ All kinds : core calls Healthcheck() periodically
 - [x] Discovers module directories with valid manifests
 - [x] Starts source module and receives Emit calls into journal
 - [x] Module crash does not take down core
-- [ ] Healthcheck RPC wired
+- [x] Healthcheck RPC wired
 
 ## Dependencies
 

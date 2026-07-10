@@ -13,6 +13,7 @@ import (
 // SourceModule is the host-side client for a running source module plugin.
 type SourceModule interface {
 	Run(ctx context.Context) error
+	Healthcheck(ctx context.Context) (*troverpc.HealthcheckResponse, error)
 }
 
 type sourceModuleClient struct {
@@ -31,6 +32,10 @@ func (c *sourceModuleClient) Run(ctx context.Context) error {
 
 	_, err := c.client.Run(ctx, &troverpc.RunRequest{IngestBrokerId: brokerID})
 	return err
+}
+
+func (c *sourceModuleClient) Healthcheck(ctx context.Context) (*troverpc.HealthcheckResponse, error) {
+	return c.client.Healthcheck(ctx, &troverpc.HealthcheckRequest{})
 }
 
 type sourceModuleGRPCPlugin struct {
