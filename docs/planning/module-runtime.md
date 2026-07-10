@@ -30,15 +30,16 @@ All kinds : core calls Healthcheck() periodically
 ## Implementation notes
 
 - Scan `[modules].paths` from config (standard Linux paths + home dir)
-- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`) — **parser landed** in
-  `internal/modules/manifest.go`; filesystem discovery scanner is next
+- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`) — landed in
+  `internal/modules/manifest.go`
+- Filesystem discovery scanner — landed in `internal/modules/discover.go`
 - Integrate go-plugin for subprocess lifecycle
 - Supervise with restart + backoff on crash
 - React to `SIGHUP` for reload (stretch)
 
 ## Acceptance criteria
 
-- [ ] Discovers module directories with valid manifests
+- [x] Discovers module directories with valid manifests
 - [ ] Starts source module and receives Emit calls into journal
 - [ ] Module crash does not take down core
 - [ ] Healthcheck RPC wired

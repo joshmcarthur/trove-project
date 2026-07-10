@@ -1,0 +1,4 @@
+name     = "duplicate-test"
+version  = "1.0"
+kind     = "source"
+provides = ["first.event"]
