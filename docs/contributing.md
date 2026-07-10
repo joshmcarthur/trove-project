@@ -43,6 +43,18 @@ nav_order: 10
 The docs site is the living plan. When you land a feature, update roadmap status
 and planning acceptance criteria in the same PR — do not leave docs stale.
 
+## iOS Shortcuts
+
+Importable capture Shortcuts live in [`examples/ios-shortcuts/`](../examples/ios-shortcuts/).
+
+- Edit unsigned sources via [`generate_unsigned.py`](../examples/ios-shortcuts/generate_unsigned.py)
+  or files in `unsigned/` — never hand-edit `signed/*.shortcut`.
+- Signing runs on `macos-latest` via
+  [`.github/workflows/sign-shortcuts.yml`](../.github/workflows/sign-shortcuts.yml).
+- After changing unsigned sources, run `python3 examples/ios-shortcuts/generate_unsigned.py`
+  and commit the updated `unsigned/` files. Merging to `main` auto-commits signed
+  output.
+
 ## License
 
 Contributions are under GPLv3, same as the project.

@@ -14,7 +14,9 @@ See [spec §6](../spec.md#6-sources).
 ## v0 priority order
 
 1. **Generic HTTP ingest** (`POST /ingest/:source`) — catch-all for Shortcuts,
-   webhooks, IFTTT. Highest leverage, build first.
+   webhooks, IFTTT. Highest leverage, build first. See
+   [iOS Shortcuts guide](../getting-started/ios-shortcuts.md) for importable
+   capture Shortcuts.
 2. **MQTT listener** — subscribes to configured topics on Mosquitto; covers
    Meshtastic (MQTT-bridged) and ESPHome traffic.
 3. **Home Assistant WebSocket tap** — `state_changed` events from HA's

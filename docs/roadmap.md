@@ -9,9 +9,11 @@ Living plan for Trove development. Update this page when a feature lands.
 
 ## Current focus
 
-**Milestone 1 — Journal + module core.** Start with
-[Journal (SQLite)](./planning/journal.md): the append-only event store everything
-else depends on.
+**Milestone 3 — MCP query + live-test capture.** Milestone 1 (journal, module
+runtime, HTTP ingest, config) is complete. Finish
+[MCP query](./planning/mcp-query.md) (`summarize_range`, client validation) and
+set up capture recipes — especially [iOS Shortcuts](./getting-started/ios-shortcuts.md)
+— for the two-week live test (spec §11.4).
 
 ## Milestone sequence
 
@@ -19,7 +21,7 @@ Build order from spec §11:
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 1 | SQLite journal + module-loading core + HTTP ingest | Planned |
+| 1 | SQLite journal + module-loading core + HTTP ingest | Supported |
 | 2 | MQTT source module | Planned |
 | 3 | Minimal MCP query server | Planned |
 | 4 | Two-week live test | Planned |
@@ -29,7 +31,7 @@ Build order from spec §11:
 
 | Feature | Status | Spec | Planning | Go package |
 |---------|--------|------|----------|------------|
-| Go CLI scaffold | Scaffold | — | — | `cmd/trove` |
+| Go CLI | Supported | — | — | `cmd/trove` |
 | SQLite journal | Supported | §4 | [journal](./planning/journal.md) | `internal/journal` |
 | Generic HTTP ingest | Supported | §6, §11.1 | [http-ingest](./planning/http-ingest.md) | module + `internal/modules` |
 | Module discovery (go-plugin) | Supported | §8 | [module-runtime](./planning/module-runtime.md) | `internal/modules` |

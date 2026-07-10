@@ -1,0 +1,48 @@
+name: Sign iOS Shortcuts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/ios-shortcuts/unsigned/**"
+      - "examples/ios-shortcuts/generate_unsigned.py"
+      - "examples/ios-shortcuts/sign.sh"
+  pull_request:
+    paths:
+      - "examples/ios-shortcuts/unsigned/**"
+      - "examples/ios-shortcuts/generate_unsigned.py"
+      - "examples/ios-shortcuts/sign.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify shortcuts CLI
+        run: shortcuts --version || which shortcuts
+
+      - name: Sign shortcuts
+        run: chmod +x ./examples/ios-shortcuts/sign.sh && ./examples/ios-shortcuts/sign.sh
+
+      - name: Check signed output (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          if compgen -G "examples/ios-shortcuts/signed/*.shortcut" > /dev/null; then
+            git diff --exit-code examples/ios-shortcuts/signed/
+          else
+            echo "No signed shortcuts committed yet; merge to main to auto-sign"
+          fi
+
+      - name: Commit signed shortcuts (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add examples/ios-shortcuts/signed/*.shortcut
+          git diff --staged --quiet || git commit -m "chore: re-sign iOS Shortcuts"
+          git push

@@ -1,0 +1,7 @@
+{
+  "type": "shortcuts.share.saved",
+  "title": "Example page title",
+  "url": "https://example.com/article",
+  "text": "Shared text or notes",
+  "content_type": "url"
+}

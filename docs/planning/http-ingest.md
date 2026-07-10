@@ -41,6 +41,19 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
   event and store bytes in the blob store once that lands ([blobs](./blobs.md))
 - Even in v0, keep behind go-plugin per spec §11
 
+### Request / response
+
+| Request | Response |
+|---------|----------|
+| `POST /ingest/{source}` with valid JSON body | `204 No Content` |
+| Empty body, invalid JSON, bad metadata fields | `400 Bad Request` |
+| Non-POST to `/ingest/{source}` | `405 Method Not Allowed` |
+| Emit failure | `500 Internal Server Error` |
+
+Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339),
+`blob_ref`. Remaining keys become `payload`. Default event type:
+`http.ingest.received`.
+
 ## Acceptance criteria
 
 - [x] `POST /ingest/shortcuts` with JSON creates journal event
@@ -52,6 +65,11 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 
 - **Blocks:** iOS Shortcuts capture, webhook integrations
 - **Blocked by:** journal, module runtime, config
+
+## See also
+
+- [iOS Shortcuts guide](../getting-started/ios-shortcuts.md) — importable
+  Shortcuts and payload conventions for `POST /ingest/shortcuts`
 
 ## Open questions
 

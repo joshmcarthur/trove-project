@@ -73,6 +73,9 @@ For large attachments, do not inline bytes in JSON. Once the blob store is
 implemented, upload content separately and reference it with `blob_ref` on the
 ingest payload.
 
+See [iOS Shortcuts](../getting-started/ios-shortcuts.md) for importable capture
+Shortcuts that POST to this endpoint.
+
 ## Publishing
 
 No central registry in v0 — copy the module directory into a search path on the
