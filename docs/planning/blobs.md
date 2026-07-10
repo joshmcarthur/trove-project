@@ -46,10 +46,10 @@ type BlobStore interface {
 
 ## Acceptance criteria
 
-- [ ] `Put`/`Get` round-trip on filesystem backend
-- [ ] Put returns stable ref for same content (dedup)
-- [ ] Range supports partial reads
-- [ ] Enumerate lists all refs
+- [x] `Put`/`Get` round-trip on filesystem backend
+- [x] Put returns stable ref for same content (dedup)
+- [x] Range supports partial reads
+- [x] Enumerate lists all refs
 - [ ] `PUT /blobs` on http-ingest returns stable `blob_ref`
 - [ ] Event with `blob_ref` references retrievable bytes
 - [ ] Share-sheet Shortcut recipe documents photo upload path
