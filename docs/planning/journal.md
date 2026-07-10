@@ -40,7 +40,7 @@ type Journal interface {
 - [x] Append persists event with ULID
 - [x] Query by type prefix, source, time range
 - [x] Get by id
-- [ ] Subscribe streams new events
+- [x] Subscribe streams new events
 
 ## Dependencies
 

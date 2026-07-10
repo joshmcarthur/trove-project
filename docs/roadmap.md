@@ -30,7 +30,7 @@ Build order from spec §11:
 | Feature | Status | Spec | Planning | Go package |
 |---------|--------|------|----------|------------|
 | Go CLI scaffold | Scaffold | — | — | `cmd/trove` |
-| SQLite journal | Planned | §4 | [journal](./planning/journal.md) | `internal/journal` |
+| SQLite journal | Supported | §4 | [journal](./planning/journal.md) | `internal/journal` |
 | Generic HTTP ingest | Planned | §6, §11.1 | [http-ingest](./planning/http-ingest.md) | module + `internal/modules` |
 | Module discovery (go-plugin) | Planned | §8 | [module-runtime](./planning/module-runtime.md) | `internal/modules` |
 | MQTT source | Planned | §6, §11.2 | [mqtt-source](./planning/mqtt-source.md) | external module |
