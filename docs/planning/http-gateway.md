@@ -33,7 +33,7 @@ Primary outcomes:
 | Surface | Process | Config | Routes |
 |---------|---------|--------|--------|
 | HTTP ingest + blobs | `http-ingest` subprocess | `modules/http-ingest/manifest.toml` `listen` | Hardcoded in `server.go` |
-| MCP query | `trove` core | `trove.toml` `[mcp].listen` | Hardcoded in `internal/query/mcp.go` |
+| MCP query | `trove` core built-in | `trove.toml` `[mcp].listen` | Hardcoded in `internal/query/mcp.go` |
 
 Pain points:
 
@@ -284,7 +284,7 @@ Rejected requests never reach module `HandleHTTP`.
 - [x] `http-ingest` routes declared in manifest; module does not bind its own port
 - [x] `POST /ingest/{source}` behaviour unchanged (ingest tests pass)
 - [x] `PUT /blobs` stores via core `BlobPut`; no `TROVE_BLOBS_PATH` env
-- [x] MCP streamable HTTP served at declared path (e.g. `POST /mcp`)
+- [x] MCP streamable HTTP served at declared path (e.g. `POST /mcp`) via `mcp-query` module
 - [x] MCP tools unchanged (`search_events`, `get_event`, etc.)
 - [x] Duplicate route registration fails at startup with clear error
 - [x] Unknown routes return `404`; wrong method returns `405`

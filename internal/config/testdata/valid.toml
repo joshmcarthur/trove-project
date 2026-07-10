@@ -13,6 +13,3 @@ listen = "tailscale:trove"
 
 [http]
 listen = ":8080"
-
-[mcp]
-listen = ":8081"

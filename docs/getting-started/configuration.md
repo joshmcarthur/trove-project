@@ -38,9 +38,7 @@ listen = ":8080"
 
 - Core config covers journal path, blob backend, module search paths, and the HTTP
   gateway listen address (`[http].listen`).
-- MCP is served at `POST /mcp` on the same HTTP listener. The legacy `[mcp].listen`
-  setting is deprecated: if set, Trove logs a warning and does not start a
-  separate MCP server.
+- MCP is provided by the `mcp-query` module at `POST /mcp` on the same listener.
 - Per-module settings (broker URLs, topics, tokens) live in each module's own
   `manifest.toml` — the core does not need to know module-specific shapes.
 

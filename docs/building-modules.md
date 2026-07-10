@@ -21,8 +21,9 @@ Install under a configured search path:
     module               # executable
 ```
 
-For local development, `make build` also builds the first-party HTTP ingest
-and MQTT source modules into `modules/http-ingest/` and `modules/mqtt-source/`.
+For local development, `make build` also builds the first-party HTTP ingest,
+MQTT source, and MCP query modules into `modules/http-ingest/`,
+`modules/mqtt-source/`, and `modules/mcp-query/`.
 Point `[modules].paths` at the repo `modules/` directory (the parent of each
 module folder).
 
@@ -71,6 +72,7 @@ own config (alongside or inside `manifest.toml`), not in the core TOML.
 | Module | Location | Planning page |
 |--------|----------|---------------|
 | HTTP ingest | `modules/http-ingest/` | [http-ingest](./planning/http-ingest.md) |
+| MCP query | `modules/mcp-query/` | [mcp-query](./planning/mcp-query.md) |
 | MQTT source | `modules/mqtt-source/` | [mqtt-source](./planning/mqtt-source.md) |
 | Home Assistant | external | [ha-source](./planning/ha-source.md) |
 

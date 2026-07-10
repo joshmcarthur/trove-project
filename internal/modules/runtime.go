@@ -42,32 +42,36 @@ func (h *SourceHandle) Close() error {
 	return nil
 }
 
-// StartSource launches mod and routes Emit RPC calls into journal.
+// StartSource launches a supervised module subprocess (sources and HTTP modules).
 func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) (*SourceHandle, error) {
-	if mod.Manifest.Kind != KindSource {
-		return nil, fmt.Errorf("modules: start source: %q is kind %q, want %q", mod.Manifest.Name, mod.Manifest.Kind, KindSource)
-	}
-
 	manifest, err := loadModuleManifest(mod)
 	if err != nil {
-		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
+		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
+	}
+
+	hasHTTP := len(manifest.HTTPRoutes()) > 0
+	needsIngest := manifest.Kind == KindSource
+
+	switch {
+	case needsIngest:
+	case hasHTTP:
+	default:
+		return nil, fmt.Errorf("modules: start %q: not a source and no http routes", mod.Manifest.Name)
 	}
 
 	policy, err := LoadIngestPolicy(manifest, mod.Dir)
 	if err != nil {
-		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
+		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
 	cmd, err := moduleExecCmd(mod)
 	if err != nil {
-		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
+		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
-
-	hasHTTP := len(manifest.HTTPRoutes()) > 0
 
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP),
+		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP, needsIngest),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),

@@ -8,7 +8,6 @@ package troverpc
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -126,16 +125,29 @@ var Source_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	CoreServices_BlobPut_FullMethodName = "/trove.v1.CoreServices/BlobPut"
+	CoreServices_BlobPut_FullMethodName         = "/trove.v1.CoreServices/BlobPut"
+	CoreServices_GetEvent_FullMethodName        = "/trove.v1.CoreServices/GetEvent"
+	CoreServices_SearchEvents_FullMethodName    = "/trove.v1.CoreServices/SearchEvents"
+	CoreServices_GetEventsByType_FullMethodName = "/trove.v1.CoreServices/GetEventsByType"
+	CoreServices_SummarizeRange_FullMethodName  = "/trove.v1.CoreServices/SummarizeRange"
 )
 
 // CoreServicesClient is the client API for CoreServices service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// CoreServices is implemented by the Trove core; modules call for blob operations.
+// CoreServices exposes durable core capabilities to module subprocesses over the
+// services broker (see RunRequest.services_broker_id). G2 added BlobPut so HTTP
+// modules store blobs in the core-owned store instead of a local path. Query
+// methods let read-only modules (e.g. mcp-query) access the journal without
+// opening trove.db directly. Emit stays on the separate ingest broker to limit
+// churn in the existing source path.
 type CoreServicesClient interface {
 	BlobPut(ctx context.Context, in *BlobPutRequest, opts ...grpc.CallOption) (*BlobPutResponse, error)
+	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*Event, error)
+	SearchEvents(ctx context.Context, in *SearchEventsRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
+	GetEventsByType(ctx context.Context, in *GetEventsByTypeRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
+	SummarizeRange(ctx context.Context, in *SummarizeRangeRequest, opts ...grpc.CallOption) (*Summary, error)
 }
 
 type coreServicesClient struct {
@@ -156,13 +168,62 @@ func (c *coreServicesClient) BlobPut(ctx context.Context, in *BlobPutRequest, op
 	return out, nil
 }
 
+func (c *coreServicesClient) GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*Event, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Event)
+	err := c.cc.Invoke(ctx, CoreServices_GetEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) SearchEvents(ctx context.Context, in *SearchEventsRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchEventsResponse)
+	err := c.cc.Invoke(ctx, CoreServices_SearchEvents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) GetEventsByType(ctx context.Context, in *GetEventsByTypeRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchEventsResponse)
+	err := c.cc.Invoke(ctx, CoreServices_GetEventsByType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) SummarizeRange(ctx context.Context, in *SummarizeRangeRequest, opts ...grpc.CallOption) (*Summary, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Summary)
+	err := c.cc.Invoke(ctx, CoreServices_SummarizeRange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoreServicesServer is the server API for CoreServices service.
 // All implementations must embed UnimplementedCoreServicesServer
 // for forward compatibility.
 //
-// CoreServices is implemented by the Trove core; modules call for blob operations.
+// CoreServices exposes durable core capabilities to module subprocesses over the
+// services broker (see RunRequest.services_broker_id). G2 added BlobPut so HTTP
+// modules store blobs in the core-owned store instead of a local path. Query
+// methods let read-only modules (e.g. mcp-query) access the journal without
+// opening trove.db directly. Emit stays on the separate ingest broker to limit
+// churn in the existing source path.
 type CoreServicesServer interface {
 	BlobPut(context.Context, *BlobPutRequest) (*BlobPutResponse, error)
+	GetEvent(context.Context, *GetEventRequest) (*Event, error)
+	SearchEvents(context.Context, *SearchEventsRequest) (*SearchEventsResponse, error)
+	GetEventsByType(context.Context, *GetEventsByTypeRequest) (*SearchEventsResponse, error)
+	SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error)
 	mustEmbedUnimplementedCoreServicesServer()
 }
 
@@ -175,6 +236,18 @@ type UnimplementedCoreServicesServer struct{}
 
 func (UnimplementedCoreServicesServer) BlobPut(context.Context, *BlobPutRequest) (*BlobPutResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BlobPut not implemented")
+}
+func (UnimplementedCoreServicesServer) GetEvent(context.Context, *GetEventRequest) (*Event, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEvent not implemented")
+}
+func (UnimplementedCoreServicesServer) SearchEvents(context.Context, *SearchEventsRequest) (*SearchEventsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchEvents not implemented")
+}
+func (UnimplementedCoreServicesServer) GetEventsByType(context.Context, *GetEventsByTypeRequest) (*SearchEventsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEventsByType not implemented")
+}
+func (UnimplementedCoreServicesServer) SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error) {
+	return nil, status.Error(codes.Unimplemented, "method SummarizeRange not implemented")
 }
 func (UnimplementedCoreServicesServer) mustEmbedUnimplementedCoreServicesServer() {}
 func (UnimplementedCoreServicesServer) testEmbeddedByValue()                      {}
@@ -215,6 +288,78 @@ func _CoreServices_BlobPut_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoreServices_GetEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).GetEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_GetEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).GetEvent(ctx, req.(*GetEventRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_SearchEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).SearchEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_SearchEvents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).SearchEvents(ctx, req.(*SearchEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_GetEventsByType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEventsByTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).GetEventsByType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_GetEventsByType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).GetEventsByType(ctx, req.(*GetEventsByTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_SummarizeRange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SummarizeRangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).SummarizeRange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_SummarizeRange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).SummarizeRange(ctx, req.(*SummarizeRangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoreServices_ServiceDesc is the grpc.ServiceDesc for CoreServices service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -225,6 +370,22 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BlobPut",
 			Handler:    _CoreServices_BlobPut_Handler,
+		},
+		{
+			MethodName: "GetEvent",
+			Handler:    _CoreServices_GetEvent_Handler,
+		},
+		{
+			MethodName: "SearchEvents",
+			Handler:    _CoreServices_SearchEvents_Handler,
+		},
+		{
+			MethodName: "GetEventsByType",
+			Handler:    _CoreServices_GetEventsByType_Handler,
+		},
+		{
+			MethodName: "SummarizeRange",
+			Handler:    _CoreServices_SummarizeRange_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

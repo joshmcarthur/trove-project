@@ -15,11 +15,16 @@ const (
 	maxBackoff     = 30 * time.Second
 )
 
-// RunSources supervises all source modules until ctx is cancelled.
+// RunSources supervises source and HTTP modules until ctx is cancelled.
 func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *HTTPRegistry) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
-		if mod.Manifest.Kind != KindSource {
+		manifest, err := loadModuleManifest(mod)
+		if err != nil {
+			log.Printf("modules: load manifest %q: %v", mod.Manifest.Name, err)
+			continue
+		}
+		if manifest.Kind != KindSource && len(manifest.HTTPRoutes()) == 0 {
 			continue
 		}
 		wg.Add(1)
