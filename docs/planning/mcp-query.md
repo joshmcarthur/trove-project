@@ -33,11 +33,12 @@ MCP tools map 1:1 onto these methods.
 ## Implementation notes
 
 - RPC layer and MCP server implemented in `internal/query`
+- `modules/mcp-query` is a processor module; journal reads go through
+  `CoreServices` query RPCs on the services broker
 - `search_events`: FTS5 keyword search
 - `summarize_range`: counts by type, notable events — avoids dumping raw rows
-- MCP streamable HTTP served at `POST /mcp` on the core HTTP gateway
-  (`[http].listen`). See [MCP client setup](../getting-started/mcp-client.md).
-- Legacy `[mcp].listen` is deprecated (warn + ignore when `[http].listen` is set)
+- MCP streamable HTTP is served by the `mcp-query` module at `POST /mcp` on
+  `[http].listen`. See [MCP client setup](../getting-started/mcp-client.md).
 
 ## Acceptance criteria
 

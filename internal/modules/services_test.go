@@ -3,9 +3,12 @@ package modules
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/joshmcarthur/trove/internal/blob"
+	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
+	"github.com/joshmcarthur/trove/internal/query"
 )
 
 func TestCoreServicesBlobPut(t *testing.T) {
@@ -52,5 +55,39 @@ func TestCoreServicesBlobPutEmpty(t *testing.T) {
 	_, err = srv.BlobPut(context.Background(), &troverpc.BlobPutRequest{})
 	if err == nil {
 		t.Fatal("BlobPut() error = nil, want error")
+	}
+}
+
+func TestCoreServicesGetEvent(t *testing.T) {
+	t.Parallel()
+
+	path := t.TempDir() + "/journal.db"
+	j, err := journal.Open(path)
+	if err != nil {
+		t.Fatalf("journal.Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = j.Close() })
+
+	now := time.Now().UTC().Truncate(time.Second)
+	if err := j.Append(context.Background(), journal.Event{
+		Type:    "note.created",
+		Source:  "test",
+		Time:    now,
+		Payload: []byte(`{"title":"hello"}`),
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+	events, err := j.Query(context.Background(), journal.Filter{TypePrefix: "note."})
+	if err != nil || len(events) != 1 {
+		t.Fatalf("Query() = %v, %d events", err, len(events))
+	}
+
+	srv := &coreServicesServer{query: &query.Service{Journal: j}}
+	resp, err := srv.GetEvent(context.Background(), &troverpc.GetEventRequest{Id: events[0].ID})
+	if err != nil {
+		t.Fatalf("GetEvent() error = %v", err)
+	}
+	if resp.Id != events[0].ID {
+		t.Errorf("Id = %q, want %q", resp.Id, events[0].ID)
 	}
 }

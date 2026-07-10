@@ -15,7 +15,6 @@ import (
 	"github.com/joshmcarthur/trove/internal/gateway"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
-	"github.com/joshmcarthur/trove/internal/query"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -42,10 +41,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.UseSeparateMCPListen() {
-		log.Printf("trove: config: [mcp].listen is deprecated; MCP is served at POST /mcp on [http].listen")
-	}
-
 	store, err := journal.Open(cfg.Journal.Path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -64,16 +59,11 @@ func main() {
 		log.Printf("trove: module discovery: %v", err)
 	}
 
-	sourceNames := make([]string, 0, len(mods))
-	for _, mod := range mods {
-		if mod.Manifest.Kind == modules.KindSource {
-			sourceNames = append(sourceNames, mod.Manifest.Name)
-		}
-	}
-	if len(sourceNames) > 0 {
-		log.Printf("trove: starting source modules: %s", strings.Join(sourceNames, ", "))
+	moduleNames := supervisedModuleNames(mods)
+	if len(moduleNames) > 0 {
+		log.Printf("trove: starting modules: %s", strings.Join(moduleNames, ", "))
 	} else {
-		log.Printf("trove: no source modules discovered")
+		log.Printf("trove: no modules discovered")
 	}
 
 	routes, err := modules.CollectHTTPRoutes(mods)
@@ -82,14 +72,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	querySvc := &query.Service{Journal: store}
-	builtins := []gateway.BuiltinRoute{{
-		Method:  "POST",
-		Pattern: "/mcp",
-		Handler: query.MCPHandler(querySvc),
-	}}
-
-	if err := gateway.ValidateRoutes(routes, builtins); err != nil {
+	if err := gateway.ValidateRoutes(routes, nil); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -104,7 +87,7 @@ func main() {
 	gw, err := gateway.New(gateway.Config{
 		Listen:       cfg.HTTP.Listen,
 		MaxBodyBytes: cfg.HTTP.MaxBodyBytes,
-	}, routes, registry, builtins)
+	}, routes, registry, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -117,4 +100,14 @@ func main() {
 	}()
 
 	<-ctx.Done()
+}
+
+func supervisedModuleNames(mods []modules.Module) []string {
+	names := make([]string, 0, len(mods))
+	for _, mod := range mods {
+		if mod.Manifest.Kind == modules.KindSource || len(mod.Manifest.HTTPRoutes()) > 0 {
+			names = append(names, mod.Manifest.Name)
+		}
+	}
+	return names
 }

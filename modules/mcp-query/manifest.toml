@@ -1,0 +1,7 @@
+name    = "mcp-query"
+version = "1.0"
+kind    = "processor"
+
+[[http.routes]]
+method = "POST"
+path   = "/mcp"

@@ -53,36 +53,55 @@ type sourceModuleServer struct {
 }
 
 func (s *sourceModuleServer) Run(ctx context.Context, req *troverpc.RunRequest) (*troverpc.RunResponse, error) {
-	conn, err := s.broker.Dial(req.IngestBrokerId)
-	if err != nil {
-		return nil, err
+	var emit Emitter = &discardingEmitter{}
+	if req.IngestBrokerId != 0 {
+		conn, err := s.broker.Dial(req.IngestBrokerId)
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		emit = &sourceEmitter{client: troverpc.NewSourceClient(conn)}
 	}
-	defer conn.Close()
-
-	emit := &sourceEmitter{client: troverpc.NewSourceClient(conn)}
 
 	var blobs BlobPutter
+	var querier Querier
 	if req.ServicesBrokerId != 0 {
 		servicesConn, err := s.broker.Dial(req.ServicesBrokerId)
 		if err != nil {
 			return nil, err
 		}
 		defer servicesConn.Close()
-		blobs = &blobPutter{client: troverpc.NewCoreServicesClient(servicesConn)}
+		services := troverpc.NewCoreServicesClient(servicesConn)
+		blobs = &blobPutter{client: services}
+		querier = newCoreQuerier(services)
 	}
 
-	if br, ok := s.runner.(BlobRunner); ok {
-		if err := br.RunWithBlobs(ctx, emit, blobs); err != nil {
+	switch runner := s.runner.(type) {
+	case BlobRunner:
+		if err := runner.RunWithBlobs(ctx, emit, blobs); err != nil {
 			return nil, err
 		}
-	} else if r, ok := s.runner.(Runner); ok {
-		if err := r.Run(ctx, emit); err != nil {
+	case QueryRunner:
+		if querier == nil {
+			return nil, fmt.Errorf("trovemodule: query services are required")
+		}
+		if err := runner.RunWithQuery(ctx, querier); err != nil {
 			return nil, err
 		}
-	} else {
-		return nil, fmt.Errorf("trovemodule: runner must implement Runner or BlobRunner")
+	case Runner:
+		if err := runner.Run(ctx, emit); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("trovemodule: runner must implement Runner, BlobRunner, or QueryRunner")
 	}
 	return &troverpc.RunResponse{}, nil
+}
+
+type discardingEmitter struct{}
+
+func (discardingEmitter) Emit(context.Context, *troverpc.Event) error {
+	return fmt.Errorf("trovemodule: emit is not available")
 }
 
 func (s *sourceModuleServer) Healthcheck(ctx context.Context, _ *troverpc.HealthcheckRequest) (*troverpc.HealthcheckResponse, error) {

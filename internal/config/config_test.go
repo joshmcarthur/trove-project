@@ -34,7 +34,6 @@ func TestLoadValidExample(t *testing.T) {
 			Remote: RemoteConfig{Listen: "tailscale:trove"},
 		},
 		HTTP: HTTPConfig{Listen: ":8080", MaxBodyBytes: 10 << 20},
-		MCP:  MCPConfig{Listen: ":8081"},
 	}
 
 	if cfg.Journal != want.Journal {
@@ -45,9 +44,6 @@ func TestLoadValidExample(t *testing.T) {
 	}
 	if cfg.HTTP != want.HTTP {
 		t.Errorf("HTTP = %#v, want %#v", cfg.HTTP, want.HTTP)
-	}
-	if cfg.MCP != want.MCP {
-		t.Errorf("MCP = %#v, want %#v", cfg.MCP, want.MCP)
 	}
 	if cfg.Modules.Remote != want.Modules.Remote {
 		t.Errorf("Modules.Remote = %#v, want %#v", cfg.Modules.Remote, want.Modules.Remote)
@@ -81,9 +77,6 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.HTTP.Listen != ":9090" {
 		t.Errorf("HTTP.Listen = %q, want %q", cfg.HTTP.Listen, ":9090")
-	}
-	if cfg.MCP.Listen != ":8081" {
-		t.Errorf("MCP.Listen = %q, want %q", cfg.MCP.Listen, ":8081")
 	}
 	if len(cfg.Modules.Paths) != 0 {
 		t.Errorf("Modules.Paths = %v, want empty slice", cfg.Modules.Paths)
