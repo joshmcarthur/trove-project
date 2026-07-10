@@ -40,7 +40,7 @@ All kinds : core calls Healthcheck() periodically
 ## Acceptance criteria
 
 - [x] Discovers module directories with valid manifests
-- [ ] Starts source module and receives Emit calls into journal
+- [x] Starts source module and receives Emit calls into journal
 - [ ] Module crash does not take down core
 - [ ] Healthcheck RPC wired
 

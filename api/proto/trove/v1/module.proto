@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package trove.v1;
+
+option go_package = "github.com/joshmcarthur/trove/internal/modules/rpc;troverpc";
+
+// Event mirrors journal.Event for RPC transport.
+message Event {
+  string id = 1;
+  string time = 2; // RFC3339
+  string type = 3;
+  string source = 4;
+  bytes payload = 5; // JSON
+  string blob_ref = 6;
+}
+
+message EmitResponse {}
+
+// Source is implemented by the Trove core; modules call Emit to append events.
+service Source {
+  rpc Emit(Event) returns (EmitResponse);
+}
+
+message RunRequest {
+  uint32 ingest_broker_id = 1;
+}
+
+message RunResponse {}
+
+// SourceModule is implemented by source modules; the core calls Run to start emission.
+service SourceModule {
+  rpc Run(RunRequest) returns (RunResponse);
+}
