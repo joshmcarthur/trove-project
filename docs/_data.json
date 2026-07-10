@@ -3,7 +3,7 @@
   "layout": "page.njk",
   "metas": {
     "title": "=title",
-    "site": "Trove Project",
+    "site": "Trove",
     "lang": "en",
     "description": "=description"
   },
@@ -11,13 +11,13 @@
     {
       "icon": "fab fa-github",
       "title": "GitHub Repository",
-      "url": "https://github.com/joshmcarthur/trove-project"
+      "url": "https://github.com/joshmcarthur/trove"
     }
   ],
   "nav_links": [
     {
       "title": "GitHub Repository",
-      "url": "https://github.com/joshmcarthur/trove-project"
+      "url": "https://github.com/joshmcarthur/trove"
     }
   ]
 }

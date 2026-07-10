@@ -1,124 +1,53 @@
 ---
 title: Events
 parent: Concepts
-order: 1
+nav_order: 1
 ---
 
 # Events
 
-Events are the core data structure in Trove. An event represents something that
-happened, along with its associated data, files, and relationships to other
-events.
+An **event** is an immutable fact: something that happened, captured once, never
+edited. If something changes, a new event is appended — nothing is mutated in
+place.
 
-## Event Structure
+See [spec §3](../spec.md#3-core-concepts) for the canonical definition.
 
-An event consists of:
-
-- **ID**: A unique identifier and optional version
-- **Schema**: The type and version of the event
-- **Payload**: The actual data of the event (must conform to the schema)
-- **Files**: Any associated files or binary data
-- **Links**: Relationships to other events
-- **Metadata**: Additional information about the event
-
-Example event:
+## Event shape
 
 ```json
 {
-  "id": {
-    "id": "evt_123abc",
-    "version": 1
-  },
-  "createdAt": "2024-03-15T10:30:00Z",
-  "producer": "web-api",
-  "schema": {
-    "id": "document.uploaded",
-    "version": "1.0"
-  },
-  "payload": {
-    "title": "Annual Report",
-    "author": "Jane Smith"
-  },
-  "files": [
-    {
-      "id": "file_xyz789",
-      "contentType": "application/pdf",
-      "filename": "report.pdf",
-      "size": 1048576,
-      "hash": "sha256:abc123...",
-      "isReference": true,
-      "data": "s3://mybucket/reports/report.pdf"
-    }
-  ],
-  "links": [
-    {
-      "type": "parent",
-      "targetEvent": {
-        "id": "evt_456def"
-      }
-    }
-  ],
-  "metadata": {
-    "ip": "192.168.1.1",
-    "userAgent": "Mozilla/5.0..."
-  }
+  "id": "01JXYZ...",
+  "time": "2026-07-10T10:00:00+12:00",
+  "type": "meshtastic.message.received",
+  "source": "radio-node-1",
+  "payload": { "...": "..." },
+  "blob_ref": null
 }
 ```
 
-## Event Schemas
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | ULID | Sortable, unique, generated at ingest |
+| `time` | RFC3339 | Event time, not ingest time |
+| `type` | string | Dotted namespace, e.g. `mqtt.tararuawx.temp` |
+| `source` | string | Free-text origin (topic, device, app) |
+| `payload` | JSON | Arbitrary structured data |
+| `blob_ref` | string \| null | Optional attachment reference |
 
-Every event must conform to a registered schema. Schemas are defined using JSON
-Schema and help ensure data consistency and validation.
+## Type naming
 
-```json
-{
-  "id": "document.uploaded",
-  "version": "1.0",
-  "schema": {
-    "type": "object",
-    "properties": {
-      "title": {
-        "type": "string",
-        "minLength": 1
-      },
-      "author": {
-        "type": "string"
-      }
-    },
-    "required": ["title"]
-  }
-}
-```
+Use namespaced strings: `<source-family>.<subject>.<verb>`. There is **no schema
+registry** — `type` is a convention, and `payload` is whatever JSON the source
+module produces. If a shape changes, use naming discipline (e.g. `.v2` suffixes)
+rather than in-place mutation.
 
-## Event Links
+## Immutability
 
-Events can be linked to create relationships:
+Events are never updated. Corrections and follow-ups are new events. The journal
+is append-only.
 
-- **Parent/Child**: Hierarchical relationships
-- **Reference**: Generic connections between events
-- **Custom**: Define your own relationship types
+## Implementation
 
-Links help build a graph of related events and enable complex queries and
-traversals.
-
-## Files and Attachments
-
-Events can include files or references to files:
-
-- Direct binary data
-- URLs
-- File system paths
-- Cloud storage references
-
-The storage backend determines how files are actually stored and retrieved.
-
-## Event Immutability
-
-Events in Trove are immutable by default. Once created, an event cannot be
-modified. If you need to update data:
-
-1. Create a new event with the updated data
-2. Link it to the original event
-3. Use versioning if supported by your storage backend
-
-This ensures a complete audit trail and enables event sourcing patterns.
+Events are persisted by the [journal](./journal.md). See
+[planning/journal.md](../planning/journal.md) for the SQLite schema and
+`Journal` interface.
