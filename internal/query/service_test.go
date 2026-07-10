@@ -189,3 +189,156 @@ func TestSearchEventsEmptyQuery(t *testing.T) {
 		t.Fatalf("SearchEvents() error = %v, want %v", err, ErrEmptyQuery)
 	}
 }
+
+func TestSummarizeRange(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+	svc := &Service{Journal: store}
+
+	timeFrom := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	timeTo := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+
+	seed := []journal.Event{
+		{ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC), Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC), Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+		{ID: "01JEVT00000000000000000003", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), Type: "http.ingest.received", Source: "shortcuts", Payload: json.RawMessage(`{"v":3}`)},
+	}
+	for _, e := range seed {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	got, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+	if err != nil {
+		t.Fatalf("SummarizeRange() error = %v", err)
+	}
+	if got.Total != 3 {
+		t.Errorf("Total = %d, want 3", got.Total)
+	}
+	if got.ByType["mqtt.sensor.temp"] != 2 {
+		t.Errorf("ByType[mqtt.sensor.temp] = %d, want 2", got.ByType["mqtt.sensor.temp"])
+	}
+	if got.ByType["http.ingest.received"] != 1 {
+		t.Errorf("ByType[http.ingest.received] = %d, want 1", got.ByType["http.ingest.received"])
+	}
+	if len(got.Notable) != 3 {
+		t.Fatalf("len(Notable) = %d, want 3", len(got.Notable))
+	}
+	if got.Notable[0].ID != seed[2].ID {
+		t.Errorf("Notable[0].ID = %q, want most recent %q", got.Notable[0].ID, seed[2].ID)
+	}
+}
+
+func TestSummarizeRangeEmptyWindow(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+	svc := &Service{Journal: store}
+
+	timeFrom := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	timeTo := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+
+	got, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+	if err != nil {
+		t.Fatalf("SummarizeRange() error = %v", err)
+	}
+	if got.Total != 0 {
+		t.Errorf("Total = %d, want 0", got.Total)
+	}
+	if len(got.ByType) != 0 {
+		t.Errorf("ByType = %v, want empty", got.ByType)
+	}
+	if len(got.Notable) != 0 {
+		t.Errorf("Notable = %v, want empty", got.Notable)
+	}
+}
+
+func TestSummarizeRangeExcludesOutside(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+	svc := &Service{Journal: store}
+
+	inside := journal.Event{
+		ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC),
+		Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{}`),
+	}
+	outside := journal.Event{
+		ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC),
+		Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{}`),
+	}
+	for _, e := range []journal.Event{inside, outside} {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append() error = %v", err)
+		}
+	}
+
+	timeFrom := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
+	timeTo := time.Date(2026, 7, 10, 23, 59, 59, 0, time.UTC)
+
+	got, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+	if err != nil {
+		t.Fatalf("SummarizeRange() error = %v", err)
+	}
+	if got.Total != 1 {
+		t.Errorf("Total = %d, want 1", got.Total)
+	}
+	if len(got.Notable) != 1 || got.Notable[0].ID != inside.ID {
+		t.Errorf("Notable = %#v, want only inside event", got.Notable)
+	}
+}
+
+func TestSummarizeRangeNotableCap(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+	svc := &Service{Journal: store}
+
+	timeFrom := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
+	timeTo := time.Date(2026, 7, 10, 23, 59, 59, 0, time.UTC)
+
+	for i := range 7 {
+		e := journal.Event{
+			ID:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
+			Time:    time.Date(2026, 7, 10, i+1, 0, 0, 0, time.UTC),
+			Type:    "mqtt.sensor.temp",
+			Source:  "sensor-a",
+			Payload: json.RawMessage(`{}`),
+		}
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append() error = %v", err)
+		}
+	}
+
+	got, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+	if err != nil {
+		t.Fatalf("SummarizeRange() error = %v", err)
+	}
+	if got.Total != 7 {
+		t.Errorf("Total = %d, want 7", got.Total)
+	}
+	if len(got.Notable) != maxNotableEvents {
+		t.Errorf("len(Notable) = %d, want %d", len(got.Notable), maxNotableEvents)
+	}
+}
+
+func TestSummarizeRangeInvalidRange(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc := &Service{Journal: openTestJournal(t)}
+
+	timeFrom := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	timeTo := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+
+	_, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+	if !errors.Is(err, ErrInvalidTimeRange) {
+		t.Fatalf("SummarizeRange() error = %v, want %v", err, ErrInvalidTimeRange)
+	}
+}

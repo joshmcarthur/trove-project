@@ -41,7 +41,7 @@ MCP tools map 1:1 onto these methods.
 
 - [x] MCP `search_events` returns matching journal events
 - [x] MCP `get_event` resolves by ULID
-- [ ] `summarize_range` returns aggregated summary for a time window
+- [x] `summarize_range` returns aggregated summary for a time window
 - [ ] OpenClaw or Cursor can connect as MCP client
 
 ## Dependencies

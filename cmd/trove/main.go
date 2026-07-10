@@ -74,5 +74,6 @@ func main() {
 		}
 	}()
 
-	modules.RunSources(ctx, store, mods)
+	go modules.RunSources(ctx, store, mods)
+	<-ctx.Done()
 }
