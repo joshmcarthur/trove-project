@@ -50,9 +50,9 @@ listen = ":8081"
 
 ## What's coming
 
-MCP query is partially wired: `search_events` and `get_event` work today.
-`summarize_range` and full client validation (OpenClaw / Cursor) are still
-outstanding — see [MCP query planning](../planning/mcp-query.md).
+MCP query is partially wired: `search_events`, `get_event`, `get_events_by_type`,
+and `summarize_range` work today. Full client validation (OpenClaw / Cursor) is
+still outstanding — see [MCP query planning](../planning/mcp-query.md).
 
 ## Capture events
 

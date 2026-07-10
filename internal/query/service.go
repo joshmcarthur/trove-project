@@ -62,6 +62,32 @@ func (s *Service) SearchEvents(ctx context.Context, query string, params SearchP
 	return out, nil
 }
 
+// GetEventsByType returns events with the exact type, optionally narrowed by time range.
+func (s *Service) GetEventsByType(ctx context.Context, eventType string, timeFrom, timeTo *time.Time) ([]Event, error) {
+	eventType = strings.TrimSpace(eventType)
+	if eventType == "" {
+		return nil, ErrEmptyType
+	}
+	if timeFrom != nil && timeTo != nil && timeFrom.After(*timeTo) {
+		return nil, ErrInvalidTimeRange
+	}
+
+	events, err := s.Journal.Query(ctx, journal.Filter{
+		Type:     eventType,
+		TimeFrom: timeFrom,
+		TimeTo:   timeTo,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]Event, len(events))
+	for i, e := range events {
+		out[i] = eventFromJournal(e)
+	}
+	return out, nil
+}
+
 // SummarizeRange returns aggregated counts and a sample of notable events for a time window.
 func (s *Service) SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (Summary, error) {
 	if timeFrom.After(timeTo) {

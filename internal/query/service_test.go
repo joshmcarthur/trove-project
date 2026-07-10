@@ -190,6 +190,101 @@ func TestSearchEventsEmptyQuery(t *testing.T) {
 	}
 }
 
+func TestGetEventsByType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+	svc := &Service{Journal: store}
+
+	t1 := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+
+	seed := []journal.Event{
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+		{ID: "01JEVT00000000000000000003", Time: t3, Type: "mqtt.sensor.temp", Source: "sensor-b", Payload: json.RawMessage(`{"v":3}`)},
+	}
+	for _, e := range seed {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	tests := []struct {
+		name      string
+		eventType string
+		timeFrom  *time.Time
+		timeTo    *time.Time
+		wantIDs   []string
+	}{
+		{
+			name:      "exact type excludes other types",
+			eventType: "mqtt.sensor.temp",
+			wantIDs:   []string{seed[0].ID, seed[2].ID},
+		},
+		{
+			name:      "time window excludes outside events",
+			eventType: "mqtt.sensor.temp",
+			timeFrom:  &t1,
+			timeTo:    &t2,
+			wantIDs:   []string{seed[0].ID},
+		},
+		{
+			name:      "no matches returns empty slice",
+			eventType: "ha.light.on",
+			wantIDs:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := svc.GetEventsByType(ctx, tt.eventType, tt.timeFrom, tt.timeTo)
+			if err != nil {
+				t.Fatalf("GetEventsByType() error = %v", err)
+			}
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("GetEventsByType() returned %d events, want %d", len(got), len(tt.wantIDs))
+			}
+			for i, e := range got {
+				if e.ID != tt.wantIDs[i] {
+					t.Errorf("event[%d].ID = %q, want %q", i, e.ID, tt.wantIDs[i])
+				}
+			}
+		})
+	}
+}
+
+func TestGetEventsByTypeEmptyType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc := &Service{Journal: openTestJournal(t)}
+
+	_, err := svc.GetEventsByType(ctx, "   ", nil, nil)
+	if !errors.Is(err, ErrEmptyType) {
+		t.Fatalf("GetEventsByType() error = %v, want %v", err, ErrEmptyType)
+	}
+}
+
+func TestGetEventsByTypeInvalidRange(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc := &Service{Journal: openTestJournal(t)}
+
+	timeFrom := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	timeTo := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+
+	_, err := svc.GetEventsByType(ctx, "mqtt.sensor.temp", &timeFrom, &timeTo)
+	if !errors.Is(err, ErrInvalidTimeRange) {
+		t.Fatalf("GetEventsByType() error = %v, want %v", err, ErrInvalidTimeRange)
+	}
+}
+
 func TestSummarizeRange(t *testing.T) {
 	t.Parallel()
 

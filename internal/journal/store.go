@@ -170,6 +170,10 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 
 // Query returns events matching f, ordered by time ascending.
 func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
+	if f.Type != "" && f.TypePrefix != "" {
+		return nil, ErrConflictingFilter
+	}
+
 	var (
 		query      string
 		predicates []string
@@ -195,6 +199,10 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 		tablePrefix = "e."
 	}
 
+	if f.Type != "" {
+		predicates = append(predicates, tablePrefix+"type = ?")
+		args = append(args, f.Type)
+	}
 	if f.TypePrefix != "" {
 		predicates = append(predicates, tablePrefix+"type LIKE ?")
 		args = append(args, f.TypePrefix+"%")
@@ -313,6 +321,9 @@ func (s *Store) notify(e Event) {
 }
 
 func matchesFilter(e Event, f Filter) bool {
+	if f.Type != "" && e.Type != f.Type {
+		return false
+	}
 	if f.TypePrefix != "" && !strings.HasPrefix(e.Type, f.TypePrefix) {
 		return false
 	}

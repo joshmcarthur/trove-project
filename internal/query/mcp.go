@@ -105,6 +105,39 @@ func newMCPServer(svc *Service) *mcp.Server {
 		}, nil, nil
 	})
 
+	type getEventsByTypeParams struct {
+		Type     string `json:"type" jsonschema:"required,Exact event type to retrieve"`
+		TimeFrom string `json:"time_from,omitempty" jsonschema:"Optional RFC3339 start of time range"`
+		TimeTo   string `json:"time_to,omitempty" jsonschema:"Optional RFC3339 end of time range"`
+	}
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_events_by_type",
+		Description: "Return journal events matching an exact event type",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, params getEventsByTypeParams) (*mcp.CallToolResult, any, error) {
+		timeFrom, err := parseOptionalRFC3339(params.TimeFrom)
+		if err != nil {
+			return nil, nil, err
+		}
+		timeTo, err := parseOptionalRFC3339(params.TimeTo)
+		if err != nil {
+			return nil, nil, err
+		}
+		events, err := svc.GetEventsByType(ctx, params.Type, timeFrom, timeTo)
+		if err != nil {
+			return nil, nil, err
+		}
+		data, err := json.Marshal(events)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: string(data)},
+			},
+		}, nil, nil
+	})
+
 	type summarizeRangeParams struct {
 		TimeFrom string `json:"time_from" jsonschema:"required,RFC3339 start of time range"`
 		TimeTo   string `json:"time_to" jsonschema:"required,RFC3339 end of time range"`

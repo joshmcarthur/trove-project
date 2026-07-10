@@ -220,6 +220,107 @@ func TestMCPSearchEventsEmptyQuery(t *testing.T) {
 	}
 }
 
+func TestMCPGetEventsByType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+
+	t1 := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+
+	seed := []journal.Event{
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+	}
+	for _, e := range seed {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append() error = %v", err)
+		}
+	}
+
+	svc := &Service{Journal: store}
+	server := newMCPServer(svc)
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "get_events_by_type",
+		Arguments: map[string]any{
+			"type":      "mqtt.sensor.temp",
+			"time_from": t1.Format(time.RFC3339),
+			"time_to":   t2.Format(time.RFC3339),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("CallTool() returned tool error: %#v", result)
+	}
+
+	var got []Event
+	for _, content := range result.Content {
+		text, ok := content.(*mcp.TextContent)
+		if !ok {
+			continue
+		}
+		if err := json.Unmarshal([]byte(text.Text), &got); err != nil {
+			t.Fatalf("unmarshal tool output: %v", err)
+		}
+		break
+	}
+	if len(got) != 1 {
+		t.Fatalf("GetEventsByType returned %d events, want 1", len(got))
+	}
+	if got[0].ID != seed[0].ID {
+		t.Errorf("ID = %q, want %q", got[0].ID, seed[0].ID)
+	}
+}
+
+func TestMCPGetEventsByTypeEmptyType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc := &Service{Journal: openTestJournal(t)}
+	server := newMCPServer(svc)
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "get_events_by_type",
+		Arguments: map[string]any{
+			"type": "   ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if !result.IsError {
+		t.Fatalf("CallTool() = %#v, want tool error", result)
+	}
+}
+
 func TestMCPSummarizeRange(t *testing.T) {
 	t.Parallel()
 
