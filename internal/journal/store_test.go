@@ -680,3 +680,95 @@ func TestSubscribeMultipleSubscribers(t *testing.T) {
 		t.Fatal("subscriber B received unexpected event")
 	}
 }
+
+func TestSubscribeConflictingFilter(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	_, err := store.Subscribe(ctx, Filter{
+		Type:       "mqtt.sensor.temp",
+		TypePrefix: "mqtt.",
+	})
+	if !errors.Is(err, ErrConflictingFilter) {
+		t.Fatalf("Subscribe() error = %v, want ErrConflictingFilter", err)
+	}
+}
+
+func TestSubscribeFiltersByText(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	ch, err := store.Subscribe(ctx, Filter{Text: "kitchen"})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	events := []Event{
+		testEvent("01JEVT00000000000000000001", when, "mqtt.sensor.temp", "sensor-a"),
+		testEvent("01JEVT00000000000000000002", when, "ha.light.on", "kitchen-light"),
+	}
+	events[0].Payload = json.RawMessage(`{"room":"bedroom"}`)
+	events[1].Payload = json.RawMessage(`{"room":"kitchen"}`)
+
+	for _, e := range events {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	got, ok := recvEvent(t, ch, time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for text-filtered event")
+	}
+	if got.ID != events[1].ID {
+		t.Errorf("ID = %q, want %q", got.ID, events[1].ID)
+	}
+
+	if _, ok := recvEvent(t, ch, 100*time.Millisecond); ok {
+		t.Fatal("received unexpected extra event")
+	}
+}
+
+func TestSubscribeFiltersByTextAndType(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	ch, err := store.Subscribe(ctx, Filter{
+		Text:       "balmy",
+		TypePrefix: "mqtt.",
+	})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	events := []Event{
+		{ID: "01JEVT00000000000000000001", Time: when, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
+		{ID: "01JEVT00000000000000000002", Time: when, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
+		{ID: "01JEVT00000000000000000003", Time: when, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"reading":"balmy"}`)},
+	}
+	for _, e := range events {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	got, ok := recvEvent(t, ch, time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for combined-filter event")
+	}
+	if got.ID != events[0].ID {
+		t.Errorf("ID = %q, want %q", got.ID, events[0].ID)
+	}
+
+	if _, ok := recvEvent(t, ch, 100*time.Millisecond); ok {
+		t.Fatal("received unexpected extra event")
+	}
+}
