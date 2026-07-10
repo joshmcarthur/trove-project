@@ -6,7 +6,7 @@ nav_order: 1
 
 # Journal
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 1 — Journal + module core\
 **Spec:** [Journal §4](../spec.md#4-journal)\
 **Package:** `internal/journal`

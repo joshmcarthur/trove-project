@@ -38,4 +38,4 @@ single-user, single-journal model.
 
 ## Implementation
 
-**Status:** Planned — [planning/journal.md](../planning/journal.md)
+**Status:** Supported — [planning/journal.md](../planning/journal.md)
