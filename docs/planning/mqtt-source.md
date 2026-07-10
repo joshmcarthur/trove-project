@@ -18,8 +18,9 @@ Covers Meshtastic (MQTT-bridged) and ESPHome sensor traffic.
 
 ## Interfaces
 
-Source module — `Emit(event)` per message. Suggested event type:
-`mqtt.<topic-with-dots>.received` or configured mapping in module config.
+Source module — `Emit(event)` per message. Event type convention (resolved):
+`mqtt.<topic-with-slashes-as-dots>.received` — e.g. topic `home/sensor/temp`
+becomes `mqtt.home.sensor.temp.received`.
 
 ## Implementation notes
 
@@ -30,8 +31,8 @@ Source module — `Emit(event)` per message. Suggested event type:
 
 ## Acceptance criteria
 
-- [ ] Subscribes to configured topics
-- [ ] Each message appends one journal event
+- [x] Subscribes to configured topics
+- [x] Each message appends one journal event
 - [ ] Survives broker disconnect/reconnect
 - [ ] Healthcheck reports subscription status
 
@@ -42,4 +43,4 @@ Source module — `Emit(event)` per message. Suggested event type:
 
 ## Open questions
 
-- Topic → `type` mapping convention
+- ~~Topic → `type` mapping convention~~ — resolved: `mqtt.<topic>.received` (slashes → dots)
