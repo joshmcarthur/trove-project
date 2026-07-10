@@ -30,7 +30,8 @@ All kinds : core calls Healthcheck() periodically
 ## Implementation notes
 
 - Scan `[modules].paths` from config (standard Linux paths + home dir)
-- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`)
+- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`) — **parser landed** in
+  `internal/modules/manifest.go`; filesystem discovery scanner is next
 - Integrate go-plugin for subprocess lifecycle
 - Supervise with restart + backoff on crash
 - React to `SIGHUP` for reload (stretch)
