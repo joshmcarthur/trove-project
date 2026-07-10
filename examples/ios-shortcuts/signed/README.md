@@ -1,10 +1,14 @@
-Signed importable Shortcut files are produced by CI on macOS.
+Signed importable Shortcut files live here.
 
-After the first merge to `main`, this directory will contain:
+They are **not** produced by GitHub Actions. `shortcuts sign` requires macOS with
+an **iCloud account signed in** — hosted CI runners are not logged in.
 
-- `trove-share-sheet.shortcut`
-- `trove-quick-note.shortcut`
-- `trove-url-bookmark.shortcut`
-- `trove-location-checkin.shortcut`
+After editing `unsigned/`, sign on your Mac:
 
-See [`sign.sh`](../sign.sh) and [`.github/workflows/sign-shortcuts.yml`](../../.github/workflows/sign-shortcuts.yml).
+```bash
+python3 examples/ios-shortcuts/generate_unsigned.py   # if you changed the generator
+./examples/ios-shortcuts/sign.sh
+git add examples/ios-shortcuts/signed/
+```
+
+Commit signed `.shortcut` files in the same PR as unsigned changes.

@@ -49,11 +49,11 @@ Importable capture Shortcuts live in [`examples/ios-shortcuts/`](../examples/ios
 
 - Edit unsigned sources via [`generate_unsigned.py`](../examples/ios-shortcuts/generate_unsigned.py)
   or files in `unsigned/` — never hand-edit `signed/*.shortcut`.
-- Signing runs on `macos-latest` via
-  [`.github/workflows/sign-shortcuts.yml`](../.github/workflows/sign-shortcuts.yml).
-- After changing unsigned sources, run `python3 examples/ios-shortcuts/generate_unsigned.py`
-  and commit the updated `unsigned/` files. Merging to `main` auto-commits signed
-  output.
+- **Signing requires macOS with iCloud signed in.** Run
+  [`sign.sh`](../examples/ios-shortcuts/sign.sh) locally, then commit `signed/`
+  in the same PR. GitHub-hosted runners cannot sign.
+- After changing unsigned sources: `python3 examples/ios-shortcuts/generate_unsigned.py`,
+  `./examples/ios-shortcuts/sign.sh`, commit both `unsigned/` and `signed/`.
 
 ## License
 
