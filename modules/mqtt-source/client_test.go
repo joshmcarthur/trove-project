@@ -1,0 +1,175 @@
+package main
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestTopicToEventType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		topic string
+		want  string
+	}{
+		{"home/sensor/temp", "mqtt.home.sensor.temp.received"},
+		{"devices/esphome/node1/state", "mqtt.devices.esphome.node1.state.received"},
+		{"single", "mqtt.single.received"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.topic, func(t *testing.T) {
+			t.Parallel()
+			if got := topicToEventType(tt.topic); got != tt.want {
+				t.Errorf("topicToEventType(%q) = %q, want %q", tt.topic, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildPayload(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		payload []byte
+		want    string
+	}{
+		{
+			name:    "valid json object",
+			payload: []byte(`{"v":21.5}`),
+			want:    `{"v":21.5}`,
+		},
+		{
+			name:    "valid json array",
+			payload: []byte(`[1,2,3]`),
+			want:    `[1,2,3]`,
+		},
+		{
+			name:    "non-json bytes",
+			payload: []byte("hello mqtt"),
+			want:    `{"raw":"hello mqtt"}`,
+		},
+		{
+			name:    "empty payload",
+			payload: []byte{},
+			want:    `{"raw":""}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := buildPayload(tt.payload)
+			if err != nil {
+				t.Fatalf("buildPayload() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("buildPayload() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildEvent(t *testing.T) {
+	t.Parallel()
+
+	event, err := buildEvent("home/sensor/temp", []byte(`{"v":21.5}`))
+	if err != nil {
+		t.Fatalf("buildEvent() error = %v", err)
+	}
+	if event.Type != "mqtt.home.sensor.temp.received" {
+		t.Errorf("Type = %q, want mqtt.home.sensor.temp.received", event.Type)
+	}
+	if event.Source != "home/sensor/temp" {
+		t.Errorf("Source = %q, want home/sensor/temp", event.Source)
+	}
+	if string(event.Payload) != `{"v":21.5}` {
+		t.Errorf("Payload = %s, want {\"v\":21.5}", event.Payload)
+	}
+}
+
+func TestLoadConfigFromDir(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	manifest := `name = "mqtt-source"
+version = "1.0"
+kind = "source"
+provides = ["mqtt.message.received"]
+
+broker = "tcp://broker.example:1883"
+topics = ["home/#", "devices/+/state"]
+qos = 1
+username = "user"
+password = "secret"
+`
+	if err := writeFile(t, dir, "manifest.toml", manifest); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := loadConfigFromDir(dir)
+	if err != nil {
+		t.Fatalf("loadConfigFromDir() error = %v", err)
+	}
+	if cfg.Broker != "tcp://broker.example:1883" {
+		t.Errorf("Broker = %q", cfg.Broker)
+	}
+	if len(cfg.Topics) != 2 {
+		t.Errorf("Topics = %v, want 2 entries", cfg.Topics)
+	}
+	if cfg.QoS != 1 {
+		t.Errorf("QoS = %d, want 1", cfg.QoS)
+	}
+	if cfg.Username != "user" {
+		t.Errorf("Username = %q", cfg.Username)
+	}
+}
+
+func TestLoadConfigFromDirValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		manifest string
+		wantErr  string
+	}{
+		{
+			name: "missing broker",
+			manifest: `topics = ["home/#"]
+`,
+			wantErr: "broker is required",
+		},
+		{
+			name: "missing topics",
+			manifest: `broker = "tcp://localhost:1883"
+`,
+			wantErr: "at least one topic is required",
+		},
+		{
+			name: "invalid qos",
+			manifest: `broker = "tcp://localhost:1883"
+topics = ["home/#"]
+qos = 3
+`,
+			wantErr: "qos must be 0, 1, or 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			if err := writeFile(t, dir, "manifest.toml", tt.manifest); err != nil {
+				t.Fatal(err)
+			}
+			_, err := loadConfigFromDir(dir)
+			if err == nil {
+				t.Fatal("loadConfigFromDir() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %v, want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
