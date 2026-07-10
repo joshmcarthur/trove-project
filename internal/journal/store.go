@@ -56,7 +56,24 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("journal: init schema: %w", err)
 	}
 
+	if err := configureDB(db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
 	return &Store{db: db}, nil
+}
+
+func configureDB(db *sql.DB) error {
+	for _, pragma := range []string{
+		"PRAGMA busy_timeout = 5000",
+		"PRAGMA journal_mode = WAL",
+	} {
+		if _, err := db.Exec(pragma); err != nil {
+			return fmt.Errorf("journal: configure db: %w", err)
+		}
+	}
+	return nil
 }
 
 // Close closes active subscriptions and the underlying database.

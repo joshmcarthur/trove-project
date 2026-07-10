@@ -32,8 +32,13 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	subCh, err := store.Subscribe(ctx, journal.Filter{TypePrefix: "test.crash.restart"})
+	if err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
 
 	done := make(chan struct{})
 	go func() {
@@ -41,16 +46,15 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 		close(done)
 	}()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "test.crash.restart"})
-		if err != nil {
-			t.Fatalf("Query() error = %v", err)
+	for range 2 {
+		select {
+		case _, ok := <-subCh:
+			if !ok {
+				t.Fatal("subscription closed before receiving restart events")
+			}
+		case <-ctx.Done():
+			t.Fatal("timed out waiting for restart events")
 		}
-		if len(events) >= 2 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "test.crash.restart"})
