@@ -30,8 +30,10 @@ All kinds : core calls Healthcheck() periodically
 ## Implementation notes
 
 - Scan `[modules].paths` from config (standard Linux paths + home dir)
-- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`) — landed in
-  `internal/modules/manifest.go`
+- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`, optional `[schemas]`)
+  — landed in `internal/modules/manifest.go`
+- Enforce `provides` allowlist and optional JSON Schema at `Emit` — landed in
+  `internal/modules/policy.go` and `internal/modules/ingest.go`
 - Filesystem discovery scanner — landed in `internal/modules/discover.go`
 - Integrate go-plugin for subprocess lifecycle
 - Supervise with restart + backoff on crash
@@ -43,6 +45,8 @@ All kinds : core calls Healthcheck() periodically
 - [x] Starts source module and receives Emit calls into journal
 - [x] Module crash does not take down core
 - [x] Healthcheck RPC wired
+- [x] Source modules reject Emit for undeclared types
+- [x] Optional JSON Schema validation when declared in manifest
 
 ## Dependencies
 

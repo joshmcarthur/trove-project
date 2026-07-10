@@ -44,18 +44,7 @@ func TestParseManifestValid(t *testing.T) {
 				Provides: []string{},
 			},
 		},
-		{
-			name: "empty provides",
-			file: "valid-empty-provides.toml",
-			want: Manifest{
-				Name:     "minimal-source",
-				Version:  "1.0",
-				Kind:     KindSource,
-				Provides: nil,
-			},
-		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -118,6 +107,16 @@ func TestParseManifestInvalid(t *testing.T) {
 			name:    "malformed toml",
 			file:    "invalid-malformed.toml",
 			wantErr: "parse:",
+		},
+		{
+			name:    "empty provides",
+			file:    "invalid-empty-provides.toml",
+			wantErr: "provides is required",
+		},
+		{
+			name:    "bare star",
+			file:    "invalid-bare-star.toml",
+			wantErr: `pattern "*" is not allowed`,
 		},
 	}
 

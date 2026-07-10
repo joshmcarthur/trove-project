@@ -1,0 +1,4 @@
+name     = "wildcard-source"
+version  = "1.0"
+kind     = "source"
+provides = ["*"]

@@ -14,8 +14,9 @@ const (
 )
 
 type config struct {
-	Listen       string `toml:"listen"`
-	MaxBodyBytes int64  `toml:"max_body_bytes"`
+	Listen       string   `toml:"listen"`
+	MaxBodyBytes int64    `toml:"max_body_bytes"`
+	Provides     []string `toml:"provides"`
 }
 
 func loadConfig() (config, error) {
