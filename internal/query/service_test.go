@@ -82,3 +82,110 @@ func TestGetEventNotFound(t *testing.T) {
 		t.Fatalf("GetEvent() error = %v, want %v", err, ErrNotFound)
 	}
 }
+
+func TestSearchEvents(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestJournal(t)
+	svc := &Service{Journal: store}
+
+	t1 := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+
+	seed := []journal.Event{
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
+		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"room":"kitchen"}`)},
+	}
+	for _, e := range seed {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	tests := []struct {
+		name    string
+		query   string
+		params  SearchParams
+		wantIDs []string
+	}{
+		{
+			name:    "match keyword in payload",
+			query:   "balmy",
+			wantIDs: []string{seed[0].ID},
+		},
+		{
+			name:    "match keyword in type",
+			query:   "humidity",
+			wantIDs: []string{seed[1].ID},
+		},
+		{
+			name:    "match keyword in source",
+			query:   "kitchen-light",
+			wantIDs: []string{seed[2].ID},
+		},
+		{
+			name:  "type prefix filter",
+			query: "balmy",
+			params: SearchParams{
+				TypePrefix: "mqtt.",
+			},
+			wantIDs: []string{seed[0].ID},
+		},
+		{
+			name:  "source filter",
+			query: "reading",
+			params: SearchParams{
+				Source: "sensor-a",
+			},
+			wantIDs: []string{seed[0].ID, seed[1].ID},
+		},
+		{
+			name:  "time range filter",
+			query: "reading",
+			params: SearchParams{
+				TimeFrom: &t2,
+				TimeTo:   &t3,
+			},
+			wantIDs: []string{seed[1].ID},
+		},
+		{
+			name:    "no match returns empty slice",
+			query:   "missing-keyword",
+			wantIDs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := svc.SearchEvents(ctx, tt.query, tt.params)
+			if err != nil {
+				t.Fatalf("SearchEvents() error = %v", err)
+			}
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("SearchEvents() returned %d events, want %d", len(got), len(tt.wantIDs))
+			}
+			for i, e := range got {
+				if e.ID != tt.wantIDs[i] {
+					t.Errorf("event[%d].ID = %q, want %q", i, e.ID, tt.wantIDs[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSearchEventsEmptyQuery(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc := &Service{Journal: openTestJournal(t)}
+
+	_, err := svc.SearchEvents(ctx, "   ", SearchParams{})
+	if !errors.Is(err, ErrEmptyQuery) {
+		t.Fatalf("SearchEvents() error = %v, want %v", err, ErrEmptyQuery)
+	}
+}

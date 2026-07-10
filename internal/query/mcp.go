@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -73,5 +74,65 @@ func newMCPServer(svc *Service) *mcp.Server {
 		}, nil, nil
 	})
 
+	type searchEventsParams struct {
+		Query      string `json:"query" jsonschema:"required,Keyword search query"`
+		TypePrefix string `json:"type_prefix,omitempty" jsonschema:"Optional event type prefix filter"`
+		Source     string `json:"source,omitempty" jsonschema:"Optional source filter"`
+		TimeFrom   string `json:"time_from,omitempty" jsonschema:"Optional RFC3339 start of time range"`
+		TimeTo     string `json:"time_to,omitempty" jsonschema:"Optional RFC3339 end of time range"`
+	}
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "search_events",
+		Description: "Search journal events by keyword using FTS5",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, params searchEventsParams) (*mcp.CallToolResult, any, error) {
+		searchParams, err := searchParamsFromMCP(params.TypePrefix, params.Source, params.TimeFrom, params.TimeTo)
+		if err != nil {
+			return nil, nil, err
+		}
+		events, err := svc.SearchEvents(ctx, params.Query, searchParams)
+		if err != nil {
+			return nil, nil, err
+		}
+		data, err := json.Marshal(events)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: string(data)},
+			},
+		}, nil, nil
+	})
+
 	return server
+}
+
+func searchParamsFromMCP(typePrefix, source, timeFrom, timeTo string) (SearchParams, error) {
+	from, err := parseOptionalRFC3339(timeFrom)
+	if err != nil {
+		return SearchParams{}, err
+	}
+	to, err := parseOptionalRFC3339(timeTo)
+	if err != nil {
+		return SearchParams{}, err
+	}
+	return SearchParams{
+		TypePrefix: typePrefix,
+		Source:     source,
+		TimeFrom:   from,
+		TimeTo:     to,
+	}, nil
+}
+
+func parseOptionalRFC3339(s string) (*time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil, fmt.Errorf("query: parse time %q: %w", s, err)
+	}
+	return &t, nil
 }
