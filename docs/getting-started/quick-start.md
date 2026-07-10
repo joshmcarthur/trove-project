@@ -21,10 +21,10 @@ make build
 ```
 
 The config loader (`internal/config`), SQLite journal (`internal/journal`), module
-runtime (`internal/modules`), and HTTP ingest module (`modules/http-ingest`) are
-implemented. With a valid config file, `trove` opens the journal, discovers
-source modules, supervises them, and starts the MCP query server until
-interrupted:
+runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), and MCP
+query server (`internal/query`) are implemented. With a valid config file, `trove`
+opens the journal, discovers source modules, supervises them, and starts the MCP
+query server until interrupted:
 
 ```bash
 make build
@@ -48,11 +48,16 @@ paths = ["./modules"]
 listen = ":8081"
 ```
 
+### Query the journal
+
+Connect Cursor (or another MCP client) to `[mcp].listen` — see
+[MCP client setup](./mcp-client.md). Four tools are available: `search_events`,
+`get_event`, `get_events_by_type`, and `summarize_range`.
+
 ## What's coming
 
-MCP query is partially wired: `search_events`, `get_event`, `get_events_by_type`,
-and `summarize_range` work today. Full client validation (OpenClaw / Cursor) is
-still outstanding — see [MCP query planning](../planning/mcp-query.md).
+The [MQTT source module](../planning/mqtt-source.md) and two-week live test are
+next on the [roadmap](../roadmap.md).
 
 ## Capture events
 
@@ -78,6 +83,7 @@ event `source` field.
 
 ## Next steps
 
+- [MCP client setup](./mcp-client.md) — connect Cursor to query your journal
 - [iOS Shortcuts](./ios-shortcuts.md) — importable Shortcuts and capture recipes
 - [Roadmap](../roadmap.md) — what to build and in what order
 - [Configuration](./configuration.md) — TOML shape (§10)
