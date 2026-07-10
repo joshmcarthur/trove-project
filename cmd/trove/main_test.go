@@ -8,7 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func troveBin(t *testing.T) string {
@@ -102,15 +104,6 @@ func TestCLI(t *testing.T) {
 			wantExit:   1,
 			wantStderr: "config:",
 		},
-		{
-			name: "valid config opens journal",
-			args: func(t *testing.T) []string {
-				journalPath := filepath.Join(t.TempDir(), "trove.db")
-				return []string{"-config", writeConfig(t, journalPath)}
-			},
-			wantExit:   1,
-			wantStderr: "journal ready",
-		},
 	}
 
 	for _, tt := range tests {
@@ -126,4 +119,39 @@ func TestCLI(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("valid config runs until signal", func(t *testing.T) {
+		t.Parallel()
+
+		journalPath := filepath.Join(t.TempDir(), "trove.db")
+		configPath := writeConfig(t, journalPath)
+
+		cmd := exec.Command(bin, "-config", configPath)
+		var errBuf bytes.Buffer
+		cmd.Stderr = &errBuf
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("start trove: %v", err)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			t.Fatalf("signal SIGTERM: %v", err)
+		}
+
+		err := cmd.Wait()
+		if err == nil {
+			// clean exit
+		} else {
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) || exitErr.ExitCode() != 0 {
+				t.Fatalf("wait trove: %v\nstderr: %s", err, errBuf.String())
+			}
+		}
+
+		stderr := errBuf.String()
+		if !strings.Contains(stderr, "no source modules discovered") {
+			t.Errorf("stderr = %q, want substring %q", stderr, "no source modules discovered")
+		}
+	})
 }

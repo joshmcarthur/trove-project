@@ -1,12 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
 	"github.com/joshmcarthur/trove/internal/config"
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/modules"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -40,6 +46,25 @@ func main() {
 	}
 	defer store.Close()
 
-	fmt.Fprintln(os.Stderr, "trove: journal ready; module runtime not yet implemented")
-	os.Exit(1)
+	mods, err := modules.Discover(cfg.Modules.Paths)
+	if err != nil {
+		log.Printf("trove: module discovery: %v", err)
+	}
+
+	sourceNames := make([]string, 0, len(mods))
+	for _, mod := range mods {
+		if mod.Manifest.Kind == modules.KindSource {
+			sourceNames = append(sourceNames, mod.Manifest.Name)
+		}
+	}
+	if len(sourceNames) > 0 {
+		log.Printf("trove: starting source modules: %s", strings.Join(sourceNames, ", "))
+	} else {
+		log.Printf("trove: no source modules discovered")
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	modules.RunSources(ctx, store, mods)
 }
