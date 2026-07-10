@@ -41,7 +41,7 @@ All kinds : core calls Healthcheck() periodically
 
 - [x] Discovers module directories with valid manifests
 - [x] Starts source module and receives Emit calls into journal
-- [ ] Module crash does not take down core
+- [x] Module crash does not take down core
 - [ ] Healthcheck RPC wired
 
 ## Dependencies
