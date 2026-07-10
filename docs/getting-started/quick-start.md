@@ -49,9 +49,11 @@ paths = ["./modules"]
 listen = ":8081"
 ```
 
-The MCP server listens on `[mcp].listen` (default `:8081`) and exposes four tools:
-`search_events`, `get_event`, `get_events_by_type`, and `summarize_range`. See
-[MCP query planning](../planning/mcp-query.md).
+### Query the journal
+
+Connect Cursor (or another MCP client) to `[mcp].listen` — see
+[MCP client setup](./mcp-client.md). Four tools are available: `search_events`,
+`get_event`, `get_events_by_type`, and `summarize_range`.
 
 MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.toml`
 (default broker `tcp://localhost:1883`, topics `["home/#"]`). See
@@ -90,6 +92,7 @@ event `source` field.
 
 ## Next steps
 
+- [MCP client setup](./mcp-client.md) — connect Cursor to query your journal
 - [iOS Shortcuts](./ios-shortcuts.md) — importable Shortcuts and capture recipes
 - [Roadmap](../roadmap.md) — what to build and in what order
 - [Configuration](./configuration.md) — TOML shape (§10)

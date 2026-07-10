@@ -36,7 +36,7 @@ MCP tools map 1:1 onto these methods.
 - `search_events`: FTS5 keyword search
 - `summarize_range`: counts by type, notable events — avoids dumping raw rows
 - Listens on `[mcp].listen` from config; `trove` starts the MCP HTTP server on
-  startup
+  startup. See [MCP client setup](../getting-started/mcp-client.md).
 
 ## Acceptance criteria
 

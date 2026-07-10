@@ -11,6 +11,8 @@ import (
 
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const defaultEventType = "http.ingest.received"
@@ -18,7 +20,7 @@ const defaultEventType = "http.ingest.received"
 func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		handleIngest(w, r, emit, cfg.MaxBodyBytes)
+		handleIngest(w, r, emit, cfg)
 	})
 	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -47,14 +49,14 @@ func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config) er
 	}
 }
 
-func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitter, maxBodyBytes int64) {
+func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitter, cfg config) {
 	source := r.PathValue("source")
 	if source == "" {
 		http.Error(w, "source is required", http.StatusBadRequest)
 		return
 	}
 
-	body, err := readBody(w, r, maxBodyBytes)
+	body, err := readBody(w, r, cfg.MaxBodyBytes)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -66,7 +68,16 @@ func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitt
 		return
 	}
 
+	if len(cfg.Provides) > 0 && !trovemodule.MatchType(cfg.Provides, event.Type) {
+		http.Error(w, fmt.Sprintf("type not allowed: %s", event.Type), http.StatusBadRequest)
+		return
+	}
+
 	if err := emit.Emit(r.Context(), event); err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.InvalidArgument {
+			http.Error(w, st.Message(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "failed to ingest event", http.StatusInternalServerError)
 		return
 	}

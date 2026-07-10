@@ -39,7 +39,7 @@ about them" actually work, for one user, on one Pi.
 
 - Multi-node / multi-journal sync or reconciliation
 - A WASM module system or sandboxed guest runtime
-- A formal schema registry or schema evolution machinery
+- A central schema registry or formal schema evolution machinery
 - Being a general-purpose content-addressable storage platform
 - Replacing Postgres, Kafka, or MQTT itself
 
@@ -73,12 +73,15 @@ Fields:
 | `payload`  | JSON              | arbitrary structured data, module-defined shape    |
 | `blob_ref` | string \| null    | optional reference to an attachment (see §6)       |
 
-There is deliberately **no schema registry**. `type` is just a namespaced
-string convention (`<source-family>.<subject>.<verb>`), and `payload` is
-whatever JSON the source module produces. If a payload shape changes,
-that's a concern for whatever reads it later — for a single-user system
-at this scale, versioning discipline in your own naming (`.v2` suffixes
-if needed) is enough. Revisit only if this actually causes pain.
+There is **no central schema registry**. `type` is a namespaced string convention
+(`<source-family>.<subject>.<verb>`), and `payload` is JSON defined by the source
+module. Source modules declare which types they may emit in `manifest.toml`
+(`provides`, including wildcard patterns such as `note.*`). The core enforces
+that allowlist at the `Emit` RPC boundary. Modules may optionally attach JSON
+Schema files per type pattern; when declared, payloads are validated before
+append. The journal itself only validates the event envelope (type, source, valid
+JSON). If a payload shape changes, use naming discipline (`.v2` suffixes) rather
+than in-place mutation.
 
 ---
 
@@ -249,8 +252,16 @@ module/
 name     = "mqtt-source"
 version  = "1.0"
 kind     = "source"        # source | processor | sink
-provides = ["mqtt.message.received"]
+provides = ["mqtt.*.received"]   # exact types or glob patterns; required for sources
+
+[schemas]
+"mqtt.*.received" = "schemas/message.json"   # optional JSON Schema per pattern
 ```
+
+Source modules may only `Emit` types matching a `provides` pattern. Wildcards use
+Go `path.Match` rules (`note.*` matches `note.created`). Bare `*` is rejected.
+Optional `[schemas]` entries validate payloads when present; undeclared types are
+allowlisted but not schema-checked. The journal validates the envelope only.
 
 ### Transport
 
@@ -407,8 +418,9 @@ noted here so they don't get silently re-added:
   problem. Remote modules can stream events to the one central journal
   over Tailscale (§8), but there's still only one journal, not several
   that need reconciling.
-- **Schema registry / formal schema evolution.** `type` strings + JSON
-  payload is enough at this scale.
+- **Central schema registry / formal schema evolution.** Per-module `provides`
+  allowlists and optional colocated JSON Schema files are in scope; a shared
+  registry service is not.
 - **A WASM guest runtime or module manifest discovery beyond the simple
   filesystem-path convention in §8.** Dynamic loading is in scope;
   sandboxed guest execution is not.

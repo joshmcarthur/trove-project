@@ -3,6 +3,7 @@ package modules
 import (
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/BurntSushi/toml"
 )
@@ -18,10 +19,11 @@ const (
 
 // Manifest describes a Trove module from manifest.toml.
 type Manifest struct {
-	Name     string   `toml:"name"`
-	Version  string   `toml:"version"`
-	Kind     Kind     `toml:"kind"`
-	Provides []string `toml:"provides"`
+	Name     string            `toml:"name"`
+	Version  string            `toml:"version"`
+	Kind     Kind              `toml:"kind"`
+	Provides []string          `toml:"provides"`
+	Schemas  map[string]string `toml:"schemas"`
 }
 
 // ParseManifest parses and validates manifest TOML from data.
@@ -59,6 +61,32 @@ func validateManifest(m Manifest) error {
 			return fmt.Errorf("modules: manifest: kind is required")
 		}
 		return fmt.Errorf("modules: manifest: invalid kind %q", m.Kind)
+	}
+
+	if m.Kind == KindSource && len(m.Provides) == 0 {
+		return fmt.Errorf("modules: manifest: provides is required for source modules")
+	}
+
+	for _, pattern := range m.Provides {
+		if err := validateProvidesPattern(pattern); err != nil {
+			return err
+		}
+	}
+	for pattern := range m.Schemas {
+		if err := validateProvidesPattern(pattern); err != nil {
+			return fmt.Errorf("modules: manifest: schemas key: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func validateProvidesPattern(pattern string) error {
+	if pattern == "*" {
+		return fmt.Errorf("modules: manifest: pattern %q is not allowed", pattern)
+	}
+	if _, err := path.Match(pattern, "x"); err != nil {
+		return fmt.Errorf("modules: manifest: invalid pattern %q: %w", pattern, err)
 	}
 	return nil
 }

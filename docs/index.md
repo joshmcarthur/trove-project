@@ -14,8 +14,8 @@ out.
 > Capture broadly, store simply, converse to retrieve.
 
 The project is migrating from an earlier Deno prototype to Go. Today you can run
-`trove`, capture events via the HTTP ingest module, and query the journal through
-the MCP server. See the [roadmap](./roadmap.md) for status.
+`trove`, capture events via the HTTP ingest and MQTT source modules, and query
+the journal through the MCP server. See the [roadmap](./roadmap.md) for status.
 
 ## What's next
 

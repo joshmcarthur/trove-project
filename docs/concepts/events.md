@@ -36,10 +36,11 @@ See [spec §3](../spec.md#3-core-concepts) for the canonical definition.
 
 ## Type naming
 
-Use namespaced strings: `<source-family>.<subject>.<verb>`. There is **no schema
-registry** — `type` is a convention, and `payload` is whatever JSON the source
-module produces. If a shape changes, use naming discipline (e.g. `.v2` suffixes)
-rather than in-place mutation.
+Use namespaced strings: `<source-family>.<subject>.<verb>`. There is **no central
+schema registry** — modules declare allowed types in `provides` (exact strings or
+glob patterns such as `note.*`). Optional JSON Schema files in the module manifest
+validate payloads when declared. If a shape changes, use naming discipline (e.g.
+`.v2` suffixes) rather than in-place mutation.
 
 ## Immutability
 
@@ -48,6 +49,8 @@ is append-only.
 
 ## Implementation
 
-Events are persisted by the [journal](./journal.md). See
+Events are persisted by the [journal](./journal.md). Type allowlists and optional
+schema validation are enforced at the module `Emit` boundary — see
+[building modules](../building-modules.md). See
 [planning/journal.md](../planning/journal.md) for the SQLite schema and
 `Journal` interface.

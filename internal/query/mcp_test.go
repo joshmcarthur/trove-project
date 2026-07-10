@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -34,10 +33,7 @@ func TestMCPGetEvent(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -91,10 +87,7 @@ func TestMCPGetEventNotFound(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -139,10 +132,7 @@ func TestMCPSearchEvents(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -192,10 +182,7 @@ func TestMCPSearchEventsEmptyQuery(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -240,10 +227,7 @@ func TestMCPGetEventsByType(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -293,10 +277,7 @@ func TestMCPGetEventsByTypeEmptyType(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -340,10 +321,7 @@ func TestMCPSummarizeRange(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -398,10 +376,7 @@ func TestMCPSummarizeRangeInvalidRange(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	server := newMCPServer(svc)
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	handler := newMCPHandler(svc)
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 

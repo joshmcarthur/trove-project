@@ -39,7 +39,9 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 - `max_body_bytes` in module manifest (default 10 MiB); raise for larger JSON payloads
 - Large binary content (photos, audio) should **not** be inlined — use `blob_ref` on the
   event and store bytes in the blob store once that lands ([blobs](./blobs.md))
-- Even in v0, keep behind go-plugin per spec §11
+- `provides` in manifest controls allowed client `type` values (wildcards such as
+  `note.*` supported); early HTTP 400 for disallowed types
+- Optional `[schemas]` validated at core `Emit`; failures return HTTP 400
 
 ### Request / response
 
@@ -47,8 +49,10 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 |---------|----------|
 | `POST /ingest/{source}` with valid JSON body | `204 No Content` |
 | Empty body, invalid JSON, bad metadata fields | `400 Bad Request` |
+| Type not in manifest `provides` | `400 Bad Request` |
+| Schema validation failure (when declared) | `400 Bad Request` |
 | Non-POST to `/ingest/{source}` | `405 Method Not Allowed` |
-| Emit failure | `500 Internal Server Error` |
+| Other Emit failure | `500 Internal Server Error` |
 
 Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339),
 `blob_ref`. Remaining keys become `payload`. Default event type:
@@ -59,6 +63,7 @@ Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339)
 - [x] `POST /ingest/shortcuts` with JSON creates journal event
 - [x] `source` field matches path segment
 - [x] Invalid JSON returns 4xx without journal write
+- [x] Disallowed type returns 400 without journal write
 - [x] Module runs under go-plugin supervision
 
 ## Dependencies
