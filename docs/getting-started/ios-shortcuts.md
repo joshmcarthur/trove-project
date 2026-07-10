@@ -73,16 +73,27 @@ v0 HTTP ingest has **no authentication** — see
 See [network auth planning](../planning/auth.md) for auth options once exposing
 beyond a trusted tailnet.
 
-## Photo attachments (Planned)
+## Photo attachments
 
-Once the [blob store](../planning/blobs.md) lands, the share-sheet flow for
-photos will be:
+For images and other binary content from the share sheet:
 
-1. `PUT /blobs` with image bytes → receive `{ "blob_ref": "sha256-..." }`
-2. `POST /ingest/shortcuts` with JSON including `blob_ref` and metadata
+1. `PUT https://<host>/blobs` with raw image bytes → receive `{ "blob_ref": "sha256-..." }`
+2. `POST https://<host>/ingest/shortcuts` with JSON including `blob_ref` and metadata
    (`type`, `title`, `content_type`, etc.)
 
-JSON-only capture works today. Binary inline upload is not supported.
+Binary content must not be inlined in the ingest JSON body.
+
+### Share Sheet with photo
+
+1. **Trigger:** Share Sheet (enable URLs, text, images).
+2. **If** Shortcut Input is an image:
+   - **Get Contents of URL** — Method PUT, URL `https://YOUR_HOST/blobs`, Request Body: Shortcut Input.
+   - **Get Dictionary from Input** (from response JSON) → `blob_ref`.
+3. **Dictionary** — `type`: `shortcuts.share.saved`, plus `blob_ref` (if image), `text`, `url`, `title`, `content_type` as available.
+4. **Get Contents of URL** — Method POST, URL `https://YOUR_HOST/ingest/shortcuts`,
+   Headers `Content-Type: application/json`, Request Body: Dictionary.
+
+Text-only and URL-only share captures skip step 2 and POST JSON directly (see below).
 
 ## Event type conventions
 
@@ -102,12 +113,14 @@ Example payloads: [`examples/ios-shortcuts/payloads/`](../examples/ios-shortcuts
 
 Build your own Shortcut if you prefer full control.
 
-### Share Sheet → Trove
+### Share Sheet → Trove (text or URL)
 
 1. **Trigger:** Share Sheet (enable URLs, text, images).
 2. **Dictionary** — `type`: `shortcuts.share.saved`, `text`: Shortcut Input.
 3. **Get Contents of URL** — Method POST, URL `https://YOUR_HOST/ingest/shortcuts`,
    Headers `Content-Type: application/json`, Request Body: Dictionary.
+
+For images, use the [photo flow](#share-sheet-with-photo) above.
 
 ### Quick Note
 

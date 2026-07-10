@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/config"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
@@ -47,6 +48,11 @@ func main() {
 	}
 	defer store.Close()
 
+	if _, err := blob.OpenFilesystem(cfg.Blobs.Path); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	mods, err := modules.Discover(cfg.Modules.Paths)
 	if err != nil {
 		log.Printf("trove: module discovery: %v", err)
@@ -74,6 +80,6 @@ func main() {
 		}
 	}()
 
-	go modules.RunSources(ctx, store, mods)
+	go modules.RunSources(ctx, store, mods, cfg.Blobs.Path)
 	<-ctx.Done()
 }

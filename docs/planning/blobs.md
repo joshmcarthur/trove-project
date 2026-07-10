@@ -6,7 +6,7 @@ nav_order: 7
 
 # Blob store
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 2b — alongside MQTT and live-test prep\
 **Spec:** [Blob storage §5](../spec.md#5-blob-storage)\
 **Package:** `internal/blob`
@@ -39,8 +39,8 @@ type BlobStore interface {
   `{ "blob_ref": "sha256-..." }` (dedicated endpoint, not multipart on ingest)
 - Update share-sheet Shortcut docs to upload photo then POST event with
   `blob_ref`
-- `blob_ref` is already accepted by journal and HTTP ingest today; blob bytes
-  are not stored or resolved until this lands
+- `blob_ref` is accepted by journal and HTTP ingest; blob bytes are stored via
+  `PUT /blobs` on http-ingest and referenced from ingest events
 - `get_event` MCP tool: optionally include blob metadata or serve URL once blobs
   exist (follow-up acceptance criterion)
 
@@ -50,14 +50,14 @@ type BlobStore interface {
 - [x] Put returns stable ref for same content (dedup)
 - [x] Range supports partial reads
 - [x] Enumerate lists all refs
-- [ ] `PUT /blobs` on http-ingest returns stable `blob_ref`
-- [ ] Event with `blob_ref` references retrievable bytes
-- [ ] Share-sheet Shortcut recipe documents photo upload path
+- [x] `PUT /blobs` on http-ingest returns stable `blob_ref`
+- [x] Event with `blob_ref` references retrievable bytes
+- [x] Share-sheet Shortcut recipe documents photo upload path
 
 ## Dependencies
 
 - **Blocks:** photo/attachment capture via iOS Shortcuts
-- **Blocked by:** config loader (`[blobs]` section parsed but not wired)
+- **Blocked by:** none
 
 ## Open questions
 

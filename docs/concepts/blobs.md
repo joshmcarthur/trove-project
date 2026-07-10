@@ -29,9 +29,9 @@ type BlobStore interface {
 No sync/replication in v0; off-Pi backup is an external `rclone`/`restic` job.
 
 Primary use case: photo/attachment capture via iOS Shortcuts share sheet.
-`blob_ref` metadata is accepted by journal and HTTP ingest today; blob bytes are
-not stored or resolved until implementation lands.
+Upload bytes with `PUT /blobs` on http-ingest, then reference the returned
+`blob_ref` on an ingest event.
 
 ## Implementation
 
-**Status:** Planned — [planning/blobs.md](../planning/blobs.md)
+**Status:** Supported — [planning/blobs.md](../planning/blobs.md)

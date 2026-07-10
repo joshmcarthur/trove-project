@@ -16,7 +16,8 @@ const (
 
 // RunSources supervises all source modules until ctx is cancelled. Each module
 // runs in its own goroutine with restart and exponential backoff on exit.
-func RunSources(ctx context.Context, j journal.Journal, mods []Module) {
+// blobsPath is passed to each module subprocess as TROVE_BLOBS_PATH when non-empty.
+func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobsPath string) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
 		if mod.Manifest.Kind != KindSource {
@@ -25,13 +26,13 @@ func RunSources(ctx context.Context, j journal.Journal, mods []Module) {
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseSource(ctx, j, mod)
+			superviseSource(ctx, j, mod, blobsPath)
 		}(mod)
 	}
 	wg.Wait()
 }
 
-func superviseSource(ctx context.Context, j journal.Journal, mod Module) {
+func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobsPath string) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
 
@@ -40,7 +41,7 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module) {
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod)
+		handle, err := StartSource(ctx, j, mod, blobsPath)
 		if handle != nil {
 			_ = handle.Close()
 		}

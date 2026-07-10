@@ -19,9 +19,8 @@ the journal through the MCP server. See the [roadmap](./roadmap.md) for status.
 
 ## What's next
 
-Milestones 1, 2, and 3 (journal, module runtime, HTTP ingest, MQTT source,
-config, MCP query) are **Supported**. Current focus: [blob store](./planning/blobs.md)
-for photo/attachment capture and the two-week live test with
+Milestones 1, 2, 2b, and 3 (journal, module runtime, HTTP ingest, MQTT source,
+blob store, config, MCP query) are **Supported**. Current focus: the two-week live test with
 [iOS Shortcuts](./getting-started/ios-shortcuts.md).
 
 ## Documentation
