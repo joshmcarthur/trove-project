@@ -30,6 +30,8 @@ func TestTopicToEventType(t *testing.T) {
 func TestBuildPayload(t *testing.T) {
 	t.Parallel()
 
+	const topic = "home/sensor/temp"
+
 	tests := []struct {
 		name    string
 		payload []byte
@@ -38,29 +40,34 @@ func TestBuildPayload(t *testing.T) {
 		{
 			name:    "valid json object",
 			payload: []byte(`{"v":21.5}`),
-			want:    `{"v":21.5}`,
+			want:    `{"metadata":{"topic":"home/sensor/temp"},"v":21.5}`,
+		},
+		{
+			name:    "valid json object preserves existing metadata",
+			payload: []byte(`{"metadata":{"device":"node-1"},"v":21.5}`),
+			want:    `{"metadata":{"device":"node-1","topic":"home/sensor/temp"},"v":21.5}`,
 		},
 		{
 			name:    "valid json array",
 			payload: []byte(`[1,2,3]`),
-			want:    `[1,2,3]`,
+			want:    `{"message":[1,2,3],"metadata":{"topic":"home/sensor/temp"}}`,
 		},
 		{
 			name:    "non-json bytes",
 			payload: []byte("hello mqtt"),
-			want:    `{"raw":"hello mqtt"}`,
+			want:    `{"metadata":{"topic":"home/sensor/temp"},"raw":"hello mqtt"}`,
 		},
 		{
 			name:    "empty payload",
 			payload: []byte{},
-			want:    `{"raw":""}`,
+			want:    `{"metadata":{"topic":"home/sensor/temp"},"raw":""}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := buildPayload(tt.payload)
+			got, err := buildPayload(topic, tt.payload)
 			if err != nil {
 				t.Fatalf("buildPayload() error = %v", err)
 			}
@@ -84,8 +91,8 @@ func TestBuildEvent(t *testing.T) {
 	if event.Source != "home/sensor/temp" {
 		t.Errorf("Source = %q, want home/sensor/temp", event.Source)
 	}
-	if string(event.Payload) != `{"v":21.5}` {
-		t.Errorf("Payload = %s, want {\"v\":21.5}", event.Payload)
+	if string(event.Payload) != `{"metadata":{"topic":"home/sensor/temp"},"v":21.5}` {
+		t.Errorf("Payload = %s, want metadata.topic and v", event.Payload)
 	}
 }
 
