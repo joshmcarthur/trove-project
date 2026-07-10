@@ -261,6 +261,20 @@ func TestQuery(t *testing.T) {
 			wantIDs: []string{seed[0].ID, seed[1].ID, seed[3].ID},
 		},
 		{
+			name:    "exact type match",
+			filter:  Filter{Type: "mqtt.sensor.temp"},
+			wantIDs: []string{seed[0].ID, seed[3].ID},
+		},
+		{
+			name: "exact type with time range",
+			filter: Filter{
+				Type:     "mqtt.sensor.temp",
+				TimeFrom: &t1,
+				TimeTo:   &t2,
+			},
+			wantIDs: []string{seed[0].ID},
+		},
+		{
 			name:    "type prefix ha. excludes mqtt",
 			filter:  Filter{TypePrefix: "ha."},
 			wantIDs: []string{seed[2].ID},
