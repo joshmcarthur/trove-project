@@ -3,7 +3,6 @@ package modules
 import (
 	"context"
 	"fmt"
-	"os/exec"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -31,10 +30,15 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHan
 		return nil, fmt.Errorf("modules: start source: %q is kind %q, want %q", mod.Manifest.Name, mod.Manifest.Kind, KindSource)
 	}
 
+	cmd, err := moduleExecCmd(mod)
+	if err != nil {
+		return nil, fmt.Errorf("modules: start source %q: %w", mod.Manifest.Name, err)
+	}
+
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  trovemodule.Handshake,
 		Plugins:          hostPluginSet(j),
-		Cmd:              exec.Command(mod.Binary),
+		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),
 	})
