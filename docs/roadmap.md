@@ -35,7 +35,7 @@ Build order from spec §11:
 | Module discovery (go-plugin) | Planned | §8 | [module-runtime](./planning/module-runtime.md) | `internal/modules` |
 | MQTT source | Planned | §6, §11.2 | [mqtt-source](./planning/mqtt-source.md) | external module |
 | MCP query server | Planned | §9, §11.3 | [mcp-query](./planning/mcp-query.md) | `internal/query` |
-| TOML config | Planned | §10 | [config](./planning/config.md) | `internal/config` |
+| TOML config | Supported | §10 | [config](./planning/config.md) | `internal/config` |
 | Blob store (filesystem) | Later | §5 | [blobs](./planning/blobs.md) | `internal/blob` |
 | HA WebSocket tap | Later | §6 | [ha-source](./planning/ha-source.md) | external module |
 | Remote modules (Tailscale) | Later | §8 | [remote-modules](./planning/remote-modules.md) | `internal/modules` |

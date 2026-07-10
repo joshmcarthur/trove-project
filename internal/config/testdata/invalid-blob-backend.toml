@@ -1,0 +1,8 @@
+[journal]
+path = "/data/trove.db"
+
+[blobs]
+backend = "s3"
+
+[mcp]
+listen = ":8081"

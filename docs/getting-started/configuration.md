@@ -8,7 +8,7 @@ nav_order: 3
 
 Trove uses TOML (not YAML). Full detail is in [spec §10](../spec.md#10-configuration).
 
-**Status:** Planned — see [planning/config.md](../planning/config.md).
+**Status:** Supported — see [planning/config.md](../planning/config.md).
 
 ## Example
 
@@ -37,8 +37,14 @@ listen = ":8081"
 - Per-module settings (broker URLs, topics, tokens) live in each module's own
   `manifest.toml` — the core does not need to know module-specific shapes.
 
-## Local development (planned)
+## Local development
 
-A config file path will be passed via flag or discovered from a conventional
-location. Until the config loader is implemented, no config file is required
-for `trove -version`.
+Pass the config file path with `-config`:
+
+```bash
+trove -config /path/to/trove.toml
+```
+
+Until journal and module startup are implemented, a valid config still exits with
+`trove: not yet implemented`. Invalid or missing config fails fast with a clear
+error. Use `trove -version` without a config file.

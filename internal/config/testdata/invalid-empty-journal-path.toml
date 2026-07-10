@@ -1,0 +1,8 @@
+[journal]
+path = ""
+
+[blobs]
+backend = "filesystem"
+
+[mcp]
+listen = ":8081"
