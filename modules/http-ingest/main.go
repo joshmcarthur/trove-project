@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"sync/atomic"
 
+	"github.com/joshmcarthur/trove/internal/blob"
+	"github.com/joshmcarthur/trove/internal/modules"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
@@ -17,9 +21,20 @@ func (m *httpIngestModule) Run(ctx context.Context, emit trovemodule.Emitter) er
 	if err != nil {
 		return err
 	}
+
+	blobsPath := os.Getenv(modules.EnvBlobsPath)
+	if blobsPath == "" {
+		return fmt.Errorf("http-ingest: %s is required (set by trove core from [blobs].path)", modules.EnvBlobsPath)
+	}
+
+	blobs, err := blob.OpenFilesystem(blobsPath)
+	if err != nil {
+		return fmt.Errorf("http-ingest: open blob store: %w", err)
+	}
+
 	m.ready.Store(true)
 	defer m.ready.Store(false)
-	return runHTTPServer(ctx, emit, cfg)
+	return runHTTPServer(ctx, emit, cfg, blobs)
 }
 
 func (m *httpIngestModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {

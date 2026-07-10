@@ -44,7 +44,7 @@ func TestStartSourceInvokesHealthcheck(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod)
+		handle, err := StartSource(ctx, store, mod, "")
 		if handle != nil {
 			_ = handle.Close()
 		}
@@ -97,7 +97,7 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 		},
 	}
 
-	handle, err := StartSource(context.Background(), store, mod)
+	handle, err := StartSource(context.Background(), store, mod, "")
 	if err != nil {
 		t.Fatalf("StartSource() error = %v", err)
 	}
@@ -132,7 +132,7 @@ func TestStartSourceHTTPIngest(t *testing.T) {
 	store := openTestJournal(t)
 	t.Cleanup(func() { _ = store.Close() })
 
-	modDir, listenAddr := buildHTTPIngestModule(t)
+	modDir, listenAddr, blobsPath := buildHTTPIngestModule(t)
 	mod := Module{
 		Dir:    modDir,
 		Binary: filepath.Join(modDir, "module"),
@@ -148,7 +148,7 @@ func TestStartSourceHTTPIngest(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod)
+		handle, err := StartSource(ctx, store, mod, blobsPath)
 		if handle != nil {
 			_ = handle.Close()
 		}
@@ -249,7 +249,7 @@ func openTestJournal(t *testing.T) *journal.Store {
 	return store
 }
 
-func buildHTTPIngestModule(t *testing.T) (string, string) {
+func buildHTTPIngestModule(t *testing.T) (string, string, string) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -281,7 +281,7 @@ listen = %q
 	if err := os.Chmod(binary, 0o755); err != nil {
 		t.Fatalf("chmod module binary: %v", err)
 	}
-	return dir, listenAddr
+	return dir, listenAddr, filepath.Join(t.TempDir(), "blobs")
 }
 
 func waitForTCP(t *testing.T, addr string) {

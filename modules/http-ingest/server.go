@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/joshmcarthur/trove/internal/blob"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc/codes"
@@ -17,12 +19,22 @@ import (
 
 const defaultEventType = "http.ingest.received"
 
-func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
+type putBlobResponse struct {
+	BlobRef string `json:"blob_ref"`
+}
+
+func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config, blobs blob.Store) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
 		handleIngest(w, r, emit, cfg)
 	})
 	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+	mux.HandleFunc("PUT /blobs", func(w http.ResponseWriter, r *http.Request) {
+		handlePutBlob(w, r, blobs, cfg)
+	})
+	mux.HandleFunc("/blobs", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
@@ -83,6 +95,42 @@ func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitt
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func handlePutBlob(w http.ResponseWriter, r *http.Request, blobs blob.Store, cfg config) {
+	body, err := readRawBody(w, r, cfg.MaxBodyBytes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ref, err := blobs.Put(r.Context(), bytes.NewReader(body))
+	if err != nil {
+		http.Error(w, "failed to store blob", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(putBlobResponse{BlobRef: ref})
+}
+
+func readRawBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {
+	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	defer limited.Close()
+
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			return nil, fmt.Errorf("request body too large")
+		}
+		return nil, fmt.Errorf("read body")
+	}
+	if len(body) == 0 {
+		return nil, fmt.Errorf("request body is required")
+	}
+	return body, nil
 }
 
 func readBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {
