@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/journal"
 )
 
@@ -14,10 +15,8 @@ const (
 	maxBackoff     = 30 * time.Second
 )
 
-// RunSources supervises all source modules until ctx is cancelled. Each module
-// runs in its own goroutine with restart and exponential backoff on exit.
-// blobsPath is passed to each module subprocess as TROVE_BLOBS_PATH when non-empty.
-func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobsPath string) {
+// RunSources supervises all source modules until ctx is cancelled.
+func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *HTTPRegistry) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
 		if mod.Manifest.Kind != KindSource {
@@ -26,13 +25,13 @@ func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobsPath
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseSource(ctx, j, mod, blobsPath)
+			superviseSource(ctx, j, mod, blobs, registry)
 		}(mod)
 	}
 	wg.Wait()
 }
 
-func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobsPath string) {
+func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
 
@@ -41,18 +40,24 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobsPa
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobsPath)
+		handle, err := StartSource(ctx, j, mod, blobs, registry)
 		if handle != nil {
-			_ = handle.Close()
+			select {
+			case <-ctx.Done():
+				_ = handle.Close()
+				return
+			case <-handle.done:
+				_ = handle.Close()
+			}
+		} else if err != nil && ctx.Err() == nil {
+			log.Printf("modules: source %q start failed: %v; restarting in %s", name, err, backoff)
 		}
 
 		if ctx.Err() != nil {
 			return
 		}
 
-		if err != nil {
-			log.Printf("modules: source %q exited: %v; restarting in %s", name, err, backoff)
-		} else {
+		if err == nil {
 			log.Printf("modules: source %q exited; restarting in %s", name, backoff)
 		}
 

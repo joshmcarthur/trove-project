@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
-	"github.com/joshmcarthur/trove/internal/blob"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc/codes"
@@ -23,135 +19,82 @@ type putBlobResponse struct {
 	BlobRef string `json:"blob_ref"`
 }
 
-func runHTTPServer(ctx context.Context, emit trovemodule.Emitter, cfg config, blobs blob.Store) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		handleIngest(w, r, emit, cfg)
-	})
-	mux.HandleFunc("/ingest/{source}", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-	mux.HandleFunc("PUT /blobs", func(w http.ResponseWriter, r *http.Request) {
-		handlePutBlob(w, r, blobs, cfg)
-	})
-	mux.HandleFunc("/blobs", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-
-	srv := &http.Server{
-		Addr:    cfg.Listen,
-		Handler: mux,
+func dispatchHTTP(ctx context.Context, emit trovemodule.Emitter, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+	if req == nil {
+		return textResponse(http.StatusBadRequest, "request is required"), nil
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
-		}
-		close(errCh)
-	}()
-
-	select {
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		return srv.Shutdown(shutdownCtx)
-	case err := <-errCh:
-		return err
+	key := req.Method + " " + req.MatchedPattern
+	switch key {
+	case "POST /ingest/{source}":
+		return handleIngest(ctx, emit, cfg, req)
+	case "PUT /blobs":
+		return handlePutBlob(ctx, blobs, cfg, req)
+	default:
+		return textResponse(http.StatusNotFound, "not found"), nil
 	}
 }
 
-func handleIngest(w http.ResponseWriter, r *http.Request, emit trovemodule.Emitter, cfg config) {
-	source := r.PathValue("source")
+func handleIngest(ctx context.Context, emit trovemodule.Emitter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+	source := req.PathValues["source"]
 	if source == "" {
-		http.Error(w, "source is required", http.StatusBadRequest)
-		return
+		return textResponse(http.StatusBadRequest, "source is required"), nil
 	}
 
-	body, err := readBody(w, r, cfg.MaxBodyBytes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	body := req.Body
+	if len(body) == 0 {
+		return textResponse(http.StatusBadRequest, "request body is required"), nil
+	}
+	if int64(len(body)) > cfg.MaxBodyBytes {
+		return textResponse(http.StatusBadRequest, "request body too large"), nil
+	}
+	if !json.Valid(body) {
+		return textResponse(http.StatusBadRequest, "invalid JSON"), nil
 	}
 
 	event, err := buildEvent(source, body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return textResponse(http.StatusBadRequest, err.Error()), nil
 	}
 
 	if len(cfg.Provides) > 0 && !trovemodule.MatchType(cfg.Provides, event.Type) {
-		http.Error(w, fmt.Sprintf("type not allowed: %s", event.Type), http.StatusBadRequest)
-		return
+		return textResponse(http.StatusBadRequest, fmt.Sprintf("type not allowed: %s", event.Type)), nil
 	}
 
-	if err := emit.Emit(r.Context(), event); err != nil {
+	if err := emit.Emit(ctx, event); err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.InvalidArgument {
-			http.Error(w, st.Message(), http.StatusBadRequest)
-			return
+			return textResponse(http.StatusBadRequest, st.Message()), nil
 		}
-		http.Error(w, "failed to ingest event", http.StatusInternalServerError)
-		return
+		return textResponse(http.StatusInternalServerError, "failed to ingest event"), nil
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return &troverpc.HTTPResponse{Status: http.StatusNoContent}, nil
 }
 
-func handlePutBlob(w http.ResponseWriter, r *http.Request, blobs blob.Store, cfg config) {
-	body, err := readRawBody(w, r, cfg.MaxBodyBytes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ref, err := blobs.Put(r.Context(), bytes.NewReader(body))
-	if err != nil {
-		http.Error(w, "failed to store blob", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(putBlobResponse{BlobRef: ref})
-}
-
-func readRawBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {
-	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	defer limited.Close()
-
-	body, err := io.ReadAll(limited)
-	if err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			return nil, fmt.Errorf("request body too large")
-		}
-		return nil, fmt.Errorf("read body")
-	}
+func handlePutBlob(ctx context.Context, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+	body := req.Body
 	if len(body) == 0 {
-		return nil, fmt.Errorf("request body is required")
+		return textResponse(http.StatusBadRequest, "request body is required"), nil
 	}
-	return body, nil
-}
+	if int64(len(body)) > cfg.MaxBodyBytes {
+		return textResponse(http.StatusBadRequest, "request body too large"), nil
+	}
 
-func readBody(w http.ResponseWriter, r *http.Request, maxBodyBytes int64) ([]byte, error) {
-	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	defer limited.Close()
-
-	body, err := io.ReadAll(limited)
+	ref, err := blobs.Put(ctx, body)
 	if err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			return nil, fmt.Errorf("request body too large")
-		}
-		return nil, fmt.Errorf("read body")
+		return textResponse(http.StatusInternalServerError, "failed to store blob"), nil
 	}
-	if len(body) == 0 {
-		return nil, fmt.Errorf("request body is required")
+
+	payload, err := json.Marshal(putBlobResponse{BlobRef: ref})
+	if err != nil {
+		return textResponse(http.StatusInternalServerError, "failed to encode response"), nil
 	}
-	if !json.Valid(body) {
-		return nil, fmt.Errorf("invalid JSON")
-	}
-	return body, nil
+
+	return &troverpc.HTTPResponse{
+		Status:  http.StatusCreated,
+		Headers: map[string]string{"Content-Type": "application/json"},
+		Body:    payload,
+	}, nil
 }
 
 func buildEvent(source string, body []byte) (*troverpc.Event, error) {
@@ -163,7 +106,6 @@ func buildEvent(source string, body []byte) (*troverpc.Event, error) {
 
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(body, &obj); err != nil {
-		// Arrays and primitives use the entire body as payload.
 		return event, nil
 	}
 
@@ -202,4 +144,11 @@ func buildEvent(source string, body []byte) (*troverpc.Event, error) {
 	}
 	event.Payload = payloadBytes
 	return event, nil
+}
+
+func textResponse(status int, message string) *troverpc.HTTPResponse {
+	return &troverpc.HTTPResponse{
+		Status: int32(status),
+		Body:   []byte(message),
+	}
 }

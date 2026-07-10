@@ -34,11 +34,12 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 ## Implementation notes
 
 - Implement as a **module**, not wired directly into core — proves module boundary
-- Listen on configurable port (module config, not core)
+- Routes declared in manifest `[[http.routes]]`; core HTTP gateway dispatches requests
 - Parse JSON body as `payload`; optional `time`, `type`, and `blob_ref` fields in body
 - `max_body_bytes` in module manifest (default 10 MiB); raise for larger JSON payloads
 - Large binary content (photos, audio) should **not** be inlined — use `blob_ref` on the
-  event and store bytes via `PUT /blobs` ([blobs](./blobs.md))
+  event and store bytes via `PUT /blobs` ([blobs](./blobs.md)); blobs stored via core
+  `BlobPut` RPC (no local blob store in module)
 - `provides` in manifest controls allowed client `type` values (wildcards such as
   `note.*` supported); early HTTP 400 for disallowed types
 - Optional `[schemas]` validated at core `Emit`; failures return HTTP 400

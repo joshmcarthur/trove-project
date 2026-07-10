@@ -3,45 +3,51 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
+	"net/http"
 	"sync/atomic"
 
-	"github.com/joshmcarthur/trove/internal/blob"
-	"github.com/joshmcarthur/trove/internal/modules"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
 type httpIngestModule struct {
 	ready atomic.Bool
+	cfg   config
+	emit  trovemodule.Emitter
+	blobs trovemodule.BlobPutter
 }
 
-func (m *httpIngestModule) Run(ctx context.Context, emit trovemodule.Emitter) error {
+func (m *httpIngestModule) RunWithBlobs(ctx context.Context, emit trovemodule.Emitter, blobs trovemodule.BlobPutter) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-
-	blobsPath := os.Getenv(modules.EnvBlobsPath)
-	if blobsPath == "" {
-		return fmt.Errorf("http-ingest: %s is required (set by trove core from [blobs].path)", modules.EnvBlobsPath)
+	if blobs == nil {
+		return fmt.Errorf("http-ingest: blob putter is required")
 	}
 
-	blobs, err := blob.OpenFilesystem(blobsPath)
-	if err != nil {
-		return fmt.Errorf("http-ingest: open blob store: %w", err)
-	}
-
+	m.cfg = cfg
+	m.emit = emit
+	m.blobs = blobs
 	m.ready.Store(true)
 	defer m.ready.Store(false)
-	return runHTTPServer(ctx, emit, cfg, blobs)
+
+	<-ctx.Done()
+	return nil
+}
+
+func (m *httpIngestModule) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+	if !m.ready.Load() {
+		return textResponse(http.StatusServiceUnavailable, "service unavailable"), nil
+	}
+	return dispatchHTTP(ctx, m.emit, m.blobs, m.cfg, req)
 }
 
 func (m *httpIngestModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {
 	if m.ready.Load() {
-		return &troverpc.HealthcheckResponse{Ok: true, Message: "http server listening"}, nil
+		return &troverpc.HealthcheckResponse{Ok: true, Message: "http handlers ready"}, nil
 	}
-	return &troverpc.HealthcheckResponse{Ok: false, Message: "http server not listening"}, nil
+	return &troverpc.HealthcheckResponse{Ok: false, Message: "http handlers not ready"}, nil
 }
 
 func main() {

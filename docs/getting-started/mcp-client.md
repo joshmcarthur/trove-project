@@ -12,10 +12,10 @@ HTTP). Trove exposes four tools backed by the internal query API — see
 
 ## Prerequisites
 
-1. Build Trove and configure `[mcp].listen` — see [Quick Start](./quick-start.md).
+1. Build Trove and configure `[http].listen` — see [Quick Start](./quick-start.md).
 2. `trove` running with a populated journal (capture events via
    [HTTP ingest](./quick-start.md#capture-events) or Shortcuts first).
-3. Default MCP listen address: `:8081` (from core `trove.toml`, not a module).
+3. Default HTTP gateway address: `:8080` (MCP at `POST /mcp` on the same port).
 
 ## Connect Cursor
 
@@ -27,13 +27,13 @@ a global setup. A committed example lives at
 {
   "mcpServers": {
     "trove": {
-      "url": "http://127.0.0.1:8081"
+      "url": "http://127.0.0.1:8080/mcp"
     }
   }
 }
 ```
 
-Adjust the host and port to match `[mcp].listen` in your config. Reload Cursor
+Adjust the host and port to match `[http].listen` in your config. Reload Cursor
 (Settings → MCP, or restart the editor) after saving.
 
 ## Verify the connection
@@ -66,11 +66,11 @@ Tool arguments use RFC3339 timestamps where a time range is accepted.
 v0 MCP has **no authentication** — see [open items](../open-items.md). Common
 setups:
 
-- **Local development** — `http://127.0.0.1:8081` while `trove` runs on the same
+- **Local development** — `http://127.0.0.1:8080/mcp` while `trove` runs on the same
   machine as Cursor.
-- **Tailscale** — point `url` at your tailnet hostname if Trove runs on a home
+- **Tailscale** — point `url` at your tailnet hostname with `/mcp` path if Trove runs on a home
   server (recommended for remote access).
-- **Reverse proxy** — terminate TLS in front of `[mcp].listen` and use an `https://`
+- **Reverse proxy** — terminate TLS in front of `[http].listen` and use an `https://`
   URL in `mcp.json`.
 
 Do not expose an unauthenticated MCP endpoint on the public internet.
@@ -78,5 +78,5 @@ Do not expose an unauthenticated MCP endpoint on the public internet.
 ## See also
 
 - [Query concept](../concepts/query.md) — RPC and tool design
-- [Configuration](./configuration.md) — `[mcp].listen` in TOML
+- [Configuration](./configuration.md) — `[http].listen` in TOML
 - [iOS Shortcuts](./ios-shortcuts.md) — capture events to query later

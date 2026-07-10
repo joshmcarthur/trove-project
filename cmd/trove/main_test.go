@@ -51,8 +51,8 @@ func writeConfig(t *testing.T, journalPath string) string {
 	content := fmt.Sprintf(`[journal]
 path = %q
 
-[mcp]
-listen = ":8081"
+[http]
+listen = ":8080"
 `, journalPath)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -153,8 +153,8 @@ func TestCLI(t *testing.T) {
 		if !strings.Contains(stderr, "no source modules discovered") {
 			t.Errorf("stderr = %q, want substring %q", stderr, "no source modules discovered")
 		}
-		if !strings.Contains(stderr, "mcp listening on :8081") {
-			t.Errorf("stderr = %q, want substring %q", stderr, "mcp listening on :8081")
+		if !strings.Contains(stderr, "http gateway listening on :8080") {
+			t.Errorf("stderr = %q, want substring %q", stderr, "http gateway listening on :8080")
 		}
 	})
 }

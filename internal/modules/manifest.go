@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -17,6 +18,17 @@ const (
 	KindSink      Kind = "sink"
 )
 
+// HTTPRoute declares an HTTP route served via the gateway.
+type HTTPRoute struct {
+	Method       string `toml:"method"`
+	Path         string `toml:"path"`
+	MaxBodyBytes int64  `toml:"max_body_bytes"`
+}
+
+type manifestHTTP struct {
+	Routes []HTTPRoute `toml:"routes"`
+}
+
 // Manifest describes a Trove module from manifest.toml.
 type Manifest struct {
 	Name     string            `toml:"name"`
@@ -24,6 +36,13 @@ type Manifest struct {
 	Kind     Kind              `toml:"kind"`
 	Provides []string          `toml:"provides"`
 	Schemas  map[string]string `toml:"schemas"`
+	HTTP     manifestHTTP      `toml:"http"`
+	Listen   string            `toml:"listen"`
+}
+
+// HTTPRoutes returns declared HTTP routes from the manifest.
+func (m Manifest) HTTPRoutes() []HTTPRoute {
+	return m.HTTP.Routes
 }
 
 // ParseManifest parses and validates manifest TOML from data.
@@ -67,6 +86,10 @@ func validateManifest(m Manifest) error {
 		return fmt.Errorf("modules: manifest: provides is required for source modules")
 	}
 
+	if strings.TrimSpace(m.Listen) != "" {
+		return fmt.Errorf("modules: manifest: listen must not be set on module %q (use gateway)", m.Name)
+	}
+
 	for _, pattern := range m.Provides {
 		if err := validateProvidesPattern(pattern); err != nil {
 			return err
@@ -78,6 +101,25 @@ func validateManifest(m Manifest) error {
 		}
 	}
 
+	for i, route := range m.HTTP.Routes {
+		if err := validateHTTPRoute(route); err != nil {
+			return fmt.Errorf("modules: manifest: http.routes[%d]: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+func validateHTTPRoute(route HTTPRoute) error {
+	if route.Method == "" {
+		return fmt.Errorf("method is required")
+	}
+	if route.Path == "" {
+		return fmt.Errorf("path is required")
+	}
+	if !strings.HasPrefix(route.Path, "/") {
+		return fmt.Errorf("path must start with /")
+	}
 	return nil
 }
 
@@ -89,4 +131,35 @@ func validateProvidesPattern(pattern string) error {
 		return fmt.Errorf("modules: manifest: invalid pattern %q: %w", pattern, err)
 	}
 	return nil
+}
+
+// CollectHTTPRoutes gathers HTTP routes from discovered modules and rejects duplicates.
+func CollectHTTPRoutes(mods []Module) ([]HTTPRouteEntry, error) {
+	seen := make(map[string]struct{})
+	var routes []HTTPRouteEntry
+
+	for _, mod := range mods {
+		manifest, err := loadModuleManifest(mod)
+		if err != nil {
+			return nil, err
+		}
+		for _, route := range manifest.HTTPRoutes() {
+			key := route.Method + " " + route.Path
+			if _, exists := seen[key]; exists {
+				return nil, fmt.Errorf("modules: duplicate http route %s for module %q", key, manifest.Name)
+			}
+			seen[key] = struct{}{}
+			routes = append(routes, HTTPRouteEntry{
+				Route:  route,
+				Module: manifest.Name,
+			})
+		}
+	}
+	return routes, nil
+}
+
+// HTTPRouteEntry binds a manifest route to its module.
+type HTTPRouteEntry struct {
+	Route  HTTPRoute
+	Module string
 }

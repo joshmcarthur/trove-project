@@ -13,8 +13,8 @@ the generic ingest endpoint — not a Trove module.
 ## Prerequisites
 
 1. Build Trove and configure `[modules].paths` — see [Quick Start](./quick-start.md).
-2. HTTP ingest listening (default `:8080` in
-   [`modules/http-ingest/manifest.toml`](https://github.com/joshmcarthur/trove/blob/main/modules/http-ingest/manifest.toml)).
+2. HTTP gateway listening on `[http].listen` (default `:8080` in core `trove.toml`).
+   Ingest routes are declared in the http-ingest module manifest.
 3. Your phone can reach the ingest URL (local network, Tailscale, or HTTPS on the
    public internet).
 
