@@ -36,7 +36,8 @@ listen = "tailscale:trove"
 listen = ":8080"
 ```
 
-`[mcp].listen` is deprecated; MCP is served at `POST /mcp` on `[http].listen`.
+`[mcp].listen` is removed; MCP is provided by the `mcp-query` module at
+`POST /mcp` on `[http].listen`.
 
 Go struct with sensible defaults for development.
 

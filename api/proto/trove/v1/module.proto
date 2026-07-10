@@ -29,9 +29,53 @@ message BlobPutResponse {
   string blob_ref = 1;
 }
 
-// CoreServices is implemented by the Trove core; modules call for blob operations.
+// CoreServices exposes durable core capabilities to module subprocesses over the
+// services broker (see RunRequest.services_broker_id). G2 added BlobPut so HTTP
+// modules store blobs in the core-owned store instead of a local path. Query
+// methods let read-only modules (e.g. mcp-query) access the journal without
+// opening trove.db directly. Emit stays on the separate ingest broker to limit
+// churn in the existing source path.
 service CoreServices {
   rpc BlobPut(BlobPutRequest) returns (BlobPutResponse);
+  rpc GetEvent(GetEventRequest) returns (Event);
+  rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse);
+  rpc GetEventsByType(GetEventsByTypeRequest) returns (SearchEventsResponse);
+  rpc SummarizeRange(SummarizeRangeRequest) returns (Summary);
+}
+
+message GetEventRequest {
+  string id = 1;
+}
+
+message SearchEventsRequest {
+  string query = 1;
+  string type_prefix = 2;
+  string source = 3;
+  string time_from = 4; // optional RFC3339
+  string time_to = 5;   // optional RFC3339
+}
+
+message SearchEventsResponse {
+  repeated Event events = 1;
+}
+
+message GetEventsByTypeRequest {
+  string type = 1;
+  string time_from = 2; // optional RFC3339
+  string time_to = 3;   // optional RFC3339
+}
+
+message SummarizeRangeRequest {
+  string time_from = 1; // RFC3339
+  string time_to = 2;   // RFC3339
+}
+
+message Summary {
+  string time_from = 1;
+  string time_to = 2;
+  int32 total = 3;
+  map<string, int32> by_type = 4;
+  repeated Event notable = 5;
 }
 
 message HTTPRequest {
@@ -56,6 +100,8 @@ service HTTPModule {
 
 message RunRequest {
   uint32 ingest_broker_id = 1;
+  // Broker ID for CoreServices (BlobPut, Query). Zero when the module needs
+  // neither blobs nor journal access.
   uint32 services_broker_id = 2;
 }
 

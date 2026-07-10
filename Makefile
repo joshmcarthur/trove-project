@@ -1,4 +1,4 @@
-.PHONY: fmt lint test build build-http-ingest build-mqtt-source docs docs-serve check proto
+.PHONY: fmt lint test build build-http-ingest build-mqtt-source build-mcp-query docs docs-serve check proto
 
 GOIMPORTS := go run golang.org/x/tools/cmd/goimports
 
@@ -18,7 +18,7 @@ lint:
 test:
 	go test -race -cover ./...
 
-build: build-http-ingest build-mqtt-source
+.build: build-http-ingest build-mqtt-source build-mcp-query build-mcp-query
 	go build -o bin/trove ./cmd/trove
 
 build-http-ingest:
@@ -28,6 +28,10 @@ build-http-ingest:
 build-mqtt-source:
 	go build -o modules/mqtt-source/module ./modules/mqtt-source
 	chmod +x modules/mqtt-source/module
+
+build-mcp-query:
+	go build -o modules/mcp-query/module ./modules/mcp-query
+	chmod +x modules/mcp-query/module
 
 docs:
 	cd docs && deno task build

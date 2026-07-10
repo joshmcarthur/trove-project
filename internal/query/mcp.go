@@ -13,9 +13,17 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// MCPHandler returns the MCP streamable HTTP handler for svc.
-func MCPHandler(svc *Service) http.Handler {
-	return newMCPHandler(svc)
+// Querier is the journal query API used by MCP handlers.
+type Querier interface {
+	GetEvent(ctx context.Context, id string) (Event, error)
+	SearchEvents(ctx context.Context, query string, params SearchParams) ([]Event, error)
+	GetEventsByType(ctx context.Context, eventType string, timeFrom, timeTo *time.Time) ([]Event, error)
+	SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (Summary, error)
+}
+
+// MCPHandler returns the MCP streamable HTTP handler for q.
+func MCPHandler(q Querier) http.Handler {
+	return newMCPHandler(q)
 }
 
 // Serve starts the MCP query server on listen until ctx is cancelled.
@@ -47,14 +55,14 @@ func Serve(ctx context.Context, listen string, svc *Service) error {
 	return err
 }
 
-func newMCPHandler(svc *Service) http.Handler {
-	server := newMCPServer(svc)
+func newMCPHandler(q Querier) http.Handler {
+	server := newMCPServer(q)
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
 	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
 }
 
-func newMCPServer(svc *Service) *mcp.Server {
+func newMCPServer(q Querier) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "trove",
 		Version: "0.1.0",
@@ -68,7 +76,7 @@ func newMCPServer(svc *Service) *mcp.Server {
 		Name:        "get_event",
 		Description: "Return a journal event by ULID",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, params getEventParams) (*mcp.CallToolResult, any, error) {
-		event, err := svc.GetEvent(ctx, params.ID)
+		event, err := q.GetEvent(ctx, params.ID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -99,7 +107,7 @@ func newMCPServer(svc *Service) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		events, err := svc.SearchEvents(ctx, params.Query, searchParams)
+		events, err := q.SearchEvents(ctx, params.Query, searchParams)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -132,7 +140,7 @@ func newMCPServer(svc *Service) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		events, err := svc.GetEventsByType(ctx, params.Type, timeFrom, timeTo)
+		events, err := q.GetEventsByType(ctx, params.Type, timeFrom, timeTo)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -160,7 +168,7 @@ func newMCPServer(svc *Service) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		summary, err := svc.SummarizeRange(ctx, timeFrom, timeTo)
+		summary, err := q.SummarizeRange(ctx, timeFrom, timeTo)
 		if err != nil {
 			return nil, nil, err
 		}

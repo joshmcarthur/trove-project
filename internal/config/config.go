@@ -14,7 +14,6 @@ type Config struct {
 	Blobs   BlobsConfig   `toml:"blobs"`
 	Modules ModulesConfig `toml:"modules"`
 	HTTP    HTTPConfig    `toml:"http"`
-	MCP     MCPConfig     `toml:"mcp"`
 }
 
 // JournalConfig holds SQLite journal settings.
@@ -43,11 +42,6 @@ type RemoteConfig struct {
 type HTTPConfig struct {
 	Listen       string `toml:"listen"`
 	MaxBodyBytes int64  `toml:"max_body_bytes"`
-}
-
-// MCPConfig holds legacy MCP listen settings (deprecated when HTTP gateway is used).
-type MCPConfig struct {
-	Listen string `toml:"listen"`
 }
 
 // Load reads and validates configuration from path.
@@ -163,9 +157,4 @@ func validate(cfg *Config) error {
 	}
 
 	return nil
-}
-
-// UseSeparateMCPListen reports whether trove should bind a standalone MCP listener.
-func (cfg Config) UseSeparateMCPListen() bool {
-	return strings.TrimSpace(cfg.MCP.Listen) != ""
 }
