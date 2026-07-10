@@ -57,7 +57,7 @@ func runMQTT(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
 }
 
 func buildEvent(topic string, payload []byte) (*troverpc.Event, error) {
-	body, err := buildPayload(payload)
+	body, err := buildPayload(topic, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +74,45 @@ func topicToEventType(topic string) string {
 	return "mqtt." + slug + ".received"
 }
 
-func buildPayload(payload []byte) ([]byte, error) {
+func buildPayload(topic string, payload []byte) ([]byte, error) {
+	meta := map[string]string{"topic": topic}
+
 	if len(payload) == 0 {
-		return json.Marshal(map[string]string{"raw": ""})
+		return json.Marshal(map[string]any{
+			"metadata": meta,
+			"raw":      "",
+		})
 	}
+
 	if json.Valid(payload) {
-		return payload, nil
+		var value any
+		if err := json.Unmarshal(payload, &value); err != nil {
+			return nil, err
+		}
+
+		switch obj := value.(type) {
+		case map[string]any:
+			obj["metadata"] = mergeTopicMetadata(obj["metadata"], topic)
+			return json.Marshal(obj)
+		default:
+			return json.Marshal(map[string]any{
+				"metadata": meta,
+				"message":  value,
+			})
+		}
 	}
-	return json.Marshal(map[string]string{"raw": string(payload)})
+
+	return json.Marshal(map[string]any{
+		"metadata": meta,
+		"raw":      string(payload),
+	})
+}
+
+func mergeTopicMetadata(existing any, topic string) map[string]any {
+	meta, ok := existing.(map[string]any)
+	if !ok {
+		meta = make(map[string]any)
+	}
+	meta["topic"] = topic
+	return meta
 }

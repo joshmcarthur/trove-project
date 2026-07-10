@@ -83,7 +83,8 @@ After `make build`, configure broker and topics in
 `modules/mqtt-source/manifest.toml` (default broker `tcp://localhost:1883`,
 topics `["home/#"]`). Add `modules/` to `[modules].paths` and start `trove`.
 Each MQTT message becomes a journal event with `type`
-`mqtt.<topic>.received` (slashes become dots) and `source` set to the topic.
+`mqtt.<topic>.received` (slashes become dots), `source` set to the topic, and
+`payload.metadata.topic` preserving the original MQTT topic.
 
 ## Publishing
 
