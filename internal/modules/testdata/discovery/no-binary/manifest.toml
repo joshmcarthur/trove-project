@@ -1,0 +1,4 @@
+name     = "no-binary"
+version  = "1.0"
+kind     = "source"
+provides = ["test.event"]

@@ -1,0 +1,4 @@
+name     = "enricher"
+version  = "0.1.0"
+kind     = "processor"
+provides = ["http.ingest.received"]
