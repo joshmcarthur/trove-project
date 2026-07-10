@@ -19,7 +19,7 @@ type Event struct {
 	BlobRef *string
 }
 
-// Filter constrains journal reads. Text is reserved for future FTS5 search.
+// Filter constrains journal reads. Text performs FTS5 keyword search when set.
 type Filter struct {
 	TypePrefix string
 	Source     string

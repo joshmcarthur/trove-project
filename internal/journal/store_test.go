@@ -3,6 +3,7 @@ package journal
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid"
+	_ "modernc.org/sqlite"
 )
 
 func TestOpenCreatesDatabase(t *testing.T) {
@@ -33,6 +35,11 @@ func TestOpenCreatesDatabase(t *testing.T) {
 	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'`).Scan(&name)
 	if err != nil {
 		t.Fatalf("events table missing: %v", err)
+	}
+
+	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events_fts'`).Scan(&name)
+	if err != nil {
+		t.Fatalf("events_fts table missing: %v", err)
 	}
 }
 
@@ -314,6 +321,143 @@ func TestQuery(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestQueryText(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	t1 := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
+	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+
+	seed := []Event{
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
+		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"room":"kitchen"}`)},
+	}
+	for _, e := range seed {
+		if err := store.Append(ctx, e); err != nil {
+			t.Fatalf("Append(%q) error = %v", e.ID, err)
+		}
+	}
+
+	tests := []struct {
+		name    string
+		filter  Filter
+		wantIDs []string
+	}{
+		{
+			name:    "match keyword in payload",
+			filter:  Filter{Text: "balmy"},
+			wantIDs: []string{seed[0].ID},
+		},
+		{
+			name:    "match keyword in type",
+			filter:  Filter{Text: "humidity"},
+			wantIDs: []string{seed[1].ID},
+		},
+		{
+			name:    "match keyword in source",
+			filter:  Filter{Text: "kitchen-light"},
+			wantIDs: []string{seed[2].ID},
+		},
+		{
+			name: "text with type prefix",
+			filter: Filter{
+				Text:       "balmy",
+				TypePrefix: "mqtt.",
+			},
+			wantIDs: []string{seed[0].ID},
+		},
+		{
+			name: "text with time range",
+			filter: Filter{
+				Text:     "reading",
+				TimeFrom: &t2,
+				TimeTo:   &t3,
+			},
+			wantIDs: []string{seed[1].ID},
+		},
+		{
+			name:    "no match returns empty",
+			filter:  Filter{Text: "missing-keyword"},
+			wantIDs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := store.Query(ctx, tt.filter)
+			if err != nil {
+				t.Fatalf("Query() error = %v", err)
+			}
+
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("Query() returned %d events, want %d", len(got), len(tt.wantIDs))
+			}
+
+			for i, e := range got {
+				if e.ID != tt.wantIDs[i] {
+					t.Errorf("event[%d].ID = %q, want %q", i, e.ID, tt.wantIDs[i])
+				}
+			}
+		})
+	}
+}
+
+func TestMigrateFTSBackfill(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "legacy.db")
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+
+	if _, err := db.Exec(schemaDDL); err != nil {
+		t.Fatalf("create events schema: %v", err)
+	}
+
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	_, err = db.Exec(`
+		INSERT INTO events (id, time, type, source, payload, blob_ref)
+		VALUES (?, ?, ?, ?, ?, NULL)`,
+		"01JEVT00000000000000000099",
+		when.UTC().Format(time.RFC3339),
+		"legacy.event",
+		"legacy-source",
+		`{"note":"backfill-me"}`,
+	)
+	if err != nil {
+		t.Fatalf("seed legacy event: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close legacy db: %v", err)
+	}
+
+	store, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	got, err := store.Query(context.Background(), Filter{Text: "backfill-me"})
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("Query() returned %d events, want 1", len(got))
+	}
+	if got[0].ID != "01JEVT00000000000000000099" {
+		t.Errorf("ID = %q, want legacy event id", got[0].ID)
 	}
 }
 

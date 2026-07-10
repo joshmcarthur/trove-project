@@ -56,6 +56,16 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("journal: init schema: %w", err)
 	}
 
+	if _, err := db.Exec(ftsSchemaDDL); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("journal: init fts schema: %w", err)
+	}
+
+	if err := migrateFTS(db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
 	if err := configureDB(db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -118,7 +128,13 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 		blobRef = sql.NullString{String: *e.BlobRef, Valid: true}
 	}
 
-	_, err := s.db.ExecContext(ctx, `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("journal: append: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO events (id, time, type, source, payload, blob_ref)
 		VALUES (?, ?, ?, ?, ?, ?)`,
 		e.ID,
@@ -132,35 +148,67 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 		return fmt.Errorf("journal: append: %w", err)
 	}
 
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO events_fts (event_id, type, source, payload)
+		VALUES (?, ?, ?, ?)`,
+		e.ID,
+		e.Type,
+		e.Source,
+		string(e.Payload),
+	)
+	if err != nil {
+		return fmt.Errorf("journal: append fts: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("journal: append: commit: %w", err)
+	}
+
 	s.notify(e)
 	return nil
 }
 
 // Query returns events matching f, ordered by time ascending.
 func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
-	query := `
-		SELECT id, time, type, source, payload, blob_ref
-		FROM events`
-
 	var (
+		query      string
 		predicates []string
 		args       []any
 	)
 
+	ftsQuery := formatFTSQuery(f.Text)
+	if ftsQuery != "" {
+		query = `
+			SELECT e.id, e.time, e.type, e.source, e.payload, e.blob_ref
+			FROM events e
+			INNER JOIN events_fts ON events_fts.event_id = e.id`
+		predicates = append(predicates, "events_fts MATCH ?")
+		args = append(args, ftsQuery)
+	} else {
+		query = `
+			SELECT id, time, type, source, payload, blob_ref
+			FROM events`
+	}
+
+	tablePrefix := ""
+	if ftsQuery != "" {
+		tablePrefix = "e."
+	}
+
 	if f.TypePrefix != "" {
-		predicates = append(predicates, "type LIKE ?")
+		predicates = append(predicates, tablePrefix+"type LIKE ?")
 		args = append(args, f.TypePrefix+"%")
 	}
 	if f.Source != "" {
-		predicates = append(predicates, "source = ?")
+		predicates = append(predicates, tablePrefix+"source = ?")
 		args = append(args, f.Source)
 	}
 	if f.TimeFrom != nil {
-		predicates = append(predicates, "time >= ?")
+		predicates = append(predicates, tablePrefix+"time >= ?")
 		args = append(args, f.TimeFrom.UTC().Format(time.RFC3339))
 	}
 	if f.TimeTo != nil {
-		predicates = append(predicates, "time <= ?")
+		predicates = append(predicates, tablePrefix+"time <= ?")
 		args = append(args, f.TimeTo.UTC().Format(time.RFC3339))
 	}
 
@@ -168,7 +216,11 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 		// Predicates are fixed fragments; user input is passed only via args.
 		query += " WHERE " + strings.Join(predicates, " AND ") //nolint:gosec // G202
 	}
-	query += " ORDER BY time ASC"
+	if ftsQuery != "" {
+		query += " ORDER BY e.time ASC"
+	} else {
+		query += " ORDER BY time ASC"
+	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
