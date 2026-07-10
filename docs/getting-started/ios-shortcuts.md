@@ -20,8 +20,10 @@ the generic ingest endpoint — not a Trove module.
 
 ## Import a Shortcut
 
-Signed, importable Shortcuts live in
+Signed `.shortcut` files live in
 [`examples/ios-shortcuts/signed/`](https://github.com/joshmcarthur/trove/tree/main/examples/ios-shortcuts/signed).
+A maintainer signs them on a **Mac with iCloud signed in** and commits them to the
+repo (hosted CI cannot sign).
 
 | Shortcut | Use |
 |----------|-----|
@@ -30,10 +32,9 @@ Signed, importable Shortcuts live in
 | [Trove URL Bookmark](https://github.com/joshmcarthur/trove/blob/main/examples/ios-shortcuts/signed/trove-url-bookmark.shortcut) | Save a URL from Safari |
 | [Trove Location Check-in](https://github.com/joshmcarthur/trove/blob/main/examples/ios-shortcuts/signed/trove-location-checkin.shortcut) | Log current location with optional label |
 
-> Signed files are committed by CI after merge. If a link 404s, check the
-> [`signed/` directory](https://github.com/joshmcarthur/trove/tree/main/examples/ios-shortcuts/signed)
-> or run the [Sign iOS Shortcuts](https://github.com/joshmcarthur/trove/actions/workflows/sign-shortcuts.yml)
-> workflow manually.
+> If a link 404s, signed files have not been committed yet. Build from
+> [`unsigned/`](https://github.com/joshmcarthur/trove/tree/main/examples/ios-shortcuts/unsigned)
+> or follow the manual recipes below.
 
 **To import:**
 
