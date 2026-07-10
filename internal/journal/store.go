@@ -272,6 +272,9 @@ func (s *Store) Get(ctx context.Context, id string) (Event, error) {
 // Subscribe streams new events matching f. Only events appended after Subscribe
 // returns are delivered; there is no historical replay.
 func (s *Store) Subscribe(ctx context.Context, f Filter) (<-chan Event, error) {
+	if f.Type != "" && f.TypePrefix != "" {
+		return nil, ErrConflictingFilter
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("journal: subscribe: %w", err)
 	}
@@ -309,7 +312,7 @@ func (s *Store) notify(e Event) {
 	defer s.mu.Unlock()
 
 	for _, sub := range s.subs {
-		if !matchesFilter(e, sub.filter) {
+		if !s.matchesFilter(e, sub.filter) {
 			continue
 		}
 		// Non-blocking send: a slow consumer must not stall ingest.
@@ -320,7 +323,7 @@ func (s *Store) notify(e Event) {
 	}
 }
 
-func matchesFilter(e Event, f Filter) bool {
+func (s *Store) matchesFilter(e Event, f Filter) bool {
 	if f.Type != "" && e.Type != f.Type {
 		return false
 	}
@@ -335,6 +338,15 @@ func matchesFilter(e Event, f Filter) bool {
 	}
 	if f.TimeTo != nil && e.Time.After(f.TimeTo.UTC()) {
 		return false
+	}
+	if ftsQuery := formatFTSQuery(f.Text); ftsQuery != "" {
+		var count int
+		err := s.db.QueryRow(`
+			SELECT COUNT(*) FROM events_fts
+			WHERE event_id = ? AND events_fts MATCH ?`, e.ID, ftsQuery).Scan(&count)
+		if err != nil || count == 0 {
+			return false
+		}
 	}
 	return true
 }
