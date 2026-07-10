@@ -3,12 +3,17 @@ package modules
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
+
+// healthcheckInterval is the period between module healthchecks.
+var healthcheckInterval = 30 * time.Second
 
 // SourceHandle supervises a running source module subprocess.
 type SourceHandle struct {
@@ -61,10 +66,53 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module) (*SourceHan
 		return nil, fmt.Errorf("modules: start source %q: unexpected plugin type %T", mod.Manifest.Name, raw)
 	}
 
-	if err := sourceModule.Run(ctx); err != nil {
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+
+	hcDone := make(chan struct{})
+	go func() {
+		defer close(hcDone)
+		runHealthchecks(runCtx, mod.Manifest.Name, sourceModule)
+	}()
+
+	err = sourceModule.Run(runCtx)
+	cancelRun()
+	<-hcDone
+
+	if err != nil {
 		client.Kill()
 		return nil, fmt.Errorf("modules: start source %q: run: %w", mod.Manifest.Name, err)
 	}
 
 	return &SourceHandle{client: client}, nil
+}
+
+func runHealthchecks(ctx context.Context, name string, mod SourceModule) {
+	ticker := time.NewTicker(healthcheckInterval)
+	defer ticker.Stop()
+
+	check := func() {
+		resp, err := mod.Healthcheck(ctx)
+		if err != nil {
+			log.Printf("modules: source %q healthcheck: %v", name, err)
+			return
+		}
+		if resp != nil && !resp.Ok {
+			msg := resp.Message
+			if msg == "" {
+				msg = "unhealthy"
+			}
+			log.Printf("modules: source %q healthcheck: %s", name, msg)
+		}
+	}
+
+	check()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			check()
+		}
+	}
 }

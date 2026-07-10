@@ -27,7 +27,15 @@ message RunRequest {
 
 message RunResponse {}
 
+message HealthcheckRequest {}
+
+message HealthcheckResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
 // SourceModule is implemented by source modules; the core calls Run to start emission.
 service SourceModule {
   rpc Run(RunRequest) returns (RunResponse);
+  rpc Healthcheck(HealthcheckRequest) returns (HealthcheckResponse);
 }

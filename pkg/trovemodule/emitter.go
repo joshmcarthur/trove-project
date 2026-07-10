@@ -16,6 +16,11 @@ type Runner interface {
 	Run(ctx context.Context, emit Emitter) error
 }
 
+// HealthChecker reports module liveness for periodic core healthchecks.
+type HealthChecker interface {
+	Healthcheck(ctx context.Context) (*troverpc.HealthcheckResponse, error)
+}
+
 // RunFunc adapts a function to Runner.
 type RunFunc func(ctx context.Context, emit Emitter) error
 

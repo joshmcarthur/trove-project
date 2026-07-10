@@ -16,6 +16,68 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 )
 
+func TestStartSourceInvokesHealthcheck(t *testing.T) {
+	oldInterval := healthcheckInterval
+	healthcheckInterval = 50 * time.Millisecond
+	t.Cleanup(func() { healthcheckInterval = oldInterval })
+
+	binary := buildHealthcheckLoopModule(t)
+	counterFile := filepath.Join(t.TempDir(), "healthchecks")
+	t.Setenv("TROVE_TEST_HEALTHCHECK_FILE", counterFile)
+
+	store := openTestJournal(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	mod := Module{
+		Dir:    filepath.Dir(binary),
+		Binary: binary,
+		Manifest: Manifest{
+			Name:    "healthcheck-loop",
+			Version: "0.1.0",
+			Kind:    KindSource,
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		handle, err := StartSource(ctx, store, mod)
+		if handle != nil {
+			_ = handle.Close()
+		}
+		if err != nil && ctx.Err() == nil {
+			t.Errorf("StartSource() error = %v", err)
+		}
+		close(done)
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	var count string
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(counterFile)
+		if err == nil && len(data) > 0 {
+			count = string(data)
+			if count != "0" {
+				break
+			}
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+
+	if count == "" || count == "0" {
+		t.Fatalf("healthcheck counter = %q, want at least 1 invocation", count)
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("StartSource did not return after context cancellation")
+	}
+}
+
 func TestStartSourceReceivesEmit(t *testing.T) {
 	t.Parallel()
 
@@ -136,6 +198,24 @@ func TestStartSourceHTTPIngest(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("StartSource did not return after context cancellation")
 	}
+}
+
+func buildHealthcheckLoopModule(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "module")
+
+	cmd := exec.Command("go", "build", "-o", binary, "./internal/modules/testdata/plugin/healthcheck-loop")
+	cmd.Dir = moduleRoot(t)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build healthcheck-loop module: %v\n%s", err, out)
+	}
+	if err := os.Chmod(binary, 0o755); err != nil {
+		t.Fatalf("chmod module binary: %v", err)
+	}
+	return binary
 }
 
 func buildEmitOnceModule(t *testing.T) string {
