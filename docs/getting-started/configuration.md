@@ -50,6 +50,7 @@ trove -config /path/to/trove.toml
 ```
 
 With a valid config, `trove` opens the journal database, discovers source modules
-from `[modules].paths`, and supervises them until interrupted. Invalid or missing
-config fails fast with a clear error. Journal open failures (e.g. unwritable path)
-are reported before exit. Use `trove -version` without a config file.
+from `[modules].paths`, starts the MCP query server on `[mcp].listen`, and
+supervises modules until interrupted. Invalid or missing config fails fast with a
+clear error. Journal open failures (e.g. unwritable path) are reported before
+exit. Use `trove -version` without a config file.

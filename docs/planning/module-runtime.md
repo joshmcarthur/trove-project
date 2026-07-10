@@ -35,6 +35,8 @@ All kinds : core calls Healthcheck() periodically
 - Filesystem discovery scanner — landed in `internal/modules/discover.go`
 - Integrate go-plugin for subprocess lifecycle
 - Supervise with restart + backoff on crash
+- Only `kind = "source"` modules are started at runtime; processor and sink
+  kinds are accepted in manifests but not wired yet
 - React to `SIGHUP` for reload (stretch)
 
 ## Acceptance criteria

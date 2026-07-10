@@ -34,6 +34,8 @@ type Journal interface {
 - SQLite driver: `modernc.org/sqlite` (pure Go, no CGO) vs `mattn/go-sqlite3` —
   prefer pure Go for Pi cross-compile unless FTS5/vec needs CGO
 - ULID generation at append time
+- `Subscribe` does not apply `Filter.Text` (FTS) — only `Query` does;
+  `matchesFilter` in `internal/journal/store.go` omits text matching
 
 ## Acceptance criteria
 

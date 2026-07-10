@@ -6,7 +6,7 @@ nav_order: 6
 
 # MCP query server
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 3\
 **Spec:** [Query §9](../spec.md#9-query-interface-mcp-over-rpc), [Build order §11.3](../spec.md#11-build-order--validation-plan)\
 **Package:** `internal/query`
@@ -32,12 +32,11 @@ MCP tools map 1:1 onto these methods.
 
 ## Implementation notes
 
-- Implement RPC layer first; MCP server is thin wrapper
-- `search_events`: FTS5 keyword search initially
-- `summarize_range`: counts by type, notable events — avoid dumping raw rows
-- Listen on `[mcp].listen` from config
-- `trove` already starts the MCP HTTP server on startup; `search_events` and
-  `get_event` are implemented and tested in `internal/query`
+- RPC layer and MCP server implemented in `internal/query`
+- `search_events`: FTS5 keyword search
+- `summarize_range`: counts by type, notable events — avoids dumping raw rows
+- Listens on `[mcp].listen` from config; `trove` starts the MCP HTTP server on
+  startup
 
 ## Acceptance criteria
 
@@ -45,7 +44,7 @@ MCP tools map 1:1 onto these methods.
 - [x] MCP `get_event` resolves by ULID
 - [x] `summarize_range` returns aggregated summary for a time window
 - [x] MCP `get_events_by_type` returns events matching exact type
-- [ ] OpenClaw or Cursor can connect as MCP client
+- [x] OpenClaw or Cursor can connect as MCP client
 
 ## Dependencies
 
@@ -54,5 +53,5 @@ MCP tools map 1:1 onto these methods.
 
 ## Open questions
 
-- Auth for MCP endpoint — [open-items.md](../open-items.md)
+- Auth for MCP endpoint — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - `summarize_range` write-time vs query-time aggregation — [open-items.md](../open-items.md)

@@ -32,3 +32,9 @@ Perkeep was kept; its object model was not.
 ## General-purpose platform
 
 Single-user tool built around specific sources — not "store anything for anyone."
+
+## Alternative journal backends
+
+Postgres, MySQL, and other database backends are out of scope. SQLite is the
+single journal backend per spec §2. Vector search stays in-file via `sqlite-vec`,
+not a separate database.
