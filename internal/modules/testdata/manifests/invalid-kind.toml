@@ -1,0 +1,4 @@
+name     = "mqtt-source"
+version  = "1.0"
+kind     = "listener"
+provides = ["mqtt.message.received"]
