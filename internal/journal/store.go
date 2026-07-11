@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,11 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schemaDDL); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("journal: init schema: %w", err)
+	}
+
+	if _, err := db.Exec(routingSchemaDDL); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("journal: init routing schema: %w", err)
 	}
 
 	if _, err := db.Exec(ftsSchemaDDL); err != nil {
@@ -354,6 +360,7 @@ func (s *Store) notify(e Event) {
 		select {
 		case sub.ch <- e:
 		default:
+			log.Printf("journal: dropped event id=%s type=%s for slow subscriber", e.ID, e.Type)
 		}
 	}
 }
