@@ -16,10 +16,9 @@ message Event {
 
 message EmitResponse {}
 
-// CoreServices is the core contract for module subprocesses (see
-// RunRequest.services_broker_id): journal writes, blob storage, and journal
-// reads. Modules dial one services broker instead of opening trove.db or blobs
-// locally.
+// CoreServices is implemented by the Trove parent process. Modules reach it
+// through trovemodule.Core; see RunRequest.services_broker_id for the internal
+// plugin wire format.
 service CoreServices {
   rpc Emit(Event) returns (EmitResponse);
   rpc BlobPut(BlobPutRequest) returns (BlobPutResponse);
@@ -93,7 +92,8 @@ service HTTPModule {
 }
 
 message RunRequest {
-  // Broker ID for CoreServices (Emit, BlobPut, Query).
+  // Internal plugin wire format: parent-process handle for CoreServices.
+  // Module authors use trovemodule.Core instead.
   uint32 services_broker_id = 1;
 }
 

@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	trovemodule.Serve(trovemodule.RunFunc(func(ctx context.Context, emit trovemodule.Emitter) error {
+	trovemodule.Serve(trovemodule.CoreRunFunc(func(ctx context.Context, core trovemodule.Core) error {
 		counterPath := os.Getenv("TROVE_TEST_COUNTER_FILE")
 		var count int
 		if counterPath != "" {
@@ -22,7 +22,7 @@ func main() {
 			_ = os.WriteFile(counterPath, []byte(strconv.Itoa(count)), 0o644)
 		}
 
-		if err := emit.Emit(ctx, &troverpc.Event{
+		if err := core.Emit(ctx, &troverpc.Event{
 			Type:    "test.crash.restart",
 			Source:  "crash-restart",
 			Payload: []byte(fmt.Sprintf(`{"run":%d}`, count)),
