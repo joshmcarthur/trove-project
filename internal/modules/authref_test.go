@@ -2,15 +2,15 @@ package modules
 
 import "testing"
 
-func TestParseAuthValidatorRef(t *testing.T) {
+func TestParseModuleRef(t *testing.T) {
 	t.Parallel()
 
-	moduleName, validatorID, err := ParseAuthValidatorRef("module.http-gateway.bearer")
+	ref, err := ParseModuleRef("module.http-gateway.bearer")
 	if err != nil {
-		t.Fatalf("ParseAuthValidatorRef() error = %v", err)
+		t.Fatalf("ParseModuleRef() error = %v", err)
 	}
-	if moduleName != "http-gateway" || validatorID != "bearer" {
-		t.Fatalf("got module=%q validator=%q", moduleName, validatorID)
+	if ref.Module != "http-gateway" || ref.Capability != "bearer" {
+		t.Fatalf("got module=%q capability=%q", ref.Module, ref.Capability)
 	}
 }
 

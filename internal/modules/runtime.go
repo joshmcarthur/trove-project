@@ -28,7 +28,6 @@ func StartSource(
 	mod Module,
 	blobs blob.Store,
 	httpRegistry *HTTPRegistry,
-	authRegistry *AuthRegistry,
 	mcpRegistry *MCPRegistry,
 	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
@@ -108,11 +107,8 @@ func StartSource(
 	runCtx, cancelRun := context.WithCancel(ctx)
 	done := make(chan struct{})
 
-	if hasHTTP && httpRegistry != nil {
+	if (hasHTTP || hasAuth) && httpRegistry != nil {
 		httpRegistry.Register(manifest.Name, moduleClient)
-	}
-	if hasAuth && authRegistry != nil {
-		authRegistry.Register(manifest.Name, moduleClient, manifest.AuthValidators())
 	}
 	if hasMCPTools && mcpRegistry != nil {
 		mcpRegistry.Register(manifest.Name, moduleClient)
@@ -126,11 +122,8 @@ func StartSource(
 
 	go func() {
 		defer close(done)
-		if hasHTTP && httpRegistry != nil {
+		if (hasHTTP || hasAuth) && httpRegistry != nil {
 			defer httpRegistry.Unregister(manifest.Name)
-		}
-		if hasAuth && authRegistry != nil {
-			defer authRegistry.Unregister(manifest.Name, manifest.AuthValidators())
 		}
 		if hasMCPTools && mcpRegistry != nil {
 			defer mcpRegistry.Unregister(manifest.Name)

@@ -189,8 +189,8 @@ func validateHTTPRoute(route HTTPRoute) error {
 	if !strings.HasPrefix(route.Path, "/") {
 		return fmt.Errorf("path must start with /")
 	}
-	if route.Auth != "" && route.Auth != AuthInherit && route.Auth != AuthNone {
-		if _, _, err := ParseAuthValidatorRef(route.Auth); err != nil {
+		if route.Auth != "" && route.Auth != AuthInherit && route.Auth != AuthNone {
+		if _, err := ParseModuleRef(route.Auth); err != nil {
 			return err
 		}
 	}
@@ -331,7 +331,7 @@ func CollectAuthValidatorRefs(mods []Module) (map[string]struct{}, error) {
 			return nil, err
 		}
 		for _, validator := range manifest.AuthValidators() {
-			ref := AuthValidatorRef(manifest.Name, validator.ID)
+			ref := FormatModuleRef(manifest.Name, validator.ID)
 			if _, exists := refs[ref]; exists {
 				return nil, fmt.Errorf("modules: duplicate auth validator %q", ref)
 			}
@@ -347,7 +347,7 @@ func ValidateAuthConfig(defaultValidator string, routes []HTTPRouteEntry, declar
 		if ref == "" {
 			return nil
 		}
-		if _, _, err := ParseAuthValidatorRef(ref); err != nil {
+		if _, err := ParseModuleRef(ref); err != nil {
 			return err
 		}
 		if _, ok := declared[ref]; !ok {
