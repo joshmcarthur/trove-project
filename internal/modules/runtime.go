@@ -71,7 +71,7 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP, needsIngest),
+		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),

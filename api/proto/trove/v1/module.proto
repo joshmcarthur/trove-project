@@ -16,9 +16,17 @@ message Event {
 
 message EmitResponse {}
 
-// Source is implemented by the Trove core; modules call Emit to append events.
-service Source {
+// CoreServices is the core contract for module subprocesses (see
+// RunRequest.services_broker_id): journal writes, blob storage, and journal
+// reads. Modules dial one services broker instead of opening trove.db or blobs
+// locally.
+service CoreServices {
   rpc Emit(Event) returns (EmitResponse);
+  rpc BlobPut(BlobPutRequest) returns (BlobPutResponse);
+  rpc GetEvent(GetEventRequest) returns (Event);
+  rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse);
+  rpc GetEventsByType(GetEventsByTypeRequest) returns (SearchEventsResponse);
+  rpc SummarizeRange(SummarizeRangeRequest) returns (Summary);
 }
 
 message BlobPutRequest {
@@ -27,20 +35,6 @@ message BlobPutRequest {
 
 message BlobPutResponse {
   string blob_ref = 1;
-}
-
-// CoreServices exposes durable core capabilities to module subprocesses over the
-// services broker (see RunRequest.services_broker_id). G2 added BlobPut so HTTP
-// modules store blobs in the core-owned store instead of a local path. Query
-// methods let read-only modules (e.g. mcp-query) access the journal without
-// opening trove.db directly. Emit stays on the separate ingest broker to limit
-// churn in the existing source path.
-service CoreServices {
-  rpc BlobPut(BlobPutRequest) returns (BlobPutResponse);
-  rpc GetEvent(GetEventRequest) returns (Event);
-  rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse);
-  rpc GetEventsByType(GetEventsByTypeRequest) returns (SearchEventsResponse);
-  rpc SummarizeRange(SummarizeRangeRequest) returns (Summary);
 }
 
 message GetEventRequest {
@@ -99,10 +93,8 @@ service HTTPModule {
 }
 
 message RunRequest {
-  uint32 ingest_broker_id = 1;
-  // Broker ID for CoreServices (BlobPut, Query). Zero when the module needs
-  // neither blobs nor journal access.
-  uint32 services_broker_id = 2;
+  // Broker ID for CoreServices (Emit, BlobPut, Query).
+  uint32 services_broker_id = 1;
 }
 
 message RunResponse {}

@@ -11,6 +11,38 @@ import (
 	"github.com/joshmcarthur/trove/internal/query"
 )
 
+func TestCoreServicesEmit(t *testing.T) {
+	t.Parallel()
+
+	store, err := blob.OpenFilesystem(t.TempDir())
+	if err != nil {
+		t.Fatalf("OpenFilesystem() error = %v", err)
+	}
+
+	j, err := journal.Open(t.TempDir() + "/journal.db")
+	if err != nil {
+		t.Fatalf("journal.Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = j.Close() })
+
+	srv := &coreServicesServer{
+		journal: j,
+		policy: IngestPolicy{
+			patterns:   []string{"test.event"},
+			moduleName: "test",
+		},
+		blobs: store,
+	}
+	_, err = srv.Emit(context.Background(), &troverpc.Event{
+		Type:    "test.event",
+		Source:  "src",
+		Payload: []byte(`{"ok":true}`),
+	})
+	if err != nil {
+		t.Fatalf("Emit() error = %v", err)
+	}
+}
+
 func TestCoreServicesBlobPut(t *testing.T) {
 	t.Parallel()
 

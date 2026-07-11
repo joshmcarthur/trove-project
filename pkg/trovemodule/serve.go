@@ -14,8 +14,8 @@ type BlobRunner interface {
 	RunWithBlobs(ctx context.Context, emit Emitter, blobs BlobPutter) error
 }
 
-// Serve starts a Trove source module plugin process. runner must implement
-// Runner and/or BlobRunner.
+// Serve starts a Trove module plugin process. runner must implement
+// Runner, BlobRunner, and/or QueryRunner.
 func Serve(runner any) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
@@ -53,28 +53,20 @@ type sourceModuleServer struct {
 }
 
 func (s *sourceModuleServer) Run(ctx context.Context, req *troverpc.RunRequest) (*troverpc.RunResponse, error) {
-	var emit Emitter = &discardingEmitter{}
-	if req.IngestBrokerId != 0 {
-		conn, err := s.broker.Dial(req.IngestBrokerId)
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-		emit = &sourceEmitter{client: troverpc.NewSourceClient(conn)}
+	if req.ServicesBrokerId == 0 {
+		return nil, fmt.Errorf("trovemodule: core services broker is required")
 	}
 
-	var blobs BlobPutter
-	var querier Querier
-	if req.ServicesBrokerId != 0 {
-		servicesConn, err := s.broker.Dial(req.ServicesBrokerId)
-		if err != nil {
-			return nil, err
-		}
-		defer servicesConn.Close()
-		services := troverpc.NewCoreServicesClient(servicesConn)
-		blobs = &blobPutter{client: services}
-		querier = newCoreQuerier(services)
+	servicesConn, err := s.broker.Dial(req.ServicesBrokerId)
+	if err != nil {
+		return nil, err
 	}
+	defer servicesConn.Close()
+
+	services := troverpc.NewCoreServicesClient(servicesConn)
+	emit := &coreEmitter{client: services}
+	blobs := &blobPutter{client: services}
+	querier := newCoreQuerier(services)
 
 	switch runner := s.runner.(type) {
 	case BlobRunner:
@@ -82,9 +74,6 @@ func (s *sourceModuleServer) Run(ctx context.Context, req *troverpc.RunRequest) 
 			return nil, err
 		}
 	case QueryRunner:
-		if querier == nil {
-			return nil, fmt.Errorf("trovemodule: query services are required")
-		}
 		if err := runner.RunWithQuery(ctx, querier); err != nil {
 			return nil, err
 		}
@@ -96,12 +85,6 @@ func (s *sourceModuleServer) Run(ctx context.Context, req *troverpc.RunRequest) 
 		return nil, fmt.Errorf("trovemodule: runner must implement Runner, BlobRunner, or QueryRunner")
 	}
 	return &troverpc.RunResponse{}, nil
-}
-
-type discardingEmitter struct{}
-
-func (discardingEmitter) Emit(context.Context, *troverpc.Event) error {
-	return fmt.Errorf("trovemodule: emit is not available")
 }
 
 func (s *sourceModuleServer) Healthcheck(ctx context.Context, _ *troverpc.HealthcheckRequest) (*troverpc.HealthcheckResponse, error) {

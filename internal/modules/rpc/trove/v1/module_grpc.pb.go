@@ -19,112 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Source_Emit_FullMethodName = "/trove.v1.Source/Emit"
-)
-
-// SourceClient is the client API for Source service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// Source is implemented by the Trove core; modules call Emit to append events.
-type SourceClient interface {
-	Emit(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EmitResponse, error)
-}
-
-type sourceClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewSourceClient(cc grpc.ClientConnInterface) SourceClient {
-	return &sourceClient{cc}
-}
-
-func (c *sourceClient) Emit(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EmitResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmitResponse)
-	err := c.cc.Invoke(ctx, Source_Emit_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// SourceServer is the server API for Source service.
-// All implementations must embed UnimplementedSourceServer
-// for forward compatibility.
-//
-// Source is implemented by the Trove core; modules call Emit to append events.
-type SourceServer interface {
-	Emit(context.Context, *Event) (*EmitResponse, error)
-	mustEmbedUnimplementedSourceServer()
-}
-
-// UnimplementedSourceServer must be embedded to have
-// forward compatible implementations.
-//
-// NOTE: this should be embedded by value instead of pointer to avoid a nil
-// pointer dereference when methods are called.
-type UnimplementedSourceServer struct{}
-
-func (UnimplementedSourceServer) Emit(context.Context, *Event) (*EmitResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Emit not implemented")
-}
-func (UnimplementedSourceServer) mustEmbedUnimplementedSourceServer() {}
-func (UnimplementedSourceServer) testEmbeddedByValue()                {}
-
-// UnsafeSourceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to SourceServer will
-// result in compilation errors.
-type UnsafeSourceServer interface {
-	mustEmbedUnimplementedSourceServer()
-}
-
-func RegisterSourceServer(s grpc.ServiceRegistrar, srv SourceServer) {
-	// If the following call panics, it indicates UnimplementedSourceServer was
-	// embedded by pointer and is nil.  This will cause panics if an
-	// unimplemented method is ever invoked, so we test this at initialization
-	// time to prevent it from happening at runtime later due to I/O.
-	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
-		t.testEmbeddedByValue()
-	}
-	s.RegisterService(&Source_ServiceDesc, srv)
-}
-
-func _Source_Emit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Event)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SourceServer).Emit(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Source_Emit_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SourceServer).Emit(ctx, req.(*Event))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// Source_ServiceDesc is the grpc.ServiceDesc for Source service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var Source_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "trove.v1.Source",
-	HandlerType: (*SourceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Emit",
-			Handler:    _Source_Emit_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "trove/v1/module.proto",
-}
-
-const (
+	CoreServices_Emit_FullMethodName            = "/trove.v1.CoreServices/Emit"
 	CoreServices_BlobPut_FullMethodName         = "/trove.v1.CoreServices/BlobPut"
 	CoreServices_GetEvent_FullMethodName        = "/trove.v1.CoreServices/GetEvent"
 	CoreServices_SearchEvents_FullMethodName    = "/trove.v1.CoreServices/SearchEvents"
@@ -136,13 +31,12 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// CoreServices exposes durable core capabilities to module subprocesses over the
-// services broker (see RunRequest.services_broker_id). G2 added BlobPut so HTTP
-// modules store blobs in the core-owned store instead of a local path. Query
-// methods let read-only modules (e.g. mcp-query) access the journal without
-// opening trove.db directly. Emit stays on the separate ingest broker to limit
-// churn in the existing source path.
+// CoreServices is the core contract for module subprocesses (see
+// RunRequest.services_broker_id): journal writes, blob storage, and journal
+// reads. Modules dial one services broker instead of opening trove.db or blobs
+// locally.
 type CoreServicesClient interface {
+	Emit(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EmitResponse, error)
 	BlobPut(ctx context.Context, in *BlobPutRequest, opts ...grpc.CallOption) (*BlobPutResponse, error)
 	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*Event, error)
 	SearchEvents(ctx context.Context, in *SearchEventsRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
@@ -156,6 +50,16 @@ type coreServicesClient struct {
 
 func NewCoreServicesClient(cc grpc.ClientConnInterface) CoreServicesClient {
 	return &coreServicesClient{cc}
+}
+
+func (c *coreServicesClient) Emit(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EmitResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EmitResponse)
+	err := c.cc.Invoke(ctx, CoreServices_Emit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *coreServicesClient) BlobPut(ctx context.Context, in *BlobPutRequest, opts ...grpc.CallOption) (*BlobPutResponse, error) {
@@ -212,13 +116,12 @@ func (c *coreServicesClient) SummarizeRange(ctx context.Context, in *SummarizeRa
 // All implementations must embed UnimplementedCoreServicesServer
 // for forward compatibility.
 //
-// CoreServices exposes durable core capabilities to module subprocesses over the
-// services broker (see RunRequest.services_broker_id). G2 added BlobPut so HTTP
-// modules store blobs in the core-owned store instead of a local path. Query
-// methods let read-only modules (e.g. mcp-query) access the journal without
-// opening trove.db directly. Emit stays on the separate ingest broker to limit
-// churn in the existing source path.
+// CoreServices is the core contract for module subprocesses (see
+// RunRequest.services_broker_id): journal writes, blob storage, and journal
+// reads. Modules dial one services broker instead of opening trove.db or blobs
+// locally.
 type CoreServicesServer interface {
+	Emit(context.Context, *Event) (*EmitResponse, error)
 	BlobPut(context.Context, *BlobPutRequest) (*BlobPutResponse, error)
 	GetEvent(context.Context, *GetEventRequest) (*Event, error)
 	SearchEvents(context.Context, *SearchEventsRequest) (*SearchEventsResponse, error)
@@ -234,6 +137,9 @@ type CoreServicesServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCoreServicesServer struct{}
 
+func (UnimplementedCoreServicesServer) Emit(context.Context, *Event) (*EmitResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Emit not implemented")
+}
 func (UnimplementedCoreServicesServer) BlobPut(context.Context, *BlobPutRequest) (*BlobPutResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BlobPut not implemented")
 }
@@ -268,6 +174,24 @@ func RegisterCoreServicesServer(s grpc.ServiceRegistrar, srv CoreServicesServer)
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&CoreServices_ServiceDesc, srv)
+}
+
+func _CoreServices_Emit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Event)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).Emit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_Emit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).Emit(ctx, req.(*Event))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CoreServices_BlobPut_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -367,6 +291,10 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "trove.v1.CoreServices",
 	HandlerType: (*CoreServicesServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Emit",
+			Handler:    _CoreServices_Emit_Handler,
+		},
 		{
 			MethodName: "BlobPut",
 			Handler:    _CoreServices_BlobPut_Handler,
