@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/blob"
+	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
 	"google.golang.org/grpc/codes"
@@ -14,8 +15,27 @@ import (
 
 type coreServicesServer struct {
 	troverpc.UnimplementedCoreServicesServer
-	blobs blob.Store
-	query *query.Service
+	journal journal.Journal
+	policy  IngestPolicy
+	blobs   blob.Store
+	query   *query.Service
+}
+
+func (s *coreServicesServer) Emit(ctx context.Context, e *troverpc.Event) (*troverpc.EmitResponse, error) {
+	if s.journal == nil {
+		return nil, status.Error(codes.Unavailable, "journal is not configured")
+	}
+	event, err := rpcEventToJournal(e)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := s.policy.ValidateEvent(event); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := s.journal.Append(ctx, event); err != nil {
+		return nil, status.Errorf(codes.Internal, "%v", err)
+	}
+	return &troverpc.EmitResponse{}, nil
 }
 
 func (s *coreServicesServer) BlobPut(ctx context.Context, req *troverpc.BlobPutRequest) (*troverpc.BlobPutResponse, error) {

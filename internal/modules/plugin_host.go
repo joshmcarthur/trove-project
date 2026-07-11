@@ -22,46 +22,33 @@ type SourceModule interface {
 }
 
 type sourceModuleClient struct {
-	client      troverpc.SourceModuleClient
-	httpClient  troverpc.HTTPModuleClient
-	broker      *plugin.GRPCBroker
-	journal     journal.Journal
-	policy      IngestPolicy
-	blobs       blob.Store
-	hasHTTP     bool
-	needsIngest bool
+	client     troverpc.SourceModuleClient
+	httpClient troverpc.HTTPModuleClient
+	broker     *plugin.GRPCBroker
+	journal    journal.Journal
+	policy     IngestPolicy
+	blobs      blob.Store
+	hasHTTP    bool
 }
 
 func (c *sourceModuleClient) Run(ctx context.Context) error {
-	var ingestID uint32
-	if c.needsIngest {
-		ingestID = c.broker.NextId()
-		go c.broker.AcceptAndServe(ingestID, func(opts []grpc.ServerOption) *grpc.Server {
-			s := grpc.NewServer(opts...)
-			troverpc.RegisterSourceServer(s, &ingestServer{journal: c.journal, policy: c.policy})
-			return s
+	servicesID := c.broker.NextId()
+	go c.broker.AcceptAndServe(servicesID, func(opts []grpc.ServerOption) *grpc.Server {
+		s := grpc.NewServer(opts...)
+		var querySvc *query.Service
+		if c.journal != nil {
+			querySvc = &query.Service{Journal: c.journal}
+		}
+		troverpc.RegisterCoreServicesServer(s, &coreServicesServer{
+			journal: c.journal,
+			policy:  c.policy,
+			blobs:   c.blobs,
+			query:   querySvc,
 		})
-	}
-
-	var servicesID uint32
-	if c.blobs != nil || c.journal != nil {
-		servicesID = c.broker.NextId()
-		go c.broker.AcceptAndServe(servicesID, func(opts []grpc.ServerOption) *grpc.Server {
-			s := grpc.NewServer(opts...)
-			var querySvc *query.Service
-			if c.journal != nil {
-				querySvc = &query.Service{Journal: c.journal}
-			}
-			troverpc.RegisterCoreServicesServer(s, &coreServicesServer{
-				blobs: c.blobs,
-				query: querySvc,
-			})
-			return s
-		})
-	}
+		return s
+	})
 
 	_, err := c.client.Run(ctx, &troverpc.RunRequest{
-		IngestBrokerId:   ingestID,
 		ServicesBrokerId: servicesID,
 	})
 	return err
@@ -80,24 +67,22 @@ func (c *sourceModuleClient) HandleHTTP(ctx context.Context, req *troverpc.HTTPR
 
 type sourceModuleGRPCPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	journal     journal.Journal
-	policy      IngestPolicy
-	moduleName  string
-	blobs       blob.Store
-	hasHTTP     bool
-	needsIngest bool
+	journal    journal.Journal
+	policy     IngestPolicy
+	moduleName string
+	blobs      blob.Store
+	hasHTTP    bool
 }
 
 func (p *sourceModuleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (any, error) {
 	return &sourceModuleClient{
-		client:      troverpc.NewSourceModuleClient(c),
-		httpClient:  troverpc.NewHTTPModuleClient(c),
-		broker:      broker,
-		journal:     p.journal,
-		policy:      p.policy,
-		blobs:       p.blobs,
-		hasHTTP:     p.hasHTTP,
-		needsIngest: p.needsIngest,
+		client:     troverpc.NewSourceModuleClient(c),
+		httpClient: troverpc.NewHTTPModuleClient(c),
+		broker:     broker,
+		journal:    p.journal,
+		policy:     p.policy,
+		blobs:      p.blobs,
+		hasHTTP:    p.hasHTTP,
 	}, nil
 }
 
@@ -105,15 +90,14 @@ func (p *sourceModuleGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.S
 	return nil
 }
 
-func hostPluginSet(j journal.Journal, policy IngestPolicy, moduleName string, blobs blob.Store, hasHTTP, needsIngest bool) map[string]plugin.Plugin {
+func hostPluginSet(j journal.Journal, policy IngestPolicy, moduleName string, blobs blob.Store, hasHTTP bool) map[string]plugin.Plugin {
 	return map[string]plugin.Plugin{
 		trovemodule.PluginName: &sourceModuleGRPCPlugin{
-			journal:     j,
-			policy:      policy,
-			moduleName:  moduleName,
-			blobs:       blobs,
-			hasHTTP:     hasHTTP,
-			needsIngest: needsIngest,
+			journal:    j,
+			policy:     policy,
+			moduleName: moduleName,
+			blobs:      blobs,
+			hasHTTP:    hasHTTP,
 		},
 	}
 }

@@ -6,7 +6,7 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
-// Emitter appends events to the Trove journal via the core ingest RPC.
+// Emitter appends events to the Trove journal via CoreServices.Emit.
 type Emitter interface {
 	Emit(ctx context.Context, event *troverpc.Event) error
 }
@@ -28,11 +28,11 @@ func (f RunFunc) Run(ctx context.Context, emit Emitter) error {
 	return f(ctx, emit)
 }
 
-type sourceEmitter struct {
-	client troverpc.SourceClient
+type coreEmitter struct {
+	client troverpc.CoreServicesClient
 }
 
-func (e *sourceEmitter) Emit(ctx context.Context, event *troverpc.Event) error {
+func (e *coreEmitter) Emit(ctx context.Context, event *troverpc.Event) error {
 	_, err := e.client.Emit(ctx, event)
 	return err
 }
