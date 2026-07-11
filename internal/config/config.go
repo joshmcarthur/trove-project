@@ -50,9 +50,9 @@ type RemoteConfig struct {
 
 // HTTPConfig holds the core HTTP gateway listener settings.
 type HTTPConfig struct {
-	Listen       string    `toml:"listen"`
-	MaxBodyBytes int64     `toml:"max_body_bytes"`
-	Auth         HTTPAuth  `toml:"auth"`
+	Listen       string   `toml:"listen"`
+	MaxBodyBytes int64    `toml:"max_body_bytes"`
+	Auth         HTTPAuth `toml:"auth"`
 }
 
 // HTTPAuth holds gateway auth validator configuration.

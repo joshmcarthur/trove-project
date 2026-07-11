@@ -31,6 +31,8 @@ The gateway calls `ValidateAuth` on the auth module before dispatching
 same module registry keyed by module name; config refs use `module.<name>.<capability>`
 (e.g. `module.http-gateway.bearer`; HTTP routes implicitly use capability `http`).
 
+Per-route overrides on `[[http.routes]]`:
+
 | `auth` value | Behavior |
 |--------------|----------|
 | `inherit` (default) | Use `[http.auth].validator` |
