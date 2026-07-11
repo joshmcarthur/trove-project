@@ -35,12 +35,11 @@ type Gateway struct {
 	authValidator string
 	routes        []modules.HTTPRouteEntry
 	registry      *modules.HTTPRegistry
-	authRegistry  *modules.AuthRegistry
 	builtins      []BuiltinRoute
 }
 
 // New constructs a Gateway. builtins may be nil.
-func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegistry, authRegistry *modules.AuthRegistry, builtins []BuiltinRoute) (*Gateway, error) {
+func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegistry, builtins []BuiltinRoute) (*Gateway, error) {
 	if cfg.Listen == "" {
 		return nil, fmt.Errorf("gateway: listen is required")
 	}
@@ -57,7 +56,6 @@ func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegi
 		authValidator: cfg.AuthValidator,
 		routes:        routes,
 		registry:      registry,
-		authRegistry:  authRegistry,
 		builtins:      builtins,
 	}, nil
 }
@@ -158,25 +156,25 @@ func (g *Gateway) authorize(w http.ResponseWriter, r *http.Request, route module
 	if skip {
 		return nil
 	}
-	if g.authRegistry == nil {
+	if g.registry == nil {
 		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
-		return fmt.Errorf("gateway: auth registry is required")
+		return fmt.Errorf("gateway: module registry is required")
 	}
 
-	moduleName, validatorID, err := modules.ParseAuthValidatorRef(validatorRef)
+	moduleRef, err := modules.ParseModuleRef(validatorRef)
 	if err != nil {
 		http.Error(w, "bad gateway", http.StatusBadGateway)
 		return err
 	}
 
-	client, ok := g.authRegistry.Get(validatorRef)
+	client, ok := g.registry.Get(moduleRef.Module)
 	if !ok {
 		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
-		return fmt.Errorf("gateway: auth validator %q unavailable", validatorRef)
+		return fmt.Errorf("gateway: module %q unavailable", moduleRef.Module)
 	}
 
 	resp, err := client.ValidateAuth(r.Context(), &troverpc.AuthRequest{
-		ValidatorId:    validatorID,
+		ValidatorId:    moduleRef.Capability,
 		Method:         r.Method,
 		Path:           r.URL.Path,
 		MatchedPattern: route.Route.Path,
@@ -198,7 +196,7 @@ func (g *Gateway) authorize(w http.ResponseWriter, r *http.Request, route module
 			message = resp.Message
 		}
 		http.Error(w, message, status)
-		return fmt.Errorf("gateway: unauthorized by %s.%s", moduleName, validatorID)
+		return fmt.Errorf("gateway: unauthorized by %s", modules.FormatModuleRef(moduleRef.Module, moduleRef.Capability))
 	}
 	for key, value := range resp.Headers {
 		headers[key] = value

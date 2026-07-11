@@ -57,14 +57,14 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	gw, err := gateway.New(gateway.Config{Listen: gwAddr, MaxBodyBytes: 10 << 20}, routes, registry, modules.NewAuthRegistry(), nil)
+	gw, err := gateway.New(gateway.Config{Listen: gwAddr, MaxBodyBytes: 10 << 20}, routes, registry, nil)
 	if err != nil {
 		t.Fatalf("gateway.New() error = %v", err)
 	}
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := modules.StartSource(ctx, store, mod, blobStore, registry, modules.NewAuthRegistry(), modules.NewMCPRegistry(), nil, nil, map[string]string{}, nil)
+		handle, err := modules.StartSource(ctx, store, mod, blobStore, registry, modules.NewMCPRegistry(), nil, nil, map[string]string{}, nil)
 		if err != nil && ctx.Err() == nil {
 			t.Errorf("StartSource() error = %v", err)
 		}

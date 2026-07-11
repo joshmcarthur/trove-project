@@ -27,7 +27,9 @@ validator = "module.http-gateway.bearer"
 ```
 
 The gateway calls `ValidateAuth` on the auth module before dispatching
-`HandleHTTP`. Per-route overrides are declared on `[[http.routes]]`:
+`HandleHTTP`. Both HTTP routes and auth validators resolve live clients from the
+same module registry keyed by module name; config refs use `module.<name>.<capability>`
+(e.g. `module.http-gateway.bearer`; HTTP routes implicitly use capability `http`).
 
 | `auth` value | Behavior |
 |--------------|----------|

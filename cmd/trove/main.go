@@ -105,7 +105,6 @@ func main() {
 	}
 
 	httpRegistry := modules.NewHTTPRegistry()
-	authRegistry := modules.NewAuthRegistry()
 	mcpRegistry := modules.NewMCPRegistry()
 	eventRegistry := modules.NewEventRegistry()
 
@@ -134,7 +133,7 @@ func main() {
 		Listen:        cfg.HTTP.Listen,
 		MaxBodyBytes:  cfg.HTTP.MaxBodyBytes,
 		AuthValidator: cfg.HTTP.Auth.Validator,
-	}, routes, httpRegistry, authRegistry, nil)
+	}, routes, httpRegistry, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -150,7 +149,7 @@ func main() {
 
 	modulesDone := make(chan struct{})
 	go func() {
-		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, authRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
+		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
 		close(modulesDone)
 	}()
 
