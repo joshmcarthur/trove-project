@@ -1,4 +1,4 @@
-package main
+package mcpquery
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func (s *stubQuerier) SummarizeRange(context.Context, *troverpc.SummarizeRangeRe
 func TestHandleHTTPNotReady(t *testing.T) {
 	t.Parallel()
 
-	mod := &mcpQueryModule{}
+	mod := &Module{}
 	resp, err := mod.HandleHTTP(context.Background(), &troverpc.HTTPRequest{
 		Method:         http.MethodPost,
 		Path:           "/mcp",
@@ -53,7 +53,7 @@ func TestHandleHTTPNotReady(t *testing.T) {
 func TestHandleHTTPDispatchesMCP(t *testing.T) {
 	t.Parallel()
 
-	mod := &mcpQueryModule{}
+	mod := &Module{}
 	mod.handler = query.MCPHandler(query.MCPDeps{Querier: &queryAdapter{q: &stubQuerier{}}})
 	mod.ready.Store(true)
 
@@ -76,6 +76,6 @@ func TestHandleHTTPDispatchesMCP(t *testing.T) {
 }
 
 var (
-	_ trovemodule.Module      = (*mcpQueryModule)(nil)
-	_ trovemodule.HTTPHandler = (*mcpQueryModule)(nil)
+	_ trovemodule.Module      = (*Module)(nil)
+	_ trovemodule.HTTPHandler = (*Module)(nil)
 )

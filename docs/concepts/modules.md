@@ -11,6 +11,25 @@ and connected to the Trove core over a local (or networked) socket.
 
 See [spec §8](../spec.md#8-module-architecture-dynamic-socket-based).
 
+## Built-in modules
+
+`http-ingest` and `mcp-query` ship **inside the `trove` binary**. The core
+discovers them automatically when no on-disk module with the same `name` exists
+in `[modules].paths`. Built-ins still run as go-plugin subprocesses (the core
+reexecs `trove` with `TROVE_BUNDLED_MODULE` set); only the packaging differs.
+
+To override a built-in, install a module directory with the same `name` under a
+configured path — filesystem discovery runs first, so the on-disk binary wins:
+
+```
+~/.local/lib/trove/modules/http-ingest/
+    manifest.toml
+    module
+```
+
+Other first-party modules (MQTT, Telegram, capture classifier) remain separate
+binaries built by `make build`.
+
 ## Discovery paths
 
 Checked at startup, in order:

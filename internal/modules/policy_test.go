@@ -41,7 +41,7 @@ func TestIngestPolicyValidateEvent(t *testing.T) {
 		Schemas: map[string]string{
 			"note.*": "schemas/note.json",
 		},
-	}, dir)
+	}, dir, false)
 	if err != nil {
 		t.Fatalf("LoadIngestPolicy() error = %v", err)
 	}
@@ -146,7 +146,7 @@ func TestLoadIngestPolicyMissingSchemaFile(t *testing.T) {
 		Schemas: map[string]string{
 			"note.created": "schemas/missing.json",
 		},
-	}, t.TempDir())
+	}, t.TempDir(), false)
 	if err == nil || !strings.Contains(err.Error(), "read schema") {
 		t.Fatalf("LoadIngestPolicy() error = %v, want read schema error", err)
 	}

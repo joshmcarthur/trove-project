@@ -1,4 +1,4 @@
-package main
+package httpingest
 
 import (
 	"context"
@@ -10,13 +10,19 @@ import (
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
-type httpIngestModule struct {
+// Module implements HTTP ingest routes for Trove.
+type Module struct {
 	ready atomic.Bool
 	cfg   config
 	core  trovemodule.Core
 }
 
-func (m *httpIngestModule) Run(ctx context.Context, core trovemodule.Core) error {
+// New constructs an http-ingest module instance.
+func New() trovemodule.Module {
+	return &Module{}
+}
+
+func (m *Module) Run(ctx context.Context, core trovemodule.Core) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
@@ -34,20 +40,16 @@ func (m *httpIngestModule) Run(ctx context.Context, core trovemodule.Core) error
 	return nil
 }
 
-func (m *httpIngestModule) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+func (m *Module) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
 	if !m.ready.Load() {
 		return textResponse(http.StatusServiceUnavailable, "service unavailable"), nil
 	}
 	return dispatchHTTP(ctx, m.core, m.core, m.cfg, req)
 }
 
-func (m *httpIngestModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {
+func (m *Module) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {
 	if m.ready.Load() {
 		return &troverpc.HealthcheckResponse{Ok: true, Message: "http handlers ready"}, nil
 	}
 	return &troverpc.HealthcheckResponse{Ok: false, Message: "http handlers not ready"}, nil
-}
-
-func main() {
-	trovemodule.Serve(&httpIngestModule{})
 }

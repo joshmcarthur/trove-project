@@ -21,11 +21,13 @@ Install under a configured search path:
     module               # executable
 ```
 
-For local development, `make build` also builds the first-party HTTP ingest,
-MQTT source, Telegram source, and MCP query modules into `modules/http-ingest/`,
-`modules/mqtt-source/`, `modules/telegram-source/`, and `modules/mcp-query/`.
-Point `[modules].paths` at the repo `modules/` directory (the parent of each
-module folder).
+For local development, `make build` compiles `bin/trove` (with `http-ingest` and
+`mcp-query` built in) and builds optional first-party modules to
+`modules/mqtt-source/`, `modules/telegram-source/`, and
+`modules/capture-classifier/`. Standalone copies of the HTTP and MCP modules are
+also emitted under `modules/http-ingest/` and `modules/mcp-query/` for module-only
+iteration. Point `[modules].paths` at the repo `modules/` directory when testing
+external modules; built-in ingest and MCP work with an empty `paths` list.
 
 ## Manifest
 

@@ -13,6 +13,11 @@ import (
 // settings overlays for a subprocess.
 const ModuleSettingsEnv = "TROVE_MODULE_SETTINGS"
 
+// BundledModuleEnv is set when the Trove parent reexecs itself to run a
+// built-in module subprocess. Must not use TROVE_MODULE — that key is reserved
+// for the go-plugin handshake magic cookie.
+const BundledModuleEnv = "TROVE_BUNDLED_MODULE"
+
 // LoadModuleConfig decodes manifest.toml from dir into dest and merges an
 // optional settings overlay from TROVE_MODULE_SETTINGS when set.
 func LoadModuleConfig(dir string, dest any) error {
@@ -21,6 +26,13 @@ func LoadModuleConfig(dir string, dest any) error {
 	if err != nil {
 		return fmt.Errorf("trovemodule: read manifest: %w", err)
 	}
+	return LoadModuleConfigBytes(data, dest)
+}
+
+// LoadModuleConfigBytes decodes manifest TOML from base and merges an optional
+// settings overlay from TROVE_MODULE_SETTINGS when set.
+func LoadModuleConfigBytes(base []byte, dest any) error {
+	data := base
 
 	overlayPath, err := moduleSettingsPathFromEnv()
 	if err != nil {

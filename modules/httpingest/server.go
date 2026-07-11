@@ -1,4 +1,4 @@
-package main
+package httpingest
 
 import (
 	"context"
@@ -147,7 +147,6 @@ func buildEvent(source string, body []byte) (*troverpc.Event, error) {
 }
 
 func textResponse(status int, message string) *troverpc.HTTPResponse {
-	// HTTP status codes are always in [100,599].
 	return &troverpc.HTTPResponse{
 		Status: int32(status), //nolint:gosec // G115: bounded HTTP status code
 		Body:   []byte(message),
