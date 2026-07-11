@@ -159,11 +159,11 @@ For images, use the [photo flow](#share-sheet-with-photo) above.
 
 ## Limitations
 
-- **`blob_ref`** is accepted by ingest but blob upload is not implemented yet —
-  see [Photo attachments (Planned)](#photo-attachments-planned) above.
+- **No authentication** on HTTP ingest, blob upload, or MCP — use localhost or a
+  trusted tailnet only until [network auth](../planning/auth.md) lands.
 - **10 MiB** request body limit (`max_body_bytes` in HTTP ingest manifest).
-- **Photos in Share Sheet** — importable Shortcut captures text/URL metadata;
-  full photo upload flow is Planned with the blob store.
+- **Photos in Share Sheet** — use the [photo flow](#share-sheet-with-photo); the
+  importable Shortcut captures text/URL metadata by default.
 
 ## Verify capture
 
