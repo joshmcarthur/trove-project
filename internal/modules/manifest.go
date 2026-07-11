@@ -189,7 +189,7 @@ func validateHTTPRoute(route HTTPRoute) error {
 	if !strings.HasPrefix(route.Path, "/") {
 		return fmt.Errorf("path must start with /")
 	}
-		if route.Auth != "" && route.Auth != AuthInherit && route.Auth != AuthNone {
+	if route.Auth != "" && route.Auth != AuthInherit && route.Auth != AuthNone {
 		if _, err := ParseModuleRef(route.Auth); err != nil {
 			return err
 		}
