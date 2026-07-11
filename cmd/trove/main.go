@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/config"
@@ -47,6 +48,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer store.Close()
+
+	if cfg.Journal.RetentionDays > 0 {
+		cutoff := time.Now().UTC().AddDate(0, 0, -cfg.Journal.RetentionDays)
+		if n, err := store.PruneBefore(context.Background(), cutoff); err != nil {
+			log.Printf("trove: journal retention: %v", err)
+		} else if n > 0 {
+			log.Printf("trove: journal retention: pruned %d events older than %d days", n, cfg.Journal.RetentionDays)
+		}
+	}
 
 	blobStore, err := blob.OpenFilesystem(cfg.Blobs.Path)
 	if err != nil {

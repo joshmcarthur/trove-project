@@ -43,6 +43,7 @@ type Journal interface {
 - [x] Query with `Filter.Text` performs FTS5 keyword search
 - [x] Get by id
 - [x] Subscribe streams new events
+- [x] Optional `retention_days` prunes events older than the configured window on startup
 
 ## Dependencies
 
@@ -51,4 +52,4 @@ type Journal interface {
 
 ## Open questions
 
-- Retention / pruning — see [open-items.md](../open-items.md)
+- ~~Retention / pruning~~ — resolved: `[journal].retention_days` deletes events older than N days on startup (FTS rows included). Blob orphan cleanup is a follow-up.

@@ -772,3 +772,41 @@ func TestSubscribeFiltersByTextAndType(t *testing.T) {
 		t.Fatal("received unexpected extra event")
 	}
 }
+
+func TestPruneBefore(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestStore(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	oldTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	newTime := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
+
+	if err := store.Append(ctx, Event{
+		ID: "01JOLD0000000000000000001", Time: oldTime, Type: "test.old", Source: "test", Payload: json.RawMessage(`{"v":1}`),
+	}); err != nil {
+		t.Fatalf("Append(old) error = %v", err)
+	}
+	if err := store.Append(ctx, Event{
+		ID: "01JNEW0000000000000000002", Time: newTime, Type: "test.new", Source: "test", Payload: json.RawMessage(`{"v":2}`),
+	}); err != nil {
+		t.Fatalf("Append(new) error = %v", err)
+	}
+
+	n, err := store.PruneBefore(ctx, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("PruneBefore() error = %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("PruneBefore() deleted %d rows, want 1", n)
+	}
+
+	events, err := store.Query(ctx, Filter{})
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if len(events) != 1 || events[0].ID != "01JNEW0000000000000000002" {
+		t.Fatalf("Query() = %+v, want only new event", events)
+	}
+}

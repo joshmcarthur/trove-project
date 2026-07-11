@@ -101,6 +101,41 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// PruneBefore deletes events with time strictly before cutoff and their FTS rows.
+// Returns the number of events deleted.
+func (s *Store) PruneBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	if s.db == nil {
+		return 0, fmt.Errorf("journal: prune: store is closed")
+	}
+	cutoff = cutoff.UTC()
+	cutoffStr := cutoff.Format(time.RFC3339)
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("journal: prune: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM events_fts
+		WHERE event_id IN (SELECT id FROM events WHERE time < ?)`, cutoffStr); err != nil {
+		return 0, fmt.Errorf("journal: prune fts: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, `DELETE FROM events WHERE time < ?`, cutoffStr)
+	if err != nil {
+		return 0, fmt.Errorf("journal: prune events: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("journal: prune rows affected: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("journal: prune: commit: %w", err)
+	}
+	return n, nil
+}
+
 // Append persists e, generating ID and Time when unset.
 func (s *Store) Append(ctx context.Context, e Event) error {
 	if e.Type == "" {
