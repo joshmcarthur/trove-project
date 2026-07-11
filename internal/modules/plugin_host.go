@@ -71,7 +71,8 @@ type moduleClient struct {
 }
 
 func (c *moduleClient) Run(ctx context.Context) error {
-	if !c.caps.needsSource {
+	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools
+	if !needsPluginRun {
 		<-ctx.Done()
 		return ctx.Err()
 	}
