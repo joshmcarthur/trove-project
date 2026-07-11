@@ -374,11 +374,16 @@ path = "/data/blobs"
 paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
 
 [modules.remote]
-listen = "tailscale:trove"   # accept remote module connections over the tailnet
+listen = "tailscale:trove"   # planned: accept remote module connections over the tailnet
 
-[mcp]
-listen = ":8081"
+[http]
+listen = ":8080"
+max_body_bytes = 10485760
 ```
+
+MCP query is served by the `mcp-query` module at `POST /mcp` on the HTTP gateway
+(same listen address as ingest). There is no separate `[mcp]` section in core
+config — see [configuration](./getting-started/configuration.md).
 
 Individual module configuration (broker addresses, topics, tokens) lives
 in each module's own manifest/config, not the core config — the core
@@ -392,11 +397,10 @@ Don't build the full module ecosystem before knowing this is worth having.
 In order:
 
 1. **SQLite journal + a minimal module-loading core.** The `events` table,
-   the Unix-domain-socket RPC plumbing, and one built-in-for-now module:
-   generic HTTP ingest (`POST /ingest/:source`). Even in v0, keep ingest
-   behind the module socket rather than wiring it directly into the core
-   — it's the cheapest way to prove the module boundary actually works
-   before more modules depend on it.
+   go-plugin gRPC IPC, and one built-in-for-now module: generic HTTP ingest
+   (`POST /ingest/:source`). Even in v0, keep ingest behind the module socket
+   rather than wiring it directly into the core — it's the cheapest way to prove
+   the module boundary actually works before more modules depend on it.
 2. **One real hardware-adjacent source module** — MQTT is highest-leverage
    since Mosquitto and Meshtastic-to-MQTT already exist.
 3. **A minimal MCP server** wrapping `search_events` and `get_event`

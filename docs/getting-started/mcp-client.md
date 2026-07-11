@@ -7,7 +7,8 @@ nav_order: 5
 # MCP client setup
 
 Query your Trove journal from Cursor (or any MCP client that supports Streamable
-HTTP). Trove exposes four tools backed by the internal query API — see
+HTTP). Trove exposes four core tools backed by the internal query API, plus
+additional tools registered by loaded modules — see
 [MCP query planning](../planning/mcp-query.md).
 
 ## Prerequisites
@@ -39,12 +40,14 @@ Adjust the host and port to match `[http].listen` in your config. Reload Cursor
 ## Verify the connection
 
 1. Open **Cursor Settings → MCP**. The `trove` server should show as connected.
-2. Confirm **4 tools** are listed:
+2. Confirm at least **4 core tools** are listed:
    - `search_events` — FTS5 keyword search
    - `get_event` — fetch one event by ULID
    - `get_events_by_type` — events with an exact type
    - `summarize_range` — counts by type and notable events for a time window
-3. In chat, ask the agent to call `summarize_range` for today, or `search_events`
+3. When `capture-classifier` is loaded, also expect `classify_event` and
+   `list_unclassified_captures`.
+4. In chat, ask the agent to call `summarize_range` for today, or `search_events`
    with a keyword from a captured event.
 
 If the server fails to connect, check that `trove` is running and that nothing
@@ -58,6 +61,9 @@ else is bound to the MCP port.
 | `get_event` | Single event by `id` (ULID) |
 | `get_events_by_type` | All events of an exact `type`, optional time range |
 | `summarize_range` | Aggregated `total`, `by_type`, and `notable` events for `time_from` / `time_to` |
+
+**Module tools** (when loaded): `classify_event`, `list_unclassified_captures` from
+`capture-classifier`.
 
 Tool arguments use RFC3339 timestamps where a time range is accepted.
 

@@ -32,6 +32,8 @@ listed package, update the [roadmap](./roadmap.md).
 | [MCP tool registration](./mcp-tools.md) | `internal/modules` |
 | [Deferred capture](./deferred-capture.md) | `modules/capture-classifier` |
 | [Telegram source](./telegram-source.md) | `modules/telegram-source` |
+| [HTTP gateway](./http-gateway.md) | `internal/gateway` + modules |
+| [Processors and sinks](./processors-sinks.md) | `internal/modules` + modules |
 
 ## Open decisions
 
@@ -43,11 +45,9 @@ listed package, update the [roadmap](./roadmap.md).
 
 | Page | Package |
 |------|---------|
-| [HTTP gateway](./http-gateway.md) | `internal/gateway` + modules |
 | [HA WebSocket source](./ha-source.md) | external module |
 | [Remote modules](./remote-modules.md) | `internal/modules` |
 | [Embeddings / semantic search](./embeddings.md) | `internal/journal` |
-| [Processors and sinks](./processors-sinks.md) | external modules |
 
 ## Template
 

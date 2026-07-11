@@ -6,8 +6,8 @@ nav_order: 2
 
 # Quick Start
 
-Trove is not yet feature-complete. This page describes what works today and what
-comes next.
+Trove is in active development toward a two-week live validation. This page
+describes what works today and what comes next.
 
 ## What works today
 
@@ -20,12 +20,14 @@ make build
 ./bin/trove -version
 ```
 
-The config loader (`internal/config`), SQLite journal (`internal/journal`), module
-runtime (`internal/modules`), HTTP ingest module (`modules/http-ingest`), MQTT
-source module (`modules/mqtt-source`), and MCP query server (`internal/query`)
-are implemented. With a valid config file, `trove` opens the journal, discovers
-source modules, supervises them, and starts the HTTP gateway (ingest + MCP) until
-interrupted:
+The config loader (`internal/config`), SQLite journal (`internal/journal`), blob
+store (`internal/blob`), module runtime (`internal/modules`), HTTP gateway
+(`internal/gateway`), HTTP ingest module (`modules/http-ingest`), MQTT source
+(`modules/mqtt-source`), Telegram source (`modules/telegram-source`), deferred
+capture (`modules/capture-classifier`), and MCP query (`internal/query` +
+`modules/mcp-query`) are implemented. With a valid config file, `trove` opens the
+journal, discovers modules, supervises them, and starts the HTTP gateway (ingest,
+blobs, capture, classify, MCP) until interrupted:
 
 ```bash
 make build
@@ -52,8 +54,10 @@ listen = ":8080"
 ### Query the journal
 
 Connect Cursor (or another MCP client) to `http://<host>:8080/mcp` on the HTTP
-gateway — see [MCP client setup](./mcp-client.md). Four tools are available: `search_events`,
-`get_event`, `get_events_by_type`, and `summarize_range`.
+gateway — see [MCP client setup](./mcp-client.md). Four core tools are always
+available: `search_events`, `get_event`, `get_events_by_type`, and
+`summarize_range`. Additional tools (e.g. `classify_event`) appear when modules
+that register MCP tools are loaded.
 
 MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.toml`
 (default broker `tcp://localhost:1883`, topics `["home/#"]`). See
@@ -62,11 +66,11 @@ MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.tom
 
 ## What's coming
 
-- [Blob store](../planning/blobs.md) — photo/attachment upload for iOS Shortcuts
-  share sheet (`PUT /blobs` then ingest with `blob_ref`)
-- Two-week live test — capture recipes and conversational retrieval validation
+- **Two-week live test** — capture recipes and conversational retrieval validation
+  (see [roadmap](../roadmap.md))
 
-JSON-only capture works today. Photo attachments require the blob store (Planned).
+Photo attachments work today via `PUT /blobs` then ingest with `blob_ref` — see
+[iOS Shortcuts](./ios-shortcuts.md).
 
 ## Capture events
 

@@ -26,4 +26,14 @@ v0 — add when a workflow demands it.
 
 ## Implementation
 
-**Status:** Later — [planning/processors-sinks.md](../planning/processors-sinks.md)
+Event routing for processors and sinks is **Supported** — see
+[planning/processors-sinks.md](../planning/processors-and-sinks.md).
+
+First-party examples today:
+
+- **`capture-classifier`** — processor with HTTP routes and MCP tools for deferred
+  capture classification
+- **`mcp-query`** — HTTP-only processor that exposes the MCP endpoint on the
+  gateway
+
+No first-party sink module ships yet; add one when a workflow demands it.
