@@ -54,9 +54,17 @@ parser ignores unknown fields.
 
 ## Source module contract
 
+Modules run in subprocesses and reach the core through a single **services
+broker** (`RunRequest.services_broker_id`). **CoreServices** is the contract:
+
+- **Emit** — append events to the journal (sources)
+- **BlobPut** — store blobs in the core filesystem store
+- **Query RPCs** — read the journal (e.g. mcp-query)
+
 The module process speaks RPC to the core:
 
-- **Emit(event)** — stream events to the journal (sources)
+- **Emit(event)** — stream events to the journal via CoreServices (sources)
+- **BlobPut** / **Query** — blobs and journal reads via the same broker
 - **Healthcheck()** — periodic liveness
 
 Local modules use hashicorp/go-plugin; the core discovers the binary named

@@ -727,11 +727,9 @@ func (x *HTTPResponse) GetBody() []byte {
 }
 
 type RunRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	IngestBrokerId uint32                 `protobuf:"varint,1,opt,name=ingest_broker_id,json=ingestBrokerId,proto3" json:"ingest_broker_id,omitempty"`
-	// Broker ID for CoreServices (BlobPut, Query). Zero when the module needs
-	// neither blobs nor journal access.
-	ServicesBrokerId uint32 `protobuf:"varint,2,opt,name=services_broker_id,json=servicesBrokerId,proto3" json:"services_broker_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Broker ID for CoreServices (Emit, BlobPut, Query).
+	ServicesBrokerId uint32 `protobuf:"varint,1,opt,name=services_broker_id,json=servicesBrokerId,proto3" json:"services_broker_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -764,13 +762,6 @@ func (x *RunRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
 func (*RunRequest) Descriptor() ([]byte, []int) {
 	return file_trove_v1_module_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *RunRequest) GetIngestBrokerId() uint32 {
-	if x != nil {
-		return x.IngestBrokerId
-	}
-	return 0
 }
 
 func (x *RunRequest) GetServicesBrokerId() uint32 {
@@ -968,19 +959,17 @@ const file_trove_v1_module_proto_rawDesc = "" +
 	"\x04body\x18\x03 \x01(\fR\x04body\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"d\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\":\n" +
 	"\n" +
-	"RunRequest\x12(\n" +
-	"\x10ingest_broker_id\x18\x01 \x01(\rR\x0eingestBrokerId\x12,\n" +
-	"\x12services_broker_id\x18\x02 \x01(\rR\x10servicesBrokerId\"\r\n" +
+	"RunRequest\x12,\n" +
+	"\x12services_broker_id\x18\x01 \x01(\rR\x10servicesBrokerId\"\r\n" +
 	"\vRunResponse\"\x14\n" +
 	"\x12HealthcheckRequest\"?\n" +
 	"\x13HealthcheckResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage29\n" +
-	"\x06Source\x12/\n" +
-	"\x04Emit\x12\x0f.trove.v1.Event\x1a\x16.trove.v1.EmitResponse2\xf0\x02\n" +
-	"\fCoreServices\x12>\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xa1\x03\n" +
+	"\fCoreServices\x12/\n" +
+	"\x04Emit\x12\x0f.trove.v1.Event\x1a\x16.trove.v1.EmitResponse\x12>\n" +
 	"\aBlobPut\x12\x18.trove.v1.BlobPutRequest\x1a\x19.trove.v1.BlobPutResponse\x126\n" +
 	"\bGetEvent\x12\x19.trove.v1.GetEventRequest\x1a\x0f.trove.v1.Event\x12M\n" +
 	"\fSearchEvents\x12\x1d.trove.v1.SearchEventsRequest\x1a\x1e.trove.v1.SearchEventsResponse\x12S\n" +
@@ -1036,7 +1025,7 @@ var file_trove_v1_module_proto_depIdxs = []int32{
 	17, // 3: trove.v1.HTTPRequest.path_values:type_name -> trove.v1.HTTPRequest.PathValuesEntry
 	18, // 4: trove.v1.HTTPRequest.headers:type_name -> trove.v1.HTTPRequest.HeadersEntry
 	19, // 5: trove.v1.HTTPResponse.headers:type_name -> trove.v1.HTTPResponse.HeadersEntry
-	0,  // 6: trove.v1.Source.Emit:input_type -> trove.v1.Event
+	0,  // 6: trove.v1.CoreServices.Emit:input_type -> trove.v1.Event
 	2,  // 7: trove.v1.CoreServices.BlobPut:input_type -> trove.v1.BlobPutRequest
 	4,  // 8: trove.v1.CoreServices.GetEvent:input_type -> trove.v1.GetEventRequest
 	5,  // 9: trove.v1.CoreServices.SearchEvents:input_type -> trove.v1.SearchEventsRequest
@@ -1045,7 +1034,7 @@ var file_trove_v1_module_proto_depIdxs = []int32{
 	10, // 12: trove.v1.HTTPModule.HandleHTTP:input_type -> trove.v1.HTTPRequest
 	12, // 13: trove.v1.SourceModule.Run:input_type -> trove.v1.RunRequest
 	14, // 14: trove.v1.SourceModule.Healthcheck:input_type -> trove.v1.HealthcheckRequest
-	1,  // 15: trove.v1.Source.Emit:output_type -> trove.v1.EmitResponse
+	1,  // 15: trove.v1.CoreServices.Emit:output_type -> trove.v1.EmitResponse
 	3,  // 16: trove.v1.CoreServices.BlobPut:output_type -> trove.v1.BlobPutResponse
 	0,  // 17: trove.v1.CoreServices.GetEvent:output_type -> trove.v1.Event
 	6,  // 18: trove.v1.CoreServices.SearchEvents:output_type -> trove.v1.SearchEventsResponse
@@ -1074,7 +1063,7 @@ func file_trove_v1_module_proto_init() {
 			NumEnums:      0,
 			NumMessages:   20,
 			NumExtensions: 0,
-			NumServices:   4,
+			NumServices:   3,
 		},
 		GoTypes:           file_trove_v1_module_proto_goTypes,
 		DependencyIndexes: file_trove_v1_module_proto_depIdxs,

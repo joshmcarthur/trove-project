@@ -104,13 +104,13 @@ func TestIngestPolicyValidateEvent(t *testing.T) {
 	}
 }
 
-func TestIngestServerEmitEnforcesPolicy(t *testing.T) {
+func TestCoreServicesEmitEnforcesPolicy(t *testing.T) {
 	t.Parallel()
 
 	store := openTestJournal(t)
 	t.Cleanup(func() { _ = store.Close() })
 
-	server := &ingestServer{
+	server := &coreServicesServer{
 		journal: store,
 		policy: IngestPolicy{
 			patterns:   []string{"allowed.event"},
