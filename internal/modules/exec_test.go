@@ -32,7 +32,7 @@ func TestModuleExecCmdBundled(t *testing.T) {
 	t.Parallel()
 
 	mod := Module{
-		Bundled: true,
+		Bundled:  true,
 		Manifest: Manifest{Name: "http-ingest"},
 	}
 

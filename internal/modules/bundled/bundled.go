@@ -11,8 +11,8 @@ import (
 )
 
 type entry struct {
-	name    string
-	new     func() trovemodule.Module
+	name     string
+	new      func() trovemodule.Module
 	manifest func() (modules.Manifest, error)
 }
 

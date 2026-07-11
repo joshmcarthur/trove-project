@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/modules"
+	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
