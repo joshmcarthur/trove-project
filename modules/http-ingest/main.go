@@ -13,22 +13,20 @@ import (
 type httpIngestModule struct {
 	ready atomic.Bool
 	cfg   config
-	emit  trovemodule.Emitter
-	blobs trovemodule.BlobPutter
+	core  trovemodule.Core
 }
 
-func (m *httpIngestModule) RunWithBlobs(ctx context.Context, emit trovemodule.Emitter, blobs trovemodule.BlobPutter) error {
+func (m *httpIngestModule) Run(ctx context.Context, core trovemodule.Core) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	if blobs == nil {
-		return fmt.Errorf("http-ingest: blob putter is required")
+	if core == nil {
+		return fmt.Errorf("http-ingest: core connection is required")
 	}
 
 	m.cfg = cfg
-	m.emit = emit
-	m.blobs = blobs
+	m.core = core
 	m.ready.Store(true)
 	defer m.ready.Store(false)
 
@@ -40,7 +38,7 @@ func (m *httpIngestModule) HandleHTTP(ctx context.Context, req *troverpc.HTTPReq
 	if !m.ready.Load() {
 		return textResponse(http.StatusServiceUnavailable, "service unavailable"), nil
 	}
-	return dispatchHTTP(ctx, m.emit, m.blobs, m.cfg, req)
+	return dispatchHTTP(ctx, m.core, m.core, m.cfg, req)
 }
 
 func (m *httpIngestModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {

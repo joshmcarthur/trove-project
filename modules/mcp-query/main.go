@@ -16,8 +16,8 @@ type mcpQueryModule struct {
 	handler http.Handler
 }
 
-func (m *mcpQueryModule) RunWithQuery(ctx context.Context, q trovemodule.Querier) error {
-	m.handler = query.MCPHandler(&queryAdapter{q: q})
+func (m *mcpQueryModule) Run(ctx context.Context, core trovemodule.Core) error {
+	m.handler = query.MCPHandler(&queryAdapter{q: core})
 	m.ready.Store(true)
 	defer m.ready.Store(false)
 	<-ctx.Done()

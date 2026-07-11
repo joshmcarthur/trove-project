@@ -9,13 +9,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// BlobRunner is implemented by modules that use core blob services.
-type BlobRunner interface {
-	RunWithBlobs(ctx context.Context, emit Emitter, blobs BlobPutter) error
-}
-
-// Serve starts a Trove module plugin process. runner must implement
-// Runner, BlobRunner, and/or QueryRunner.
+// Serve starts a Trove module plugin subprocess. runner must implement Module
+// and may also implement HTTPHandler and HealthChecker.
 func Serve(runner any) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
@@ -53,38 +48,33 @@ type sourceModuleServer struct {
 }
 
 func (s *sourceModuleServer) Run(ctx context.Context, req *troverpc.RunRequest) (*troverpc.RunResponse, error) {
-	if req.ServicesBrokerId == 0 {
-		return nil, fmt.Errorf("trovemodule: core services broker is required")
-	}
-
-	servicesConn, err := s.broker.Dial(req.ServicesBrokerId)
+	core, err := connectCore(s.broker, req.ServicesBrokerId)
 	if err != nil {
 		return nil, err
 	}
-	defer servicesConn.Close()
+	if c, ok := core.(*coreConn); ok {
+		defer c.Close()
+	}
 
-	services := troverpc.NewCoreServicesClient(servicesConn)
-	emit := &coreEmitter{client: services}
-	blobs := &blobPutter{client: services}
-	querier := newCoreQuerier(services)
-
-	switch runner := s.runner.(type) {
-	case BlobRunner:
-		if err := runner.RunWithBlobs(ctx, emit, blobs); err != nil {
-			return nil, err
-		}
-	case QueryRunner:
-		if err := runner.RunWithQuery(ctx, querier); err != nil {
-			return nil, err
-		}
-	case Runner:
-		if err := runner.Run(ctx, emit); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("trovemodule: runner must implement Runner, BlobRunner, or QueryRunner")
+	if err := runModule(ctx, s.runner, core); err != nil {
+		return nil, err
 	}
 	return &troverpc.RunResponse{}, nil
+}
+
+func runModule(ctx context.Context, runner any, core Core) error {
+	switch mod := runner.(type) {
+	case Module:
+		return mod.Run(ctx, core)
+	case BlobRunner:
+		return mod.RunWithBlobs(ctx, core, core)
+	case QueryRunner:
+		return mod.RunWithQuery(ctx, core)
+	case Runner:
+		return mod.Run(ctx, core)
+	default:
+		return fmt.Errorf("trovemodule: runner must implement Module")
+	}
 }
 
 func (s *sourceModuleServer) Healthcheck(ctx context.Context, _ *troverpc.HealthcheckRequest) (*troverpc.HealthcheckResponse, error) {

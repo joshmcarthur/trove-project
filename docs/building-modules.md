@@ -52,23 +52,25 @@ Types without a schema entry are allowlisted but not payload-validated.
 Module-specific keys such as `listen` are read by the module binary; the core
 parser ignores unknown fields.
 
-## Source module contract
+## Module contract
 
-Modules run in subprocesses and reach the core through a single **services
-broker** (`RunRequest.services_broker_id`). **CoreServices** is the contract:
+Modules run as subprocesses of the single `trove` process. When the parent
+starts a module, it passes a **Core** handle — your connection back to the
+parent for journal writes, blob storage, and journal reads:
 
-- **Emit** — append events to the journal (sources)
-- **BlobPut** — store blobs in the core filesystem store
-- **Query RPCs** — read the journal (e.g. mcp-query)
+```go
+func (m *myModule) Run(ctx context.Context, core trovemodule.Core) error {
+    return core.Emit(ctx, &troverpc.Event{ ... })
+}
+```
 
-The module process speaks RPC to the core:
+Use `trovemodule.Serve` to register the module. Optional interfaces:
 
-- **Emit(event)** — stream events to the journal via CoreServices (sources)
-- **BlobPut** / **Query** — blobs and journal reads via the same broker
-- **Healthcheck()** — periodic liveness
+- **HTTPHandler** — serve HTTP routes declared in the manifest
+- **HealthChecker** — report liveness to the parent
 
-Local modules use hashicorp/go-plugin; the core discovers the binary named
-`module` from `manifest.toml` and manages the subprocess.
+The parent enforces ingest policy on `core.Emit`. Modules do not open
+`trove.db` or the blob directory directly.
 
 ## Module-specific config
 

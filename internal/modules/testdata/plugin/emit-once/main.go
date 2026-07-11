@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	trovemodule.Serve(trovemodule.RunFunc(func(ctx context.Context, emit trovemodule.Emitter) error {
-		return emit.Emit(ctx, &troverpc.Event{
+	trovemodule.Serve(trovemodule.CoreRunFunc(func(ctx context.Context, core trovemodule.Core) error {
+		return core.Emit(ctx, &troverpc.Event{
 			Type:    "test.emit.once",
 			Source:  "emit-once",
 			Payload: []byte(`{"hello":"world"}`),

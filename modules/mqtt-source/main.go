@@ -12,14 +12,14 @@ type mqttSourceModule struct {
 	ready atomic.Bool
 }
 
-func (m *mqttSourceModule) Run(ctx context.Context, emit trovemodule.Emitter) error {
+func (m *mqttSourceModule) Run(ctx context.Context, core trovemodule.Core) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
 	m.ready.Store(true)
 	defer m.ready.Store(false)
-	return runMQTT(ctx, emit, cfg)
+	return runMQTT(ctx, core, cfg)
 }
 
 func (m *mqttSourceModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {

@@ -6,19 +6,15 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
-// Emitter appends events to the Trove journal via CoreServices.Emit.
+// Emitter appends events to the Trove journal via Core.Emit.
 type Emitter interface {
 	Emit(ctx context.Context, event *troverpc.Event) error
 }
 
-// Runner executes module logic and emits events through the core.
+// Runner is a legacy module entry point that only uses Core.Emit.
+// Prefer implementing Module with Run(ctx, core Core).
 type Runner interface {
 	Run(ctx context.Context, emit Emitter) error
-}
-
-// HealthChecker reports module liveness for periodic core healthchecks.
-type HealthChecker interface {
-	Healthcheck(ctx context.Context) (*troverpc.HealthcheckResponse, error)
 }
 
 // RunFunc adapts a function to Runner.
@@ -28,11 +24,7 @@ func (f RunFunc) Run(ctx context.Context, emit Emitter) error {
 	return f(ctx, emit)
 }
 
-type coreEmitter struct {
-	client troverpc.CoreServicesClient
-}
-
-func (e *coreEmitter) Emit(ctx context.Context, event *troverpc.Event) error {
-	_, err := e.client.Emit(ctx, event)
-	return err
+// HealthChecker reports module liveness for periodic parent healthchecks.
+type HealthChecker interface {
+	Healthcheck(ctx context.Context) (*troverpc.HealthcheckResponse, error)
 }

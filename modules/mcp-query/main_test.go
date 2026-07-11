@@ -76,6 +76,6 @@ func TestHandleHTTPDispatchesMCP(t *testing.T) {
 }
 
 var (
-	_ trovemodule.QueryRunner = (*mcpQueryModule)(nil)
+	_ trovemodule.Module      = (*mcpQueryModule)(nil)
 	_ trovemodule.HTTPHandler = (*mcpQueryModule)(nil)
 )
