@@ -22,8 +22,8 @@ Install under a configured search path:
 ```
 
 For local development, `make build` also builds the first-party HTTP ingest,
-MQTT source, and MCP query modules into `modules/http-ingest/`,
-`modules/mqtt-source/`, and `modules/mcp-query/`.
+MQTT source, Telegram source, and MCP query modules into `modules/http-ingest/`,
+`modules/mqtt-source/`, `modules/telegram-source/`, and `modules/mcp-query/`.
 Point `[modules].paths` at the repo `modules/` directory (the parent of each
 module folder).
 
@@ -134,6 +134,7 @@ Modules load overlays through `trovemodule.LoadModuleConfig` (merges manifest +
 | Capture classifier | `modules/capture-classifier/` | [deferred-capture](./planning/deferred-capture.md) |
 | MCP query | `modules/mcp-query/` | [mcp-query](./planning/mcp-query.md) |
 | MQTT source | `modules/mqtt-source/` | [mqtt-source](./planning/mqtt-source.md) |
+| Telegram source | `modules/telegram-source/` | [telegram-source](./planning/telegram-source.md) |
 | Home Assistant | external | [ha-source](./planning/ha-source.md) |
 
 ### HTTP ingest
@@ -163,6 +164,13 @@ Each MQTT message becomes a journal event with `type`
 `mqtt.<topic>.received` (slashes become dots), `source` set to the topic, and
 `payload.metadata.topic` preserving the original MQTT topic, with the MQTT
 body in `payload.message` (JSON) or `payload.raw` (non-JSON).
+
+### Telegram source
+
+After `make build`, set `TELEGRAM_BOT_TOKEN` and your chat ID in
+`modules/telegram-source/manifest.toml`. Add `modules/` to `[modules].paths` and
+start `trove`. Send a message to your bot; it replies with a capture event ID and
+type buttons. See [Telegram getting started](../getting-started/telegram.md).
 
 ## Publishing
 

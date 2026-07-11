@@ -44,6 +44,27 @@ func (s *stubJournal) Emit(_ context.Context, event *troverpc.Event) error {
 	return nil
 }
 
+func TestCapturePendingWithResultReturnsID(t *testing.T) {
+	j := newStubJournal()
+	got, err := classify.CapturePendingWithResult(context.Background(), j, "telegram", []byte(`{"text":"hi"}`))
+	if err != nil {
+		t.Fatalf("CapturePendingWithResult() error = %v", err)
+	}
+	if got.EventID == "" {
+		t.Fatal("CapturePendingWithResult() EventID is empty")
+	}
+	event := j.events[got.EventID]
+	if event == nil {
+		t.Fatalf("event %q not stored", got.EventID)
+	}
+	if event.Type != classify.PendingType {
+		t.Fatalf("type = %q, want %q", event.Type, classify.PendingType)
+	}
+	if event.Id != got.EventID {
+		t.Fatalf("stored id = %q, result id = %q", event.Id, got.EventID)
+	}
+}
+
 func TestClassifyHappyPath(t *testing.T) {
 	j := newStubJournal()
 	pendingID := "01JPENDING000000000000000"
