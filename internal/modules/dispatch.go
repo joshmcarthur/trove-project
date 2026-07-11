@@ -20,16 +20,6 @@ func dispatchContextToProto(d DispatchContext) *troverpc.DispatchContext {
 	}
 }
 
-func dispatchContextFromProto(d *troverpc.DispatchContext) DispatchContext {
-	if d == nil {
-		return DispatchContext{}
-	}
-	return DispatchContext{
-		RootID: d.RootId,
-		Seen:   append([]string(nil), d.Seen...),
-	}
-}
-
 func withSeen(seen []string, moduleName string) []string {
 	for _, name := range seen {
 		if name == moduleName {
