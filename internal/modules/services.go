@@ -15,10 +15,13 @@ import (
 
 type coreServicesServer struct {
 	troverpc.UnimplementedCoreServicesServer
-	journal journal.Journal
-	policy  IngestPolicy
-	blobs   blob.Store
-	query   *query.Service
+	journal     journal.Journal
+	policy      IngestPolicy
+	blobs       blob.Store
+	query       *query.Service
+	mcpTools    []MCPToolEntry
+	toolModules map[string]string
+	mcpRegistry *MCPRegistry
 }
 
 func (s *coreServicesServer) Emit(ctx context.Context, e *troverpc.Event) (*troverpc.EmitResponse, error) {
@@ -135,6 +138,37 @@ func (s *coreServicesServer) SummarizeRange(ctx context.Context, req *troverpc.S
 		return nil, queryGRPCError(err)
 	}
 	return summaryToProto(summary), nil
+}
+
+func (s *coreServicesServer) ListMCPTools(ctx context.Context, _ *troverpc.ListMCPToolsRequest) (*troverpc.ListMCPToolsResponse, error) {
+	_ = ctx
+	tools := make([]*troverpc.MCPToolDescriptor, 0, len(s.mcpTools))
+	for _, entry := range s.mcpTools {
+		tools = append(tools, &troverpc.MCPToolDescriptor{
+			Name:        entry.Tool.Name,
+			Description: entry.Tool.Description,
+			Module:      entry.Module,
+		})
+	}
+	return &troverpc.ListMCPToolsResponse{Tools: tools}, nil
+}
+
+func (s *coreServicesServer) CallMCPTool(ctx context.Context, req *troverpc.MCPToolCallRequest) (*troverpc.MCPToolCallResponse, error) {
+	if req == nil || req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "tool name is required")
+	}
+	if s.mcpRegistry == nil {
+		return nil, status.Error(codes.Unavailable, "mcp registry is not configured")
+	}
+	module, ok := s.toolModules[req.Name]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "mcp tool %q not found", req.Name)
+	}
+	dispatcher, ok := s.mcpRegistry.Get(module)
+	if !ok {
+		return nil, status.Errorf(codes.Unavailable, "mcp module %q is not available", module)
+	}
+	return dispatcher.CallTool(ctx, req)
 }
 
 func queryGRPCError(err error) error {

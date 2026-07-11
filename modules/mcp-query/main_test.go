@@ -54,7 +54,7 @@ func TestHandleHTTPDispatchesMCP(t *testing.T) {
 	t.Parallel()
 
 	mod := &mcpQueryModule{}
-	mod.handler = query.MCPHandler(&queryAdapter{q: &stubQuerier{}})
+	mod.handler = query.MCPHandler(query.MCPDeps{Querier: &queryAdapter{q: &stubQuerier{}}})
 	mod.ready.Store(true)
 
 	resp, err := mod.HandleHTTP(context.Background(), &troverpc.HTTPRequest{

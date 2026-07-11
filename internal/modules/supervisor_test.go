@@ -43,7 +43,7 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		RunSources(ctx, store, []Module{mod}, nil, NewHTTPRegistry())
+		RunSources(ctx, store, []Module{mod}, nil, NewHTTPRegistry(), NewMCPRegistry(), nil, map[string]string{})
 		close(done)
 	}()
 

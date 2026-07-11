@@ -41,6 +41,8 @@ Build order from spec §11:
 | TOML config | Supported | §10 | [config](./planning/config.md) | `internal/config` |
 | iOS Shortcuts capture recipes | Supported | §6 | [iOS Shortcuts](./getting-started/ios-shortcuts.md) | `examples/ios-shortcuts/` |
 | Blob store (filesystem) | Supported | §5 | [blobs](./planning/blobs.md) | `internal/blob` |
+| MCP tool registration | Supported | §8, §9 | [mcp-tools](./planning/mcp-tools.md) | `internal/modules` + `modules/mcp-query` |
+| Deferred capture / classify | Supported | §3, §6 | [deferred-capture](./planning/deferred-capture.md) | `modules/capture-classifier` |
 | Network auth (HTTP ingest + MCP) | Open | §13 | [auth](./planning/auth.md) | `internal/config` + modules |
 | Journal retention / pruning | Open | §13 | [journal](./planning/journal.md) | `internal/journal` |
 | HA WebSocket tap | Later | §6 | [ha-source](./planning/ha-source.md) | external module |

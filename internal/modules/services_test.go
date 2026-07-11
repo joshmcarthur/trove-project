@@ -123,3 +123,41 @@ func TestCoreServicesGetEvent(t *testing.T) {
 		t.Errorf("Id = %q, want %q", resp.Id, events[0].ID)
 	}
 }
+
+func TestCoreServicesCallMCPTool(t *testing.T) {
+	t.Parallel()
+
+	registry := NewMCPRegistry()
+	dispatcher := &stubMCPDispatcher{}
+	registry.Register("capture-classifier", dispatcher)
+
+	srv := &coreServicesServer{
+		toolModules: map[string]string{"classify_event": "capture-classifier"},
+		mcpRegistry: registry,
+	}
+
+	resp, err := srv.CallMCPTool(context.Background(), &troverpc.MCPToolCallRequest{
+		Name:          "classify_event",
+		ArgumentsJson: []byte(`{"source_event_id":"01JTEST","target_type":"note.created"}`),
+	})
+	if err != nil {
+		t.Fatalf("CallMCPTool() error = %v", err)
+	}
+	if !dispatcher.called {
+		t.Fatal("dispatcher was not called")
+	}
+	if string(resp.ResultJson) != `{"ok":true}` {
+		t.Fatalf("ResultJson = %s", resp.ResultJson)
+	}
+}
+
+type stubMCPDispatcher struct {
+	called bool
+}
+
+func (s *stubMCPDispatcher) CallTool(ctx context.Context, req *troverpc.MCPToolCallRequest) (*troverpc.MCPToolCallResponse, error) {
+	_ = ctx
+	_ = req
+	s.called = true
+	return &troverpc.MCPToolCallResponse{ResultJson: []byte(`{"ok":true}`)}, nil
+}

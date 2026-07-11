@@ -72,22 +72,30 @@ func main() {
 		os.Exit(1)
 	}
 
+	mcpTools, err := modules.CollectMCPTools(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	toolModules := modules.MCPToolModuleIndex(mcpTools)
+
 	if err := gateway.ValidateRoutes(routes, nil); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	registry := modules.NewHTTPRegistry()
+	httpRegistry := modules.NewHTTPRegistry()
+	mcpRegistry := modules.NewMCPRegistry()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go modules.RunSources(ctx, store, mods, blobStore, registry)
+	go modules.RunSources(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, mcpTools, toolModules)
 
 	gw, err := gateway.New(gateway.Config{
 		Listen:       cfg.HTTP.Listen,
 		MaxBodyBytes: cfg.HTTP.MaxBodyBytes,
-	}, routes, registry, nil)
+	}, routes, httpRegistry, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -105,7 +113,7 @@ func main() {
 func supervisedModuleNames(mods []modules.Module) []string {
 	names := make([]string, 0, len(mods))
 	for _, mod := range mods {
-		if mod.Manifest.Kind == modules.KindSource || len(mod.Manifest.HTTPRoutes()) > 0 {
+		if mod.Manifest.Kind == modules.KindSource || len(mod.Manifest.HTTPRoutes()) > 0 || len(mod.Manifest.MCPTools()) > 0 {
 			names = append(names, mod.Manifest.Name)
 		}
 	}

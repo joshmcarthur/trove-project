@@ -29,6 +29,8 @@ listed package, update the [roadmap](./roadmap.md).
 | Page | Package |
 |------|---------|
 | [MCP query server](./mcp-query.md) | `internal/query` |
+| [MCP tool registration](./mcp-tools.md) | `internal/modules` |
+| [Deferred capture](./deferred-capture.md) | `modules/capture-classifier` |
 
 ## Open decisions
 
