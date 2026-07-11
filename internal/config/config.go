@@ -29,8 +29,10 @@ type BlobsConfig struct {
 
 // ModulesConfig holds module discovery and remote listener settings.
 type ModulesConfig struct {
-	Paths  []string     `toml:"paths"`
-	Remote RemoteConfig `toml:"remote"`
+	Paths    []string                  `toml:"paths"`
+	Remote   RemoteConfig              `toml:"remote"`
+	Config   map[string]string         `toml:"config"`
+	Settings map[string]toml.Primitive `toml:"settings"`
 }
 
 // RemoteConfig holds remote module transport settings.
@@ -96,6 +98,12 @@ func applyDefaults(cfg *Config) {
 	if cfg.Modules.Paths == nil {
 		cfg.Modules.Paths = []string{}
 	}
+	if cfg.Modules.Config == nil {
+		cfg.Modules.Config = map[string]string{}
+	}
+	if cfg.Modules.Settings == nil {
+		cfg.Modules.Settings = map[string]toml.Primitive{}
+	}
 }
 
 func expandPaths(cfg *Config) error {
@@ -115,6 +123,13 @@ func expandPaths(cfg *Config) error {
 		cfg.Modules.Paths[i], err = expandPath(p)
 		if err != nil {
 			return fmt.Errorf("config: modules.paths[%d]: %w", i, err)
+		}
+	}
+
+	for name, path := range cfg.Modules.Config {
+		cfg.Modules.Config[name], err = expandPath(path)
+		if err != nil {
+			return fmt.Errorf("config: modules.config[%q]: %w", name, err)
 		}
 	}
 

@@ -111,6 +111,21 @@ from `Process`. Modules do not open `trove.db` or the blob directory directly.
 Broker addresses, topics, API tokens, and similar settings belong in the module's
 own config (alongside or inside `manifest.toml`), not in the core TOML.
 
+Optionally override module settings from `trove.toml` without editing the module
+directory:
+
+```toml
+[modules.settings.mqtt-source]
+broker = "tcp://mosquitto:1883"
+
+[modules.config]
+telegram-source = "/etc/trove/telegram.toml"
+```
+
+See [Configuration](../getting-started/configuration.md#module-settings-overlays).
+Modules load overlays through `trovemodule.LoadModuleConfig` (merges manifest +
+`TROVE_MODULE_SETTINGS` when set by the parent).
+
 ## Examples
 
 | Module | Location | Planning page |

@@ -107,6 +107,22 @@ func TestLoadTildeExpansion(t *testing.T) {
 	}
 }
 
+func TestLoadModuleSettings(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := Load(filepath.Join("testdata", "module-settings.toml"))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got := cfg.Modules.Config["mqtt-source"]; got != "/etc/trove/mqtt.toml" {
+		t.Fatalf("Modules.Config[mqtt-source] = %q", got)
+	}
+	if _, ok := cfg.Modules.Settings["mqtt-source"]; !ok {
+		t.Fatal("Modules.Settings[mqtt-source] is missing")
+	}
+}
+
 func TestLoadErrors(t *testing.T) {
 	t.Parallel()
 

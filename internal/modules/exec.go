@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func moduleExecCmd(mod Module) (*exec.Cmd, error) {
+func moduleExecCmd(mod Module, settings *SettingsStore) (*exec.Cmd, error) {
 	if mod.Dir == "" {
 		return nil, fmt.Errorf("modules: module dir is required")
 	}
@@ -32,5 +32,6 @@ func moduleExecCmd(mod Module) (*exec.Cmd, error) {
 
 	cmd := exec.Command(binary) //nolint:gosec // G204: path is not taken from untrusted input
 	cmd.Env = os.Environ()
+	applyModuleSettingsEnv(cmd, settings, mod.Manifest.Name)
 	return cmd, nil
 }

@@ -29,6 +29,12 @@ path = "/data/blobs"
 [modules]
 paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
 
+[modules.config]
+mqtt-source = "/etc/trove/mqtt.toml"
+
+[modules.settings.mqtt-source]
+broker = "tcp://mosquitto:1883"
+
 [modules.remote]
 listen = "tailscale:trove"
 
@@ -47,12 +53,15 @@ Go struct with sensible defaults for development.
 - Expand `~` in paths
 - Validate required fields for enabled subsystems
 - Flag: `-config /path/to/trove.toml` in `cmd/trove`
+- Optional `[modules.settings]` inline overlays and `[modules.config]` external
+  file paths — serialized to `TROVE_MODULE_SETTINGS` for each module subprocess
 
 ## Acceptance criteria
 
 - [x] Parses example config from spec
 - [x] Returns clear errors on missing/invalid fields
 - [x] `main` loads config before starting journal/modules
+- [x] Optional per-module settings overlays from `trove.toml`
 
 ## Dependencies
 

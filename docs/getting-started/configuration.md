@@ -27,6 +27,13 @@ path = "/data/blobs"
 [modules]
 paths = ["/usr/local/lib/trove/modules", "~/.local/lib/trove/modules"]
 
+# Optional per-module settings overlays (see below).
+[modules.config]
+mqtt-source = "/etc/trove/mqtt.toml"
+
+[modules.settings.mqtt-source]
+broker = "tcp://mosquitto:1883"
+
 [modules.remote]
 listen = "tailscale:trove"
 
@@ -40,7 +47,39 @@ listen = ":8080"
   gateway listen address (`[http].listen`).
 - MCP is provided by the `mcp-query` module at `POST /mcp` on the same listener.
 - Per-module settings (broker URLs, topics, tokens) live in each module's own
-  `manifest.toml` — the core does not need to know module-specific shapes.
+  `manifest.toml` by default — the core does not validate module-specific shapes.
+- Optional **`[modules.settings]`** and **`[modules.config]`** in `trove.toml`
+  overlay or replace those values at runtime without editing files under
+  `modules/`.
+
+## Module settings overlays
+
+Modules read `manifest.toml` beside their binary. Trove can pass additional
+settings from `trove.toml` via the `TROVE_MODULE_SETTINGS` environment variable
+(set automatically when overlays are configured).
+
+**Inline overlay** — keys under `[modules.settings.<module-name>]`:
+
+```toml
+[modules.settings.mqtt-source]
+broker = "tcp://mosquitto:1883"
+topics = ["sensors/#"]
+```
+
+**External file** — map module name to a TOML file path in `[modules.config]`:
+
+```toml
+[modules.config]
+telegram-source = "/etc/trove/telegram.toml"
+```
+
+When both are set for the same module, the external file is loaded first and
+inline settings are merged on top. Overlay keys override the module manifest;
+arrays and tables in the overlay replace the manifest values wholesale.
+
+Module `manifest.toml` is still required for discovery (`name`, `provides`, HTTP
+routes, MCP tools). Use overlays for deployment-specific values (brokers, chat
+IDs, secrets paths) rather than duplicating the full manifest.
 
 ## Local development
 

@@ -17,7 +17,7 @@ func TestModuleExecCmd(t *testing.T) {
 
 	mod := Module{Dir: dir, Binary: binary}
 
-	cmd, err := moduleExecCmd(mod)
+	cmd, err := moduleExecCmd(mod, nil)
 	if err != nil {
 		t.Fatalf("moduleExecCmd() error = %v", err)
 	}

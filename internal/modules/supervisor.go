@@ -26,6 +26,7 @@ func RunModules(
 	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
+	settings *SettingsStore,
 ) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
@@ -40,7 +41,7 @@ func RunModules(
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseModule(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
+			superviseModule(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settings)
 		}(mod)
 	}
 	wg.Wait()
@@ -63,6 +64,7 @@ func superviseModule(
 	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
+	settings *SettingsStore,
 ) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
@@ -72,7 +74,7 @@ func superviseModule(
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
+		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settings)
 		if handle != nil {
 			select {
 			case <-ctx.Done():
@@ -114,18 +116,19 @@ func RunSources(
 	mcpRegistry *MCPRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
+	settings *SettingsStore,
 ) {
-	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules)
+	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules, settings)
 }
 
 // RunProcessors supervises event-routing processors until ctx is cancelled.
-func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
-	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil)
+func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore) {
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings)
 }
 
 // RunSinks supervises event-routing sinks until ctx is cancelled.
-func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
-	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil)
+func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore) {
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings)
 }
 
 func sleepOrDone(ctx context.Context, d time.Duration) bool {
