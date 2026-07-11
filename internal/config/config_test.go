@@ -121,6 +121,9 @@ func TestLoadModuleSettings(t *testing.T) {
 	if _, ok := cfg.Modules.Settings["mqtt-source"]; !ok {
 		t.Fatal("Modules.Settings[mqtt-source] is missing")
 	}
+	if cfg.Modules.Settings["mqtt-source"]["broker"] != "tcp://inline:1883" {
+		t.Fatalf("Modules.Settings[mqtt-source] = %#v", cfg.Modules.Settings["mqtt-source"])
+	}
 }
 
 func TestLoadErrors(t *testing.T) {

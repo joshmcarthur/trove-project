@@ -22,8 +22,12 @@ func LoadModuleConfig(dir string, dest any) error {
 		return fmt.Errorf("trovemodule: read manifest: %w", err)
 	}
 
-	if overlayPath := strings.TrimSpace(os.Getenv(ModuleSettingsEnv)); overlayPath != "" {
-		overlayData, err := os.ReadFile(overlayPath)
+	overlayPath, err := moduleSettingsPathFromEnv()
+	if err != nil {
+		return err
+	}
+	if overlayPath != "" {
+		overlayData, err := os.ReadFile(overlayPath) //nolint:gosec // G703: path validated by moduleSettingsPathFromEnv; parent-controlled env
 		if err != nil {
 			return fmt.Errorf("trovemodule: read module settings overlay: %w", err)
 		}
@@ -37,6 +41,25 @@ func LoadModuleConfig(dir string, dest any) error {
 		return fmt.Errorf("trovemodule: parse module config: %w", err)
 	}
 	return nil
+}
+
+func moduleSettingsPathFromEnv() (string, error) {
+	raw := strings.TrimSpace(os.Getenv(ModuleSettingsEnv))
+	if raw == "" {
+		return "", nil
+	}
+	if !filepath.IsAbs(raw) {
+		return "", fmt.Errorf("trovemodule: %s must be an absolute path", ModuleSettingsEnv)
+	}
+	clean := filepath.Clean(raw)
+	info, err := os.Stat(clean)
+	if err != nil {
+		return "", fmt.Errorf("trovemodule: %s: %w", ModuleSettingsEnv, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("trovemodule: %s must point to a file", ModuleSettingsEnv)
+	}
+	return clean, nil
 }
 
 // MergeTOMLBytes deep-merges overlay onto base at the map level. Overlay keys

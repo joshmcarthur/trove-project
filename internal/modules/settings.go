@@ -98,7 +98,7 @@ func resolveModuleOverlay(cfg config.ModulesConfig, moduleName string) (path str
 
 	var overlayMap map[string]any
 	if filePath != "" {
-		data, readErr := os.ReadFile(filePath)
+		data, readErr := os.ReadFile(filePath) //nolint:gosec // G703: path from trove.toml modules.config
 		if readErr != nil {
 			return "", false, fmt.Errorf("modules: settings config for %q: read %q: %w", moduleName, filePath, readErr)
 		}
@@ -107,14 +107,10 @@ func resolveModuleOverlay(cfg config.ModulesConfig, moduleName string) (path str
 		}
 	}
 	if hasInline {
-		var inlineMap map[string]any
-		if err := toml.PrimitiveDecode(inline, &inlineMap); err != nil {
-			return "", false, fmt.Errorf("modules: settings for %q: parse inline settings: %w", moduleName, err)
-		}
 		if overlayMap == nil {
 			overlayMap = make(map[string]any)
 		}
-		deepMergeSettings(overlayMap, inlineMap)
+		deepMergeSettings(overlayMap, inline)
 	}
 	if len(overlayMap) == 0 {
 		return "", false, nil

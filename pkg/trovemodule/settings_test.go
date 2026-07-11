@@ -42,6 +42,21 @@ broker = "tcp://mosquitto:1883"
 	}
 }
 
+func TestLoadModuleConfigRejectsRelativeOverlayPath(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(`broker = "tcp://localhost:1883"`), 0o600); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	t.Setenv(trovemodule.ModuleSettingsEnv, "relative/overlay.toml")
+
+	var cfg struct {
+		Broker string `toml:"broker"`
+	}
+	if err := trovemodule.LoadModuleConfig(dir, &cfg); err == nil {
+		t.Fatal("LoadModuleConfig() error = nil, want error")
+	}
+}
+
 func TestLoadModuleConfigAppliesOverlayEnv(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(`
