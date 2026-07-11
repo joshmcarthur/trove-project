@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	trovemodule.Serve(trovemodule.CoreRunFunc(func(ctx context.Context, core trovemodule.Core) error {
+	trovemodule.Serve(trovemodule.RunFunc(func(ctx context.Context, core trovemodule.Core) error {
 		counterPath := os.Getenv("TROVE_TEST_COUNTER_FILE")
 		var count int
 		if counterPath != "" {

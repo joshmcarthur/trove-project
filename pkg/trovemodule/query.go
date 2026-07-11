@@ -16,12 +16,6 @@ type Querier interface {
 	SummarizeRange(ctx context.Context, req *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error)
 }
 
-// QueryRunner is a legacy entry point for modules that only query the journal.
-// Prefer implementing Module with Run(ctx, core Core).
-type QueryRunner interface {
-	RunWithQuery(ctx context.Context, q Querier) error
-}
-
 // ParseRFC3339Optional parses an optional RFC3339 timestamp string.
 func ParseRFC3339Optional(s string) (*time.Time, error) {
 	if s == "" {

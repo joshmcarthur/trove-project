@@ -22,10 +22,10 @@ type Module interface {
 	Run(ctx context.Context, core Core) error
 }
 
-// CoreRunFunc adapts a function to Module.
-type CoreRunFunc func(ctx context.Context, core Core) error
+// RunFunc adapts a function to Module.
+type RunFunc func(ctx context.Context, core Core) error
 
-func (f CoreRunFunc) Run(ctx context.Context, core Core) error {
+func (f RunFunc) Run(ctx context.Context, core Core) error {
 	return f(ctx, core)
 }
 
