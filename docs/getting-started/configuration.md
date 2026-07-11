@@ -39,6 +39,7 @@ listen = "tailscale:trove"
 
 [http]
 listen = ":8080"
+# auth_token = "change-me"   # optional: require Authorization: Bearer <token>
 ```
 
 ## Principles
@@ -46,6 +47,8 @@ listen = ":8080"
 - Core config covers journal path, blob backend, module search paths, and the HTTP
   gateway listen address (`[http].listen`).
 - MCP is provided by the `mcp-query` module at `POST /mcp` on the same listener.
+- Optional **`[http].auth_token`** enables Bearer token auth on all gateway routes
+  (ingest, blobs, MCP). Leave unset for localhost-only development.
 - Per-module settings (broker URLs, topics, tokens) live in each module's own
   `manifest.toml` by default — the core does not validate module-specific shapes.
 - Optional **`[modules.settings]`** and **`[modules.config]`** in `trove.toml`

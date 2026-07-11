@@ -112,6 +112,7 @@ func main() {
 	gw, err := gateway.New(gateway.Config{
 		Listen:       cfg.HTTP.Listen,
 		MaxBodyBytes: cfg.HTTP.MaxBodyBytes,
+		AuthToken:    cfg.HTTP.AuthToken,
 	}, routes, httpRegistry, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

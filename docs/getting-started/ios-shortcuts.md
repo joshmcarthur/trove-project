@@ -62,16 +62,16 @@ Content-Type: application/json
 
 ## Network and auth
 
-v0 HTTP ingest has **no authentication** — see
-[open items](../open-items.md) and [network auth planning](../planning/auth.md). For a home server, common setups are:
+When `[http].auth_token` is set in Trove config, add an `Authorization` header
+(`Bearer <token>`) to every ingest and blob request. When unset, v0 endpoints
+have **no authentication** — see [open items](../open-items.md).
 
 - **Local network** — `http://192.168.x.x:8080/ingest/shortcuts` (Wi‑Fi only;
   Shortcuts may block plain HTTP on cellular).
 - **Tailscale** — HTTPS via your tailnet hostname (recommended for phone capture).
 - **Public HTTPS** — reverse proxy with TLS in front of `:8080`.
 
-See [network auth planning](../planning/auth.md) for auth options once exposing
-beyond a trusted tailnet.
+See [network auth planning](../planning/auth.md) for Bearer token configuration.
 
 ## Photo attachments
 

@@ -28,11 +28,17 @@ a global setup. A committed example lives at
 {
   "mcpServers": {
     "trove": {
-      "url": "http://127.0.0.1:8080/mcp"
+      "url": "http://127.0.0.1:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
     }
   }
 }
 ```
+
+Omit `headers` when `[http].auth_token` is not set in your Trove config. When
+auth is enabled, every MCP request must include the Bearer token.
 
 Adjust the host and port to match `[http].listen` in your config. Reload Cursor
 (Settings → MCP, or restart the editor) after saving.

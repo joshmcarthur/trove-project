@@ -25,12 +25,14 @@ type BuiltinRoute struct {
 type Config struct {
 	Listen       string
 	MaxBodyBytes int64
+	AuthToken    string
 }
 
 // Gateway routes HTTP requests to module HandleHTTP RPC clients.
 type Gateway struct {
 	listen       string
 	maxBodyBytes int64
+	authToken    string
 	routes       []modules.HTTPRouteEntry
 	registry     *modules.HTTPRegistry
 	builtins     []BuiltinRoute
@@ -51,6 +53,7 @@ func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegi
 	return &Gateway{
 		listen:       cfg.Listen,
 		maxBodyBytes: maxBody,
+		authToken:    cfg.AuthToken,
 		routes:       routes,
 		registry:     registry,
 		builtins:     builtins,
@@ -99,6 +102,11 @@ func (g *Gateway) Serve(ctx context.Context) error {
 }
 
 func (g *Gateway) handle(w http.ResponseWriter, r *http.Request) {
+	if g.authToken != "" && !authorized(r, g.authToken) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	route, pathValues, ok := g.matchRoute(r.Method, r.URL.Path)
 	if !ok {
 		http.NotFound(w, r)

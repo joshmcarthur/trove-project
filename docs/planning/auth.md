@@ -6,10 +6,10 @@ nav_order: 12
 
 # Network auth
 
-**Status:** Open\
+**Status:** Supported\
 **Milestone:** Decision before wider network exposure\
 **Spec:** [Open items §13](../spec.md#13-open-items-not-yet-decided)\
-**Package:** `internal/config` + modules
+**Package:** `internal/config` + `internal/gateway`
 
 ## Goal
 
@@ -20,41 +20,37 @@ before exposing them beyond localhost or a trusted tailnet.
 
 | Endpoint | Config | Current state |
 |----------|--------|---------------|
-| HTTP ingest | module listen address | No authentication |
-| MCP query | `[mcp].listen` | No authentication |
+| HTTP ingest | `[http].listen` + gateway | Optional Bearer token |
+| MCP query | `POST /mcp` on gateway | Optional Bearer token (same token) |
+| Blob upload | `PUT /blobs` on gateway | Optional Bearer token (same token) |
 | Remote modules | `[modules.remote].listen` | Not implemented |
 
-v0 is suitable only for localhost or trusted network boundaries. This becomes
-especially important once [blob store](./blobs.md) exposes binary upload via
-`PUT /blobs`.
+## Chosen model
 
-## Options to decide
-
-- **Tailscale identity** — bind via tailnet hostname; verify
-  `X-Tailscale-User` or equivalent (matches existing OpenClaw pattern)
-- **Reverse-proxy auth** — Caddy/Traefik in front; Trove stays bind-localhost
-- **Shared secret / API key** — header or Bearer token in core config; simplest
-  for LAN + Shortcuts
-- **mTLS** — heavier; likely overkill for single-user Pi
+**Shared secret Bearer token** — set `[http].auth_token` in core config. When set,
+every gateway route requires `Authorization: Bearer <token>`. When unset, endpoints
+remain open (localhost development only).
 
 ## Implementation notes
 
-- Not blocking MQTT source or live test on a trusted tailnet
-- Decide before exposing HTTP ingest or MCP beyond localhost/Tailscale
-- Auth may live in core (MCP) and/or http-ingest module depending on approach
+- Enforced in `internal/gateway` before module dispatch
+- Constant-time token comparison
+- iOS Shortcuts: add `Authorization` header `Bearer <token>` on ingest/blob requests
+- MCP clients: configure Bearer token on the HTTP transport (see
+  [MCP client setup](../getting-started/mcp-client.md))
 
 ## Acceptance criteria
 
-- [ ] Auth model chosen and documented in config
-- [ ] HTTP ingest rejects unauthenticated requests when auth enabled
-- [ ] MCP query rejects unauthenticated requests when auth enabled
-- [ ] iOS Shortcuts / MCP client setup documented for chosen model
+- [x] Auth model chosen and documented in config
+- [x] HTTP ingest rejects unauthenticated requests when auth enabled
+- [x] MCP query rejects unauthenticated requests when auth enabled
+- [x] iOS Shortcuts / MCP client setup documented for chosen model
 
 ## Dependencies
 
-- **Blocks:** safe exposure on untrusted networks
-- **Blocked by:** decision on auth model
+- **Blocks:** safe exposure on untrusted networks (partial — single shared secret)
+- **Blocked by:** —
 
 ## Open questions
 
-- Tailscale-only vs shared secret vs reverse-proxy — [open-items.md](../open-items.md)
+- Tailscale identity headers vs reverse-proxy auth — future hardening if needed

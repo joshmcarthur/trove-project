@@ -51,6 +51,7 @@ type RemoteConfig struct {
 type HTTPConfig struct {
 	Listen       string `toml:"listen"`
 	MaxBodyBytes int64  `toml:"max_body_bytes"`
+	AuthToken    string `toml:"auth_token"`
 }
 
 // Load reads and validates configuration from path.

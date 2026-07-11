@@ -44,7 +44,7 @@ Build order from spec §11:
 | MCP tool registration | Supported | §8, §9 | [mcp-tools](./planning/mcp-tools.md) | `internal/modules` + `modules/mcp-query` |
 | Deferred capture / classify | Supported | §3, §6 | [deferred-capture](./planning/deferred-capture.md) | `modules/capture-classifier` |
 | Telegram source | Supported | §6 | [telegram-source](./planning/telegram-source.md) | `modules/telegram-source` |
-| Network auth (HTTP ingest + MCP) | Open | §13 | [auth](./planning/auth.md) | `internal/config` + modules |
+| Network auth (HTTP ingest + MCP) | Supported | §13 | [auth](./planning/auth.md) | `internal/gateway` |
 | Journal retention / pruning | Open | §13 | [journal](./planning/journal.md) | `internal/journal` |
 | HA WebSocket tap | Later | §6 | [ha-source](./planning/ha-source.md) | external module |
 | Remote modules (Tailscale) | Later | §8 | [remote-modules](./planning/remote-modules.md) | `internal/modules` |
