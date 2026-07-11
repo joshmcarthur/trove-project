@@ -16,7 +16,7 @@ From [spec §13](../spec.md#13-open-items-not-yet-decided):
 | Blob upload path | **Resolved:** `PUT /blobs` on http-ingest — see [blobs](./planning/blobs.md), [http-ingest](./planning/http-ingest.md) |
 | Embedding model (local ONNX vs API) | [embeddings](./planning/embeddings.md) |
 | Auth for HTTP ingest and MCP | [auth](./planning/auth.md), [http-ingest](./planning/http-ingest.md), [mcp-query](./planning/mcp-query.md) |
-| Retention / pruning policy | [journal](./planning/journal.md) |
+| Retention / pruning policy | **Resolved:** `[journal].retention_days` — see [journal planning](./planning/journal.md) |
 | Default config file location (XDG vs `/etc/trove`) | [config](./planning/config.md) |
 | `summarize_range`: pre-aggregate at write vs query time | [mcp-query](./planning/mcp-query.md), [processors-sinks](./planning/processors-sinks.md) |
 | HTTP gateway: route registration, MCP migration, streaming RPC | [http-gateway](./planning/http-gateway.md) |

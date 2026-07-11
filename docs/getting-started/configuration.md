@@ -19,6 +19,7 @@ Trove uses TOML (not YAML). Full detail is in [spec §10](../spec.md#10-configur
 ```toml
 [journal]
 path = "/data/trove.db"
+# retention_days = 90   # optional: delete events older than N days on startup
 
 [blobs]
 backend = "filesystem"

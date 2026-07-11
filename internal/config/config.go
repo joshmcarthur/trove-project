@@ -18,7 +18,8 @@ type Config struct {
 
 // JournalConfig holds SQLite journal settings.
 type JournalConfig struct {
-	Path string `toml:"path"`
+	Path          string `toml:"path"`
+	RetentionDays int    `toml:"retention_days"`
 }
 
 // BlobsConfig holds blob storage settings.
@@ -213,6 +214,9 @@ func validate(cfg *Config) error {
 
 	if cfg.HTTP.Listen == "" {
 		return fmt.Errorf("config: http.listen is required")
+	}
+	if cfg.Journal.RetentionDays < 0 {
+		return fmt.Errorf("config: journal.retention_days must be >= 0")
 	}
 
 	return nil
