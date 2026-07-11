@@ -49,24 +49,39 @@ type ClassifyResult struct {
 	ClassificationEventID string `json:"classification_event_id"`
 }
 
+// CapturePendingResult is returned when a pending capture is stored.
+type CapturePendingResult struct {
+	EventID string
+}
+
 // CapturePending stores a quick capture as classify.pending.
 func CapturePending(ctx context.Context, j Journal, source string, body []byte) error {
+	_, err := CapturePendingWithResult(ctx, j, source, body)
+	return err
+}
+
+// CapturePendingWithResult stores a quick capture and returns the assigned event ID.
+func CapturePendingWithResult(ctx context.Context, j Journal, source string, body []byte) (CapturePendingResult, error) {
 	source = strings.TrimSpace(source)
 	if source == "" {
-		return fmt.Errorf("classify: source is required")
+		return CapturePendingResult{}, fmt.Errorf("classify: source is required")
 	}
 	if len(body) == 0 {
-		return fmt.Errorf("classify: body is required")
+		return CapturePendingResult{}, fmt.Errorf("classify: body is required")
 	}
 	if !json.Valid(body) {
-		return fmt.Errorf("classify: body must be valid JSON")
+		return CapturePendingResult{}, fmt.Errorf("classify: body must be valid JSON")
 	}
 
 	event, err := buildPendingEvent(source, body)
 	if err != nil {
-		return err
+		return CapturePendingResult{}, err
 	}
-	return j.Emit(ctx, event)
+	event.Id = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	if err := j.Emit(ctx, event); err != nil {
+		return CapturePendingResult{}, err
+	}
+	return CapturePendingResult{EventID: event.Id}, nil
 }
 
 // Classify creates a typed event and classify.assigned link from a pending capture.

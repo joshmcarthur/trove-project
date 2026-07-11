@@ -1,0 +1,41 @@
+name     = "telegram-source"
+version  = "1.0"
+kind     = "source"
+provides = ["classify.pending", "classify.assigned", "note.*"]
+
+# Set TELEGRAM_BOT_TOKEN in the environment or bot_token below.
+bot_token_env    = "TELEGRAM_BOT_TOKEN"
+allowed_chat_ids = []
+poll_timeout_sec = 30
+max_file_bytes   = 52428800
+session_ttl_min  = 30
+
+[[bot.types]]
+label       = "Quick note"
+target_type = "note.quick"
+
+[[bot.types]]
+label       = "Bookmark"
+target_type = "note.bookmark"
+
+[[bot.commands]]
+command     = "note"
+description = "Quick note (skip picker)"
+target_type = "note.quick"
+fast_path   = true
+
+  [[bot.commands.fields]]
+  name     = "title"
+  prompt   = "Add a title? (/skip)"
+  required = false
+
+[[bot.commands]]
+command     = "bookmark"
+description = "Bookmark (skip picker)"
+target_type = "note.bookmark"
+fast_path   = true
+
+  [[bot.commands.fields]]
+  name     = "url"
+  prompt   = "URL?"
+  required = true

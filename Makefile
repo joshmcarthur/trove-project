@@ -1,4 +1,4 @@
-.PHONY: fmt lint test build build-http-ingest build-mqtt-source build-mcp-query build-capture-classifier docs docs-serve check proto
+.PHONY: fmt lint test build build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier docs docs-serve check proto
 
 GOIMPORTS := go run golang.org/x/tools/cmd/goimports
 
@@ -18,7 +18,7 @@ lint:
 test:
 	go test -race -cover ./...
 
-build: build-http-ingest build-mqtt-source build-mcp-query build-capture-classifier
+build: build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier
 	go build -o bin/trove ./cmd/trove
 
 build-http-ingest:
@@ -28,6 +28,10 @@ build-http-ingest:
 build-mqtt-source:
 	go build -o modules/mqtt-source/module ./modules/mqtt-source
 	chmod +x modules/mqtt-source/module
+
+build-telegram-source:
+	go build -o modules/telegram-source/module ./modules/telegram-source
+	chmod +x modules/telegram-source/module
 
 build-mcp-query:
 	go build -o modules/mcp-query/module ./modules/mcp-query

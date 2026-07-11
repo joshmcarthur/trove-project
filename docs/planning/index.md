@@ -31,6 +31,7 @@ listed package, update the [roadmap](./roadmap.md).
 | [MCP query server](./mcp-query.md) | `internal/query` |
 | [MCP tool registration](./mcp-tools.md) | `internal/modules` |
 | [Deferred capture](./deferred-capture.md) | `modules/capture-classifier` |
+| [Telegram source](./telegram-source.md) | `modules/telegram-source` |
 
 ## Open decisions
 

@@ -19,7 +19,9 @@ See [spec §6](../spec.md#6-sources).
    capture Shortcuts.
 2. **MQTT listener** — subscribes to configured topics on Mosquitto; covers
    Meshtastic (MQTT-bridged) and ESPHome traffic.
-3. **Home Assistant WebSocket tap** — `state_changed` events from HA's
+3. **Telegram bot** — capture-first deferred classify from DMs; media via
+   `core.Put`. See [Telegram guide](../getting-started/telegram.md).
+4. **Home Assistant WebSocket tap** — `state_changed` events from HA's
    `/api/websocket`.
 
 ## Later
@@ -42,4 +44,5 @@ Realized as RPC over the module socket (§8), not an in-process Go interface.
 
 - [HTTP ingest](../planning/http-ingest.md) — milestone 1, **Supported**
 - [MQTT source](../planning/mqtt-source.md) — milestone 2, **Supported**
+- [Telegram source](../planning/telegram-source.md) — milestone 4, **Supported**
 - [HA source](../planning/ha-source.md) — later
