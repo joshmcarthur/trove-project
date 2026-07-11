@@ -12,6 +12,19 @@ import (
 	"github.com/oklog/ulid"
 )
 
+const routerPollInterval = 500 * time.Millisecond
+
+// routingJournal extends Journal with cursor-based dispatch support.
+type routingJournal interface {
+	journal.Journal
+	QueryAfter(ctx context.Context, afterID string, limit int) ([]journal.Event, error)
+	LoadRouterWatermark(ctx context.Context) (string, error)
+	SaveRouterWatermark(ctx context.Context, id string) error
+	SaveEventDispatch(ctx context.Context, eventID, rootID string, seen []string) error
+	LoadEventDispatch(ctx context.Context, eventID string) (rootID string, seen []string, ok bool, err error)
+	DeleteEventDispatch(ctx context.Context, eventID string) error
+}
+
 // Router dispatches journal events to event-routing processors and sinks.
 type Router struct {
 	journal  journal.Journal
@@ -28,41 +41,98 @@ func NewRouter(j journal.Journal, registry *EventRegistry) *Router {
 	}
 }
 
-// Run subscribes to the journal and dispatches events until ctx is cancelled.
+// Run pulls events from the journal in ULID order and dispatches them until ctx
+// is cancelled. Subscribe is used only as a wakeup signal; dispatch correctness
+// does not depend on pub/sub channel delivery.
 func (r *Router) Run(ctx context.Context) error {
+	routeStore, ok := r.journal.(routingJournal)
+	if !ok {
+		return fmt.Errorf("modules: router requires routing-capable journal store")
+	}
+
 	ch, err := r.journal.Subscribe(ctx, journal.Filter{})
 	if err != nil {
 		return fmt.Errorf("modules: router subscribe: %w", err)
 	}
+
+	watermark, err := routeStore.LoadRouterWatermark(ctx)
+	if err != nil {
+		return fmt.Errorf("modules: router load watermark: %w", err)
+	}
+
+	poll := time.NewTicker(routerPollInterval)
+	defer poll.Stop()
+
 	for {
+		events, err := routeStore.QueryAfter(ctx, watermark, 1)
+		if err != nil {
+			return fmt.Errorf("modules: router query after: %w", err)
+		}
+		if len(events) > 0 {
+			event := events[0]
+			if err := r.deliver(ctx, routeStore, event); err != nil {
+				log.Printf("modules: router dispatch %q: %v", event.ID, err)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Second):
+				}
+				continue
+			}
+			watermark = event.ID
+			if err := routeStore.SaveRouterWatermark(ctx, watermark); err != nil {
+				return fmt.Errorf("modules: router save watermark: %w", err)
+			}
+			continue
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case event, ok := <-ch:
+		case _, ok := <-ch:
 			if !ok {
 				return nil
 			}
-			r.deliver(ctx, event)
+		case <-poll.C:
 		}
 	}
 }
 
-func (r *Router) deliver(ctx context.Context, event journal.Event) {
+func (r *Router) deliver(ctx context.Context, routeStore routingJournal, event journal.Event) error {
 	if _, loaded := r.claims.LoadOrStore(event.ID, struct{}{}); loaded {
-		return
+		return nil
 	}
 	defer r.claims.Delete(event.ID)
 
 	dctx := DispatchContext{RootID: event.ID}
+	persistedDispatch := false
 	if pending, ok := r.pending.LoadAndDelete(event.ID); ok {
 		dctx = pending.(DispatchContext)
+		persistedDispatch = true
+	} else {
+		rootID, seen, ok, err := routeStore.LoadEventDispatch(ctx, event.ID)
+		if err != nil {
+			return err
+		}
+		if ok {
+			dctx = DispatchContext{RootID: rootID, Seen: seen}
+			persistedDispatch = true
+		}
 	}
-	if err := r.dispatch(ctx, event, dctx); err != nil {
-		log.Printf("modules: router dispatch %q: %v", event.ID, err)
+
+	if err := r.dispatch(ctx, routeStore, event, dctx); err != nil {
+		return err
 	}
+
+	if persistedDispatch {
+		if err := routeStore.DeleteEventDispatch(ctx, event.ID); err != nil {
+			return fmt.Errorf("delete event dispatch %q: %w", event.ID, err)
+		}
+	}
+	return nil
 }
 
-func (r *Router) dispatch(ctx context.Context, event journal.Event, dctx DispatchContext) error {
+func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event journal.Event, dctx DispatchContext) error {
 	if dctx.RootID == "" {
 		dctx.RootID = event.ID
 	}
@@ -89,7 +159,7 @@ func (r *Router) dispatch(ctx context.Context, event journal.Event, dctx Dispatc
 				RootID: dctx.RootID,
 				Seen:   childSeen,
 			}
-			if err := r.appendDerived(ctx, out, childCtx); err != nil {
+			if err := r.appendDerived(ctx, routeStore, out, childCtx); err != nil {
 				return err
 			}
 		}
@@ -110,7 +180,7 @@ func (r *Router) dispatch(ctx context.Context, event journal.Event, dctx Dispatc
 	return nil
 }
 
-func (r *Router) appendDerived(ctx context.Context, event journal.Event, dctx DispatchContext) error {
+func (r *Router) appendDerived(ctx context.Context, routeStore routingJournal, event journal.Event, dctx DispatchContext) error {
 	if event.ID == "" {
 		event.ID = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
@@ -121,8 +191,13 @@ func (r *Router) appendDerived(ctx context.Context, event journal.Event, dctx Di
 		dctx.RootID = event.ID
 	}
 	r.pending.Store(event.ID, dctx)
+	if err := routeStore.SaveEventDispatch(ctx, event.ID, dctx.RootID, dctx.Seen); err != nil {
+		r.pending.Delete(event.ID)
+		return fmt.Errorf("save event dispatch: %w", err)
+	}
 	if err := r.journal.Append(ctx, event); err != nil {
 		r.pending.Delete(event.ID)
+		_ = routeStore.DeleteEventDispatch(ctx, event.ID)
 		return fmt.Errorf("append derived event: %w", err)
 	}
 	return nil

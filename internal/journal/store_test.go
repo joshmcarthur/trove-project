@@ -810,3 +810,109 @@ func TestPruneBefore(t *testing.T) {
 		t.Fatalf("Query() = %+v, want only new event", events)
 	}
 }
+
+func TestQueryAfter(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestStore(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	ids := []string{
+		"01JAAA0000000000000000001",
+		"01JBBB0000000000000000002",
+		"01JCCC0000000000000000003",
+	}
+	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
+	for i, id := range ids {
+		if err := store.Append(ctx, Event{
+			ID: id, Time: when.Add(time.Duration(i) * time.Minute),
+			Type: "test.after", Source: "test", Payload: json.RawMessage(`{"n":1}`),
+		}); err != nil {
+			t.Fatalf("Append(%q) error = %v", id, err)
+		}
+	}
+
+	first, err := store.QueryAfter(ctx, "", 2)
+	if err != nil {
+		t.Fatalf("QueryAfter('', 2) error = %v", err)
+	}
+	if len(first) != 2 || first[0].ID != ids[0] || first[1].ID != ids[1] {
+		t.Fatalf("QueryAfter('', 2) = %#v, want first two ids", first)
+	}
+
+	rest, err := store.QueryAfter(ctx, ids[1], 10)
+	if err != nil {
+		t.Fatalf("QueryAfter(ids[1], 10) error = %v", err)
+	}
+	if len(rest) != 1 || rest[0].ID != ids[2] {
+		t.Fatalf("QueryAfter(ids[1], 10) = %#v, want third id", rest)
+	}
+}
+
+func TestRouterWatermarkRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestStore(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	got, err := store.LoadRouterWatermark(ctx)
+	if err != nil {
+		t.Fatalf("LoadRouterWatermark() error = %v", err)
+	}
+	if got != "" {
+		t.Fatalf("LoadRouterWatermark() = %q, want empty", got)
+	}
+
+	const id = "01JWM00000000000000000001"
+	if err := store.SaveRouterWatermark(ctx, id); err != nil {
+		t.Fatalf("SaveRouterWatermark() error = %v", err)
+	}
+
+	got, err = store.LoadRouterWatermark(ctx)
+	if err != nil {
+		t.Fatalf("LoadRouterWatermark() error = %v", err)
+	}
+	if got != id {
+		t.Fatalf("LoadRouterWatermark() = %q, want %q", got, id)
+	}
+}
+
+func TestEventDispatchRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := openTestStore(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	const eventID = "01JDISP000000000000000001"
+	if err := store.SaveEventDispatch(ctx, eventID, "01JROOT000000000000000001", []string{"step-a", "step-b"}); err != nil {
+		t.Fatalf("SaveEventDispatch() error = %v", err)
+	}
+
+	rootID, seen, ok, err := store.LoadEventDispatch(ctx, eventID)
+	if err != nil {
+		t.Fatalf("LoadEventDispatch() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("LoadEventDispatch() ok = false, want true")
+	}
+	if rootID != "01JROOT000000000000000001" {
+		t.Fatalf("rootID = %q, want root id", rootID)
+	}
+	if len(seen) != 2 || seen[0] != "step-a" || seen[1] != "step-b" {
+		t.Fatalf("seen = %#v, want [step-a step-b]", seen)
+	}
+
+	if err := store.DeleteEventDispatch(ctx, eventID); err != nil {
+		t.Fatalf("DeleteEventDispatch() error = %v", err)
+	}
+	_, _, ok, err = store.LoadEventDispatch(ctx, eventID)
+	if err != nil {
+		t.Fatalf("LoadEventDispatch() after delete error = %v", err)
+	}
+	if ok {
+		t.Fatal("LoadEventDispatch() after delete ok = true, want false")
+	}
+}

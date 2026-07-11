@@ -31,6 +31,10 @@ type Journal interface {
 `Filter` supports type prefix, source, time range, and free-text match at
 minimum.
 
+Persistence and routing are separate: every accepted append is durable in
+SQLite. The event router pulls undispatched events via a stored cursor, so
+processor/sink delivery does not depend on pub/sub channel capacity.
+
 ## Why SQLite
 
 Single file, durable, queryable on a Pi without extra services. Fits the

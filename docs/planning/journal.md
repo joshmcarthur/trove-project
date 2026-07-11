@@ -35,6 +35,10 @@ type Journal interface {
   prefer pure Go for Pi cross-compile unless FTS5/vec needs CGO
 - ULID generation at append time
 - `Subscribe` applies the same filters as `Query`, including `Filter.Text` (FTS)
+- `Subscribe` uses a bounded, non-blocking channel — slow subscribers may miss
+  live notifications; the event router does not rely on pub/sub delivery and
+  instead pulls undispatched events via a durable `last_dispatched_id` cursor
+- `router_state` and `event_dispatch` tables support cursor-based routing replay
 
 ## Acceptance criteria
 
@@ -44,6 +48,7 @@ type Journal interface {
 - [x] Get by id
 - [x] Subscribe streams new events
 - [x] Optional `retention_days` prunes events older than the configured window on startup
+- [x] Router cursor (`router_state`) enables pull-based dispatch independent of pub/sub drops
 
 ## Dependencies
 
