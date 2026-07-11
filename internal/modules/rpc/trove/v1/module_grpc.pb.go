@@ -8,7 +8,6 @@ package troverpc
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -26,6 +25,8 @@ const (
 	CoreServices_SearchEvents_FullMethodName    = "/trove.v1.CoreServices/SearchEvents"
 	CoreServices_GetEventsByType_FullMethodName = "/trove.v1.CoreServices/GetEventsByType"
 	CoreServices_SummarizeRange_FullMethodName  = "/trove.v1.CoreServices/SummarizeRange"
+	CoreServices_ListMCPTools_FullMethodName    = "/trove.v1.CoreServices/ListMCPTools"
+	CoreServices_CallMCPTool_FullMethodName     = "/trove.v1.CoreServices/CallMCPTool"
 )
 
 // CoreServicesClient is the client API for CoreServices service.
@@ -42,6 +43,8 @@ type CoreServicesClient interface {
 	SearchEvents(ctx context.Context, in *SearchEventsRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
 	GetEventsByType(ctx context.Context, in *GetEventsByTypeRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
 	SummarizeRange(ctx context.Context, in *SummarizeRangeRequest, opts ...grpc.CallOption) (*Summary, error)
+	ListMCPTools(ctx context.Context, in *ListMCPToolsRequest, opts ...grpc.CallOption) (*ListMCPToolsResponse, error)
+	CallMCPTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error)
 }
 
 type coreServicesClient struct {
@@ -112,6 +115,26 @@ func (c *coreServicesClient) SummarizeRange(ctx context.Context, in *SummarizeRa
 	return out, nil
 }
 
+func (c *coreServicesClient) ListMCPTools(ctx context.Context, in *ListMCPToolsRequest, opts ...grpc.CallOption) (*ListMCPToolsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMCPToolsResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ListMCPTools_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) CallMCPTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MCPToolCallResponse)
+	err := c.cc.Invoke(ctx, CoreServices_CallMCPTool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoreServicesServer is the server API for CoreServices service.
 // All implementations must embed UnimplementedCoreServicesServer
 // for forward compatibility.
@@ -126,6 +149,8 @@ type CoreServicesServer interface {
 	SearchEvents(context.Context, *SearchEventsRequest) (*SearchEventsResponse, error)
 	GetEventsByType(context.Context, *GetEventsByTypeRequest) (*SearchEventsResponse, error)
 	SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error)
+	ListMCPTools(context.Context, *ListMCPToolsRequest) (*ListMCPToolsResponse, error)
+	CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error)
 	mustEmbedUnimplementedCoreServicesServer()
 }
 
@@ -153,6 +178,12 @@ func (UnimplementedCoreServicesServer) GetEventsByType(context.Context, *GetEven
 }
 func (UnimplementedCoreServicesServer) SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error) {
 	return nil, status.Error(codes.Unimplemented, "method SummarizeRange not implemented")
+}
+func (UnimplementedCoreServicesServer) ListMCPTools(context.Context, *ListMCPToolsRequest) (*ListMCPToolsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMCPTools not implemented")
+}
+func (UnimplementedCoreServicesServer) CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CallMCPTool not implemented")
 }
 func (UnimplementedCoreServicesServer) mustEmbedUnimplementedCoreServicesServer() {}
 func (UnimplementedCoreServicesServer) testEmbeddedByValue()                      {}
@@ -283,6 +314,42 @@ func _CoreServices_SummarizeRange_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoreServices_ListMCPTools_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMCPToolsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ListMCPTools(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ListMCPTools_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ListMCPTools(ctx, req.(*ListMCPToolsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_CallMCPTool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MCPToolCallRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).CallMCPTool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_CallMCPTool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).CallMCPTool(ctx, req.(*MCPToolCallRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoreServices_ServiceDesc is the grpc.ServiceDesc for CoreServices service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -313,6 +380,14 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SummarizeRange",
 			Handler:    _CoreServices_SummarizeRange_Handler,
+		},
+		{
+			MethodName: "ListMCPTools",
+			Handler:    _CoreServices_ListMCPTools_Handler,
+		},
+		{
+			MethodName: "CallMCPTool",
+			Handler:    _CoreServices_CallMCPTool_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -419,6 +494,112 @@ var HTTPModule_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandleHTTP",
 			Handler:    _HTTPModule_HandleHTTP_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "trove/v1/module.proto",
+}
+
+const (
+	MCPModule_CallTool_FullMethodName = "/trove.v1.MCPModule/CallTool"
+)
+
+// MCPModuleClient is the client API for MCPModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// MCPModule is implemented by modules that provide MCP tools.
+type MCPModuleClient interface {
+	CallTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error)
+}
+
+type mCPModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewMCPModuleClient(cc grpc.ClientConnInterface) MCPModuleClient {
+	return &mCPModuleClient{cc}
+}
+
+func (c *mCPModuleClient) CallTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MCPToolCallResponse)
+	err := c.cc.Invoke(ctx, MCPModule_CallTool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// MCPModuleServer is the server API for MCPModule service.
+// All implementations must embed UnimplementedMCPModuleServer
+// for forward compatibility.
+//
+// MCPModule is implemented by modules that provide MCP tools.
+type MCPModuleServer interface {
+	CallTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error)
+	mustEmbedUnimplementedMCPModuleServer()
+}
+
+// UnimplementedMCPModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedMCPModuleServer struct{}
+
+func (UnimplementedMCPModuleServer) CallTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CallTool not implemented")
+}
+func (UnimplementedMCPModuleServer) mustEmbedUnimplementedMCPModuleServer() {}
+func (UnimplementedMCPModuleServer) testEmbeddedByValue()                   {}
+
+// UnsafeMCPModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to MCPModuleServer will
+// result in compilation errors.
+type UnsafeMCPModuleServer interface {
+	mustEmbedUnimplementedMCPModuleServer()
+}
+
+func RegisterMCPModuleServer(s grpc.ServiceRegistrar, srv MCPModuleServer) {
+	// If the following call panics, it indicates UnimplementedMCPModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&MCPModule_ServiceDesc, srv)
+}
+
+func _MCPModule_CallTool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MCPToolCallRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MCPModuleServer).CallTool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MCPModule_CallTool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MCPModuleServer).CallTool(ctx, req.(*MCPToolCallRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// MCPModule_ServiceDesc is the grpc.ServiceDesc for MCPModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var MCPModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "trove.v1.MCPModule",
+	HandlerType: (*MCPModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CallTool",
+			Handler:    _MCPModule_CallTool_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

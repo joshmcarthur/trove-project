@@ -39,7 +39,7 @@ func TestStartSourceInvokesHealthcheck(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod, nil, nil, nil)
+		handle, err := StartSource(ctx, store, mod, nil, nil, NewMCPRegistry(), nil, nil, map[string]string{})
 		if err != nil && ctx.Err() == nil {
 			t.Errorf("StartSource() error = %v", err)
 		}
@@ -95,7 +95,7 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 		},
 	}
 
-	handle, err := StartSource(context.Background(), store, mod, nil, nil, nil)
+	handle, err := StartSource(context.Background(), store, mod, nil, nil, NewMCPRegistry(), nil, nil, map[string]string{})
 	if err != nil {
 		t.Fatalf("StartSource() error = %v", err)
 	}

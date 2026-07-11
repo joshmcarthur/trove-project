@@ -94,6 +94,7 @@ func (m *myModule) Run(ctx context.Context, core trovemodule.Core) error {
 Use `trovemodule.Serve` to register the module. Optional interfaces:
 
 - **HTTPHandler** — serve HTTP routes declared in the manifest
+- **MCPToolHandler** — handle MCP tools declared in `[[mcp.tools]]`
 - **EventProcessor** — `Process(event, dispatch)` for event-routing processors
 - **EventSink** — `Handle(event, dispatch)` for sinks
 - **HealthChecker** — report liveness to the parent
@@ -115,6 +116,7 @@ own config (alongside or inside `manifest.toml`), not in the core TOML.
 | Module | Location | Planning page |
 |--------|----------|---------------|
 | HTTP ingest | `modules/http-ingest/` | [http-ingest](./planning/http-ingest.md) |
+| Capture classifier | `modules/capture-classifier/` | [deferred-capture](./planning/deferred-capture.md) |
 | MCP query | `modules/mcp-query/` | [mcp-query](./planning/mcp-query.md) |
 | MQTT source | `modules/mqtt-source/` | [mqtt-source](./planning/mqtt-source.md) |
 | Home Assistant | external | [ha-source](./planning/ha-source.md) |

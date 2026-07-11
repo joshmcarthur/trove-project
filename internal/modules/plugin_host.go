@@ -14,11 +14,13 @@ import (
 )
 
 var errHTTPNotSupported = errors.New("modules: module does not support HTTP")
+var errMCPNotSupported = errors.New("modules: module does not support MCP tools")
 
 type moduleCapabilities struct {
 	hasHTTP      bool
 	hasProcessor bool
 	hasSink      bool
+	hasMCPTools  bool
 	needsSource  bool
 }
 
@@ -46,7 +48,7 @@ func (h *ModuleHandle) Close() error {
 	return nil
 }
 
-// SourceModule is the host-side client for a running source module plugin.
+// SourceModule is the host-side client for a running module plugin.
 type SourceModule interface {
 	Run(ctx context.Context) error
 	Healthcheck(ctx context.Context) (*troverpc.HealthcheckResponse, error)
@@ -57,10 +59,14 @@ type moduleClient struct {
 	processorClient troverpc.ProcessorModuleClient
 	sinkClient      troverpc.SinkModuleClient
 	httpClient      troverpc.HTTPModuleClient
+	mcpClient       troverpc.MCPModuleClient
 	broker          *plugin.GRPCBroker
 	journal         journal.Journal
 	policy          IngestPolicy
 	blobs           blob.Store
+	mcpTools        []MCPToolEntry
+	toolModules     map[string]string
+	mcpRegistry     *MCPRegistry
 	caps            moduleCapabilities
 }
 
@@ -78,10 +84,13 @@ func (c *moduleClient) Run(ctx context.Context) error {
 			querySvc = &query.Service{Journal: c.journal}
 		}
 		troverpc.RegisterCoreServicesServer(s, &coreServicesServer{
-			journal: c.journal,
-			policy:  c.policy,
-			blobs:   c.blobs,
-			query:   querySvc,
+			journal:     c.journal,
+			policy:      c.policy,
+			blobs:       c.blobs,
+			query:       querySvc,
+			mcpTools:    c.mcpTools,
+			toolModules: c.toolModules,
+			mcpRegistry: c.mcpRegistry,
 		})
 		return s
 	})
@@ -108,6 +117,13 @@ func (c *moduleClient) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest
 		return nil, errHTTPNotSupported
 	}
 	return c.httpClient.HandleHTTP(ctx, req)
+}
+
+func (c *moduleClient) CallTool(ctx context.Context, req *troverpc.MCPToolCallRequest) (*troverpc.MCPToolCallResponse, error) {
+	if !c.caps.hasMCPTools {
+		return nil, errMCPNotSupported
+	}
+	return c.mcpClient.CallTool(ctx, req)
 }
 
 func (c *moduleClient) Process(ctx context.Context, event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
@@ -145,11 +161,14 @@ func (c *moduleClient) Handle(ctx context.Context, event journal.Event, dispatch
 
 type moduleGRPCPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	journal    journal.Journal
-	policy     IngestPolicy
-	moduleName string
-	blobs      blob.Store
-	caps       moduleCapabilities
+	journal     journal.Journal
+	policy      IngestPolicy
+	moduleName  string
+	blobs       blob.Store
+	mcpTools    []MCPToolEntry
+	toolModules map[string]string
+	mcpRegistry *MCPRegistry
+	caps        moduleCapabilities
 }
 
 func (p *moduleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (any, error) {
@@ -158,10 +177,14 @@ func (p *moduleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBr
 		processorClient: troverpc.NewProcessorModuleClient(c),
 		sinkClient:      troverpc.NewSinkModuleClient(c),
 		httpClient:      troverpc.NewHTTPModuleClient(c),
+		mcpClient:       troverpc.NewMCPModuleClient(c),
 		broker:          broker,
 		journal:         p.journal,
 		policy:          p.policy,
 		blobs:           p.blobs,
+		mcpTools:        p.mcpTools,
+		toolModules:     p.toolModules,
+		mcpRegistry:     p.mcpRegistry,
 		caps:            p.caps,
 	}, nil
 }
@@ -170,14 +193,26 @@ func (p *moduleGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 	return nil
 }
 
-func hostPluginSet(j journal.Journal, policy IngestPolicy, moduleName string, blobs blob.Store, caps moduleCapabilities) map[string]plugin.Plugin {
+func hostPluginSet(
+	j journal.Journal,
+	policy IngestPolicy,
+	moduleName string,
+	blobs blob.Store,
+	caps moduleCapabilities,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+	mcpRegistry *MCPRegistry,
+) map[string]plugin.Plugin {
 	return map[string]plugin.Plugin{
 		trovemodule.PluginName: &moduleGRPCPlugin{
-			journal:    j,
-			policy:     policy,
-			moduleName: moduleName,
-			blobs:      blobs,
-			caps:       caps,
+			journal:     j,
+			policy:      policy,
+			moduleName:  moduleName,
+			blobs:       blobs,
+			mcpTools:    mcpTools,
+			toolModules: toolModules,
+			mcpRegistry: mcpRegistry,
+			caps:        caps,
 		},
 	}
 }

@@ -39,6 +39,8 @@ MCP tools map 1:1 onto these methods.
 - `summarize_range`: counts by type, notable events — avoids dumping raw rows
 - MCP streamable HTTP is served by the `mcp-query` module at `POST /mcp` on
   `[http].listen`. See [MCP client setup](../getting-started/mcp-client.md).
+- Built-in read tools are registered in-process; module tools from `[[mcp.tools]]`
+  are aggregated via `CoreServices.CallMCPTool` — see [mcp-tools](./mcp-tools.md).
 
 ## Acceptance criteria
 

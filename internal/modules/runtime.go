@@ -22,13 +22,24 @@ var healthcheckInterval = 30 * time.Second
 type SourceHandle = ModuleHandle
 
 // StartSource launches a supervised module subprocess.
-func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, httpRegistry *HTTPRegistry, eventRegistry *EventRegistry) (*SourceHandle, error) {
+func StartSource(
+	ctx context.Context,
+	j journal.Journal,
+	mod Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	eventRegistry *EventRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) (*SourceHandle, error) {
 	manifest, err := loadModuleManifest(mod)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
 	hasHTTP := len(manifest.HTTPRoutes()) > 0
+	hasMCPTools := len(manifest.MCPTools()) > 0
 	needsSource := manifest.Kind == KindSource
 	hasProcessor := manifest.Kind == KindProcessor && manifest.EventRoutes()
 	hasSink := manifest.Kind == KindSink && manifest.EventRoutes()
@@ -36,6 +47,7 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 	switch {
 	case needsSource:
 	case hasHTTP:
+	case hasMCPTools:
 	case hasProcessor:
 	case hasSink:
 	default:
@@ -56,12 +68,15 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 		hasHTTP:      hasHTTP,
 		hasProcessor: hasProcessor,
 		hasSink:      hasSink,
+		hasMCPTools:  hasMCPTools,
 		needsSource:  needsSource,
 	}
 
 	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, caps),
+		HandshakeConfig: trovemodule.Handshake,
+		Plugins: hostPluginSet(
+			j, policy, manifest.Name, blobs, caps, mcpTools, toolModules, mcpRegistry,
+		),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),
@@ -91,6 +106,9 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 	if hasHTTP && httpRegistry != nil {
 		httpRegistry.Register(manifest.Name, moduleClient)
 	}
+	if hasMCPTools && mcpRegistry != nil {
+		mcpRegistry.Register(manifest.Name, moduleClient)
+	}
 	if hasProcessor && eventRegistry != nil {
 		eventRegistry.RegisterProcessor(manifest.Name, manifest.Consumes, policy, moduleClient)
 	}
@@ -102,6 +120,9 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 		defer close(done)
 		if hasHTTP && httpRegistry != nil {
 			defer httpRegistry.Unregister(manifest.Name)
+		}
+		if hasMCPTools && mcpRegistry != nil {
+			defer mcpRegistry.Unregister(manifest.Name)
 		}
 		if hasProcessor && eventRegistry != nil {
 			defer eventRegistry.UnregisterProcessor(manifest.Name)

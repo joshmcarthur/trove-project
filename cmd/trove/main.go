@@ -72,12 +72,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	mcpTools, err := modules.CollectMCPTools(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	toolModules := modules.MCPToolModuleIndex(mcpTools)
+
 	if err := gateway.ValidateRoutes(routes, nil); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	registry := modules.NewHTTPRegistry()
+	httpRegistry := modules.NewHTTPRegistry()
+	mcpRegistry := modules.NewMCPRegistry()
 	eventRegistry := modules.NewEventRegistry()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -85,7 +93,7 @@ func main() {
 
 	modules.WarnModuleCycles(mods)
 
-	go modules.RunModules(ctx, store, mods, blobStore, registry, eventRegistry)
+	go modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
 
 	router := modules.NewRouter(store, eventRegistry)
 	go func() {
@@ -97,7 +105,7 @@ func main() {
 	gw, err := gateway.New(gateway.Config{
 		Listen:       cfg.HTTP.Listen,
 		MaxBodyBytes: cfg.HTTP.MaxBodyBytes,
-	}, routes, registry, nil)
+	}, routes, httpRegistry, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -118,6 +126,7 @@ func supervisedModuleNames(mods []modules.Module) []string {
 		manifest := mod.Manifest
 		if manifest.Kind == modules.KindSource ||
 			len(manifest.HTTPRoutes()) > 0 ||
+			len(manifest.MCPTools()) > 0 ||
 			manifest.EventRoutes() {
 			names = append(names, manifest.Name)
 		}

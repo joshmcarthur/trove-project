@@ -33,7 +33,7 @@ func TestMCPGetEvent(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -87,7 +87,7 @@ func TestMCPGetEventNotFound(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -132,7 +132,7 @@ func TestMCPSearchEvents(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -182,7 +182,7 @@ func TestMCPSearchEventsEmptyQuery(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -227,7 +227,7 @@ func TestMCPGetEventsByType(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -277,7 +277,7 @@ func TestMCPGetEventsByTypeEmptyType(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -321,7 +321,7 @@ func TestMCPSummarizeRange(t *testing.T) {
 	}
 
 	svc := &Service{Journal: store}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -376,7 +376,7 @@ func TestMCPSummarizeRangeInvalidRange(t *testing.T) {
 
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(svc)
+	handler := newMCPHandler(MCPDeps{Querier: svc})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 

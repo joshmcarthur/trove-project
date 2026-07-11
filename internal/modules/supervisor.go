@@ -16,7 +16,17 @@ const (
 )
 
 // RunModules supervises discovered modules until ctx is cancelled.
-func RunModules(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, httpRegistry *HTTPRegistry, eventRegistry *EventRegistry) {
+func RunModules(
+	ctx context.Context,
+	j journal.Journal,
+	mods []Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	eventRegistry *EventRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
 		manifest, err := loadModuleManifest(mod)
@@ -30,7 +40,7 @@ func RunModules(ctx context.Context, j journal.Journal, mods []Module, blobs blo
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseModule(ctx, j, mod, blobs, httpRegistry, eventRegistry)
+			superviseModule(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
 		}(mod)
 	}
 	wg.Wait()
@@ -39,10 +49,21 @@ func RunModules(ctx context.Context, j journal.Journal, mods []Module, blobs blo
 func shouldSupervise(manifest Manifest) bool {
 	return manifest.Kind == KindSource ||
 		len(manifest.HTTPRoutes()) > 0 ||
+		len(manifest.MCPTools()) > 0 ||
 		manifest.EventRoutes()
 }
 
-func superviseModule(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, httpRegistry *HTTPRegistry, eventRegistry *EventRegistry) {
+func superviseModule(
+	ctx context.Context,
+	j journal.Journal,
+	mod Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	eventRegistry *EventRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
 
@@ -51,7 +72,7 @@ func superviseModule(ctx context.Context, j journal.Journal, mod Module, blobs b
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, eventRegistry)
+		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
 		if handle != nil {
 			select {
 			case <-ctx.Done():
@@ -83,19 +104,28 @@ func superviseModule(ctx context.Context, j journal.Journal, mod Module, blobs b
 	}
 }
 
-// RunSources supervises source and HTTP modules until ctx is cancelled.
-func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *HTTPRegistry) {
-	RunModules(ctx, j, mods, blobs, registry, nil)
+// RunSources supervises source, HTTP, and MCP modules until ctx is cancelled.
+func RunSources(
+	ctx context.Context,
+	j journal.Journal,
+	mods []Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) {
+	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules)
 }
 
 // RunProcessors supervises event-routing processors until ctx is cancelled.
 func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
-	RunModules(ctx, j, mods, blobs, nil, registry)
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil)
 }
 
 // RunSinks supervises event-routing sinks until ctx is cancelled.
 func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
-	RunModules(ctx, j, mods, blobs, nil, registry)
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil)
 }
 
 func sleepOrDone(ctx context.Context, d time.Duration) bool {

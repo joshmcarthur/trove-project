@@ -51,6 +51,23 @@ Routing metadata (`seen` module lists, processing chain `root_id`) is passed to
 processors and sinks at dispatch time only — it is **not** stored on events in
 the journal.
 
+## Derived events
+
+When a new event supersedes or re-types an earlier capture, link them in payload
+metadata rather than mutating the original:
+
+```json
+{
+  "_trove": {
+    "derived_from": "01JXYZ..."
+  }
+}
+```
+
+The [capture-classifier](../planning/deferred-capture.md) module emits
+`classify.pending` for quick capture, then `classify.assigned` plus a typed target
+event when classified later.
+
 ## Implementation
 
 Events are persisted by the [journal](./journal.md). Type allowlists and optional
