@@ -225,7 +225,7 @@ Build in slices; each slice should be deployable and testable.
 | **G1** | `internal/gateway` mux + `[http].listen`; proxy to existing module listeners | Single URL via reverse proxy; modules unchanged |
 | **G2** | `HandleHTTP` RPC + migrate `http-ingest` off `ListenAndServe` | Drop `TROVE_BLOBS_PATH`; `BlobPut` via core services |
 | **G3** | Register MCP on gateway; deprecate `[mcp].listen` | MCP and ingest on same port |
-| **G4** | Gateway auth middleware | One auth config for all HTTP routes |
+| **G4** | Gateway auth via validator modules | `[http.auth].validator = "module.http-gateway.bearer"` |
 | **G5** | Streaming RPC (if needed) | Large uploads + MCP streaming without buffering entire body |
 
 **Recommendation:** implement **G2** as the real milestone; treat **G1** as optional
@@ -256,17 +256,20 @@ No change. `mqtt-source` keeps `Run` + `Emit`; no `[[http.routes]]`.
 
 ### Auth integration
 
-Gateway is the single TLS termination / auth checkpoint when [auth](./auth.md)
-lands:
+Gateway dispatches to auth validator modules before `HandleHTTP`:
 
 ```toml
 [http]
 listen = ":8080"
 
 [http.auth]
-# shape TBD — shared secret, Tailscale headers, or "none"
+validator = "module.http-gateway.bearer"
+
+[modules.settings.http-gateway]
+token_env = "TROVE_HTTP_TOKEN"
 ```
 
+Per-route `auth = "inherit" | "none" | "module.<name>.<id>"` on `[[http.routes]]`.
 Rejected requests never reach module `HandleHTTP`.
 
 ### Documentation updates (same PR as implementation)

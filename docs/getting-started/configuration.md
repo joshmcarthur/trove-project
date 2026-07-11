@@ -40,6 +40,13 @@ listen = "tailscale:trove"
 
 [http]
 listen = ":8080"
+
+# Optional gateway auth (requires http-gateway module in [modules].paths)
+# [http.auth]
+# validator = "module.http-gateway.bearer"
+#
+# [modules.settings.http-gateway]
+# token_env = "TROVE_HTTP_TOKEN"
 ```
 
 ## Principles

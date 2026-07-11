@@ -6,55 +6,73 @@ nav_order: 12
 
 # Network auth
 
-**Status:** Open\
+**Status:** Supported (gateway default auth via `http-gateway` module)\
 **Milestone:** Decision before wider network exposure\
 **Spec:** [Open items §13](../spec.md#13-open-items-not-yet-decided)\
-**Package:** `internal/config` + modules
+**Package:** `internal/gateway` + `modules/http-gateway`
 
 ## Goal
 
-Decide and implement an authentication model for Trove's network-facing endpoints
-before exposing them beyond localhost or a trusted tailnet.
+Authenticate Trove's network-facing HTTP endpoints before exposing them beyond
+localhost or a trusted tailnet.
+
+## Model
+
+Gateway auth uses **pluggable validator modules** referenced as
+`module.<module-name>.<validator-id>`:
+
+```toml
+[http.auth]
+validator = "module.http-gateway.bearer"
+```
+
+The gateway calls `ValidateAuth` on the auth module before dispatching
+`HandleHTTP`. Per-route overrides are declared on `[[http.routes]]`:
+
+| `auth` value | Behavior |
+|--------------|----------|
+| `inherit` (default) | Use `[http.auth].validator` |
+| `none` | Skip gateway auth; route module may verify |
+| `module.<name>.<id>` | Route-specific validator |
 
 ## Scope
 
-| Endpoint | Config | Current state |
-|----------|--------|---------------|
-| HTTP ingest | module listen address | No authentication |
-| MCP query | `[mcp].listen` | No authentication |
-| Remote modules | `[modules.remote].listen` | Not implemented |
+| Endpoint | Protection |
+|----------|------------|
+| HTTP ingest (`POST /ingest/*`) | Gateway validator when configured |
+| Blob upload (`PUT /blobs`) | Same |
+| MCP (`POST /mcp`) | Same |
+| Remote modules | Not implemented — separate Tailscale auth (Later) |
 
-v0 is suitable only for localhost or trusted network boundaries. This becomes
-especially important once [blob store](./blobs.md) exposes binary upload via
-`PUT /blobs`.
+When `[http.auth].validator` is unset, endpoints remain open (localhost dev).
 
-## Options to decide
+## First-party validator: `module.http-gateway.bearer`
 
-- **Tailscale identity** — bind via tailnet hostname; verify
-  `X-Tailscale-User` or equivalent (matches existing OpenClaw pattern)
-- **Reverse-proxy auth** — Caddy/Traefik in front; Trove stays bind-localhost
-- **Shared secret / API key** — header or Bearer token in core config; simplest
-  for LAN + Shortcuts
-- **mTLS** — heavier; likely overkill for single-user Pi
+Bearer token settings live in the `http-gateway` module:
 
-## Implementation notes
+```toml
+[modules.settings.http-gateway]
+token_env = "TROVE_HTTP_TOKEN"
+# token = "..."   # optional inline
+```
 
-- Not blocking MQTT source or live test on a trusted tailnet
-- Decide before exposing HTTP ingest or MCP beyond localhost/Tailscale
-- Auth may live in core (MCP) and/or http-ingest module depending on approach
+Clients send `Authorization: Bearer <token>`.
+
+## Layered posture (home network)
+
+1. **Network boundary** — Tailscale/VPN/localhost (primary control)
+2. **Gateway validator** — optional `module.http-gateway.bearer`
+3. **Per-route** — `auth = "none"` or integration-specific validators
+4. **Module-local** — webhook HMAC, Telegram allowlist, etc.
 
 ## Acceptance criteria
 
-- [ ] Auth model chosen and documented in config
-- [ ] HTTP ingest rejects unauthenticated requests when auth enabled
-- [ ] MCP query rejects unauthenticated requests when auth enabled
-- [ ] iOS Shortcuts / MCP client setup documented for chosen model
-
-## Dependencies
-
-- **Blocks:** safe exposure on untrusted networks
-- **Blocked by:** decision on auth model
+- [x] Auth model chosen and documented in config
+- [x] HTTP ingest rejects unauthenticated requests when auth enabled
+- [x] MCP rejects unauthenticated requests when auth enabled
+- [x] iOS Shortcuts / MCP client setup documented for chosen model
 
 ## Open questions
 
-- Tailscale-only vs shared secret vs reverse-proxy — [open-items.md](../open-items.md)
+- Tailscale identity validator (`module.http-gateway.tailscale`) — Planned
+- Reverse-proxy-only auth (no Trove validator) — document as alternative

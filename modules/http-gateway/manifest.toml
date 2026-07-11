@@ -1,0 +1,7 @@
+name = "http-gateway"
+version = "0.1.0"
+kind = "processor"
+
+[[auth.validators]]
+id = "bearer"
+description = "Shared-secret Bearer token"

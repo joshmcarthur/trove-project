@@ -23,6 +23,7 @@ type HTTPRoute struct {
 	Method       string `toml:"method"`
 	Path         string `toml:"path"`
 	MaxBodyBytes int64  `toml:"max_body_bytes"`
+	Auth         string `toml:"auth"`
 }
 
 type manifestHTTP struct {
@@ -31,6 +32,16 @@ type manifestHTTP struct {
 
 type manifestMCP struct {
 	Tools []MCPTool `toml:"tools"`
+}
+
+type manifestAuth struct {
+	Validators []AuthValidatorDecl `toml:"validators"`
+}
+
+// AuthValidatorDecl declares an auth validator provided by a module.
+type AuthValidatorDecl struct {
+	ID          string `toml:"id"`
+	Description string `toml:"description"`
 }
 
 // MCPTool declares an MCP tool provided by a module.
@@ -49,6 +60,7 @@ type Manifest struct {
 	Schemas  map[string]string `toml:"schemas"`
 	HTTP     manifestHTTP      `toml:"http"`
 	MCP      manifestMCP       `toml:"mcp"`
+	Auth     manifestAuth      `toml:"auth"`
 	Listen   string            `toml:"listen"`
 }
 
@@ -65,6 +77,11 @@ func (m Manifest) HTTPRoutes() []HTTPRoute {
 // MCPTools returns declared MCP tools from the manifest.
 func (m Manifest) MCPTools() []MCPTool {
 	return m.MCP.Tools
+}
+
+// AuthValidators returns declared auth validators from the manifest.
+func (m Manifest) AuthValidators() []AuthValidatorDecl {
+	return m.Auth.Validators
 }
 
 // ParseManifest parses and validates manifest TOML from data.
@@ -137,6 +154,12 @@ func validateManifest(m Manifest) error {
 		}
 	}
 
+	for i, validator := range m.Auth.Validators {
+		if err := validateAuthValidator(validator); err != nil {
+			return fmt.Errorf("modules: manifest: auth.validators[%d]: %w", i, err)
+		}
+	}
+
 	for i, tool := range m.MCP.Tools {
 		if err := validateMCPTool(tool); err != nil {
 			return fmt.Errorf("modules: manifest: mcp.tools[%d]: %w", i, err)
@@ -166,6 +189,18 @@ func validateHTTPRoute(route HTTPRoute) error {
 	if !strings.HasPrefix(route.Path, "/") {
 		return fmt.Errorf("path must start with /")
 	}
+	if route.Auth != "" && route.Auth != AuthInherit && route.Auth != AuthNone {
+		if _, _, err := ParseAuthValidatorRef(route.Auth); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateAuthValidator(validator AuthValidatorDecl) error {
+	if strings.TrimSpace(validator.ID) == "" {
+		return fmt.Errorf("id is required")
+	}
 	return nil
 }
 
@@ -174,6 +209,7 @@ func validateKindPatterns(m Manifest) error {
 	hasProvides := len(m.Provides) > 0
 	hasHTTP := len(m.HTTP.Routes) > 0
 	hasMCPTools := len(m.MCP.Tools) > 0
+	hasAuth := len(m.Auth.Validators) > 0
 
 	switch m.Kind {
 	case KindSource:
@@ -191,12 +227,12 @@ func validateKindPatterns(m Manifest) error {
 		switch {
 		case hasConsumes:
 			// event-routing processor
-		case hasHTTP, hasMCPTools:
+		case hasHTTP, hasMCPTools, hasAuth:
 			if hasProvides {
-				return fmt.Errorf("modules: manifest: provides is not allowed for HTTP/MCP-only processor modules")
+				return fmt.Errorf("modules: manifest: provides is not allowed for HTTP/MCP/auth-only processor modules")
 			}
 		default:
-			return fmt.Errorf("modules: manifest: processor %q must declare consumes, http.routes, and/or mcp.tools", m.Name)
+			return fmt.Errorf("modules: manifest: processor %q must declare consumes, http.routes, auth.validators, and/or mcp.tools", m.Name)
 		}
 	}
 	return nil
@@ -284,4 +320,54 @@ func MCPToolModuleIndex(entries []MCPToolEntry) map[string]string {
 		index[entry.Tool.Name] = entry.Module
 	}
 	return index
+}
+
+// CollectAuthValidatorRefs gathers declared auth validator refs from discovered modules.
+func CollectAuthValidatorRefs(mods []Module) (map[string]struct{}, error) {
+	refs := make(map[string]struct{})
+	for _, mod := range mods {
+		manifest, err := loadModuleManifest(mod)
+		if err != nil {
+			return nil, err
+		}
+		for _, validator := range manifest.AuthValidators() {
+			ref := AuthValidatorRef(manifest.Name, validator.ID)
+			if _, exists := refs[ref]; exists {
+				return nil, fmt.Errorf("modules: duplicate auth validator %q", ref)
+			}
+			refs[ref] = struct{}{}
+		}
+	}
+	return refs, nil
+}
+
+// ValidateAuthConfig ensures configured validator refs are declared by discovered modules.
+func ValidateAuthConfig(defaultValidator string, routes []HTTPRouteEntry, declared map[string]struct{}) error {
+	validateRef := func(ref string) error {
+		if ref == "" {
+			return nil
+		}
+		if _, _, err := ParseAuthValidatorRef(ref); err != nil {
+			return err
+		}
+		if _, ok := declared[ref]; !ok {
+			return fmt.Errorf("modules: auth validator %q is not declared by any discovered module", ref)
+		}
+		return nil
+	}
+
+	if err := validateRef(defaultValidator); err != nil {
+		return fmt.Errorf("config: http.auth.validator: %w", err)
+	}
+
+	for _, route := range routes {
+		auth := NormalizeRouteAuth(route.Route.Auth)
+		if auth == AuthInherit || auth == AuthNone {
+			continue
+		}
+		if err := validateRef(auth); err != nil {
+			return fmt.Errorf("modules: http route %s %s auth: %w", route.Route.Method, route.Route.Path, err)
+		}
+	}
+	return nil
 }

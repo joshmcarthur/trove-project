@@ -15,9 +15,11 @@ import (
 
 var errHTTPNotSupported = errors.New("modules: module does not support HTTP")
 var errMCPNotSupported = errors.New("modules: module does not support MCP tools")
+var errAuthNotSupported = errors.New("modules: module does not support auth")
 
 type moduleCapabilities struct {
 	hasHTTP      bool
+	hasAuth      bool
 	hasProcessor bool
 	hasSink      bool
 	hasMCPTools  bool
@@ -59,6 +61,7 @@ type moduleClient struct {
 	processorClient troverpc.ProcessorModuleClient
 	sinkClient      troverpc.SinkModuleClient
 	httpClient      troverpc.HTTPModuleClient
+	authClient      troverpc.AuthModuleClient
 	mcpClient       troverpc.MCPModuleClient
 	broker          *plugin.GRPCBroker
 	journal         journal.Journal
@@ -71,7 +74,7 @@ type moduleClient struct {
 }
 
 func (c *moduleClient) Run(ctx context.Context) error {
-	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools
+	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools || c.caps.hasAuth
 	if !needsPluginRun {
 		<-ctx.Done()
 		return ctx.Err()
@@ -118,6 +121,13 @@ func (c *moduleClient) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest
 		return nil, errHTTPNotSupported
 	}
 	return c.httpClient.HandleHTTP(ctx, req)
+}
+
+func (c *moduleClient) ValidateAuth(ctx context.Context, req *troverpc.AuthRequest) (*troverpc.AuthResponse, error) {
+	if !c.caps.hasAuth {
+		return nil, errAuthNotSupported
+	}
+	return c.authClient.ValidateAuth(ctx, req)
 }
 
 func (c *moduleClient) CallTool(ctx context.Context, req *troverpc.MCPToolCallRequest) (*troverpc.MCPToolCallResponse, error) {
@@ -178,6 +188,7 @@ func (p *moduleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBr
 		processorClient: troverpc.NewProcessorModuleClient(c),
 		sinkClient:      troverpc.NewSinkModuleClient(c),
 		httpClient:      troverpc.NewHTTPModuleClient(c),
+		authClient:      troverpc.NewAuthModuleClient(c),
 		mcpClient:       troverpc.NewMCPModuleClient(c),
 		broker:          broker,
 		journal:         p.journal,

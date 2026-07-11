@@ -69,8 +69,12 @@ Tool arguments use RFC3339 timestamps where a time range is accepted.
 
 ## Network and auth
 
-v0 MCP has **no authentication** — see [open items](../open-items.md). Common
-setups:
+By default MCP has **no authentication**. When `[http.auth].validator` is set
+(e.g. `module.http-gateway.bearer`), configure your MCP client to send
+`Authorization: Bearer <token>` on requests to `/mcp`. See
+[network auth planning](../planning/auth.md).
+
+Common setups:
 
 - **Local development** — `http://127.0.0.1:8080/mcp` while `trove` runs on the same
   machine as Cursor.

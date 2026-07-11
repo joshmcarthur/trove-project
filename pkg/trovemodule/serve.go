@@ -10,7 +10,7 @@ import (
 )
 
 // Serve starts a Trove module plugin subprocess. mod must implement Module and
-// may also implement HTTPHandler, MCPToolHandler, EventProcessor, EventSink,
+// may also implement HTTPHandler, AuthHandler, MCPToolHandler, EventProcessor, EventSink,
 // and HealthChecker.
 func Serve(mod Module) {
 	plugin.Serve(&plugin.ServeConfig{
@@ -38,6 +38,9 @@ func (p *sourceGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 	})
 	if _, ok := p.mod.(HTTPHandler); ok {
 		troverpc.RegisterHTTPModuleServer(s, &httpModuleServer{mod: p.mod})
+	}
+	if _, ok := p.mod.(AuthHandler); ok {
+		troverpc.RegisterAuthModuleServer(s, &authModuleServer{mod: p.mod})
 	}
 	if _, ok := p.mod.(MCPToolHandler); ok {
 		troverpc.RegisterMCPModuleServer(s, &mcpModuleServer{mod: p.mod})
@@ -90,6 +93,19 @@ func (s *httpModuleServer) HandleHTTP(ctx context.Context, req *troverpc.HTTPReq
 		return nil, fmt.Errorf("trovemodule: module does not implement HTTPHandler")
 	}
 	return h.HandleHTTP(ctx, req)
+}
+
+type authModuleServer struct {
+	troverpc.UnimplementedAuthModuleServer
+	mod Module
+}
+
+func (s *authModuleServer) ValidateAuth(ctx context.Context, req *troverpc.AuthRequest) (*troverpc.AuthResponse, error) {
+	h, ok := s.mod.(AuthHandler)
+	if !ok {
+		return nil, fmt.Errorf("trovemodule: module does not implement AuthHandler")
+	}
+	return h.ValidateAuth(ctx, req)
 }
 
 type mcpModuleServer struct {

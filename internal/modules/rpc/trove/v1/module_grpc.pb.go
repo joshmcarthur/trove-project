@@ -501,6 +501,112 @@ var HTTPModule_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	AuthModule_ValidateAuth_FullMethodName = "/trove.v1.AuthModule/ValidateAuth"
+)
+
+// AuthModuleClient is the client API for AuthModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AuthModule is implemented by modules that validate gateway requests.
+type AuthModuleClient interface {
+	ValidateAuth(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+}
+
+type authModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAuthModuleClient(cc grpc.ClientConnInterface) AuthModuleClient {
+	return &authModuleClient{cc}
+}
+
+func (c *authModuleClient) ValidateAuth(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, AuthModule_ValidateAuth_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AuthModuleServer is the server API for AuthModule service.
+// All implementations must embed UnimplementedAuthModuleServer
+// for forward compatibility.
+//
+// AuthModule is implemented by modules that validate gateway requests.
+type AuthModuleServer interface {
+	ValidateAuth(context.Context, *AuthRequest) (*AuthResponse, error)
+	mustEmbedUnimplementedAuthModuleServer()
+}
+
+// UnimplementedAuthModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAuthModuleServer struct{}
+
+func (UnimplementedAuthModuleServer) ValidateAuth(context.Context, *AuthRequest) (*AuthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidateAuth not implemented")
+}
+func (UnimplementedAuthModuleServer) mustEmbedUnimplementedAuthModuleServer() {}
+func (UnimplementedAuthModuleServer) testEmbeddedByValue()                    {}
+
+// UnsafeAuthModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AuthModuleServer will
+// result in compilation errors.
+type UnsafeAuthModuleServer interface {
+	mustEmbedUnimplementedAuthModuleServer()
+}
+
+func RegisterAuthModuleServer(s grpc.ServiceRegistrar, srv AuthModuleServer) {
+	// If the following call panics, it indicates UnimplementedAuthModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AuthModule_ServiceDesc, srv)
+}
+
+func _AuthModule_ValidateAuth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthModuleServer).ValidateAuth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthModule_ValidateAuth_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthModuleServer).ValidateAuth(ctx, req.(*AuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AuthModule_ServiceDesc is the grpc.ServiceDesc for AuthModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AuthModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "trove.v1.AuthModule",
+	HandlerType: (*AuthModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ValidateAuth",
+			Handler:    _AuthModule_ValidateAuth_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "trove/v1/module.proto",
+}
+
+const (
 	MCPModule_CallTool_FullMethodName = "/trove.v1.MCPModule/CallTool"
 )
 
