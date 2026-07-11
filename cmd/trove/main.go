@@ -100,10 +100,10 @@ func main() {
 
 	modules.WarnModuleCycles(mods)
 
-	go modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
-
 	router := modules.NewRouter(store, eventRegistry)
+	routerDone := make(chan struct{})
 	go func() {
+		defer close(routerDone)
 		if err := router.Run(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("trove: event router: %v", err)
 		}
@@ -118,13 +118,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	gatewayDone := make(chan struct{})
 	go func() {
+		defer close(gatewayDone)
 		if err := gw.Serve(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("trove: http gateway: %v", err)
 		}
 	}()
 
+	modulesDone := make(chan struct{})
+	go func() {
+		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
+		close(modulesDone)
+	}()
+
 	<-ctx.Done()
+	log.Printf("trove: shutting down")
+
+	<-gatewayDone
+	<-routerDone
+	<-modulesDone
 }
 
 func supervisedModuleNames(mods []modules.Module) []string {

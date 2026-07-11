@@ -156,5 +156,8 @@ func TestCLI(t *testing.T) {
 		if !strings.Contains(stderr, "http gateway listening on :8080") {
 			t.Errorf("stderr = %q, want substring %q", stderr, "http gateway listening on :8080")
 		}
+		if !strings.Contains(stderr, "shutting down") {
+			t.Errorf("stderr = %q, want substring %q", stderr, "shutting down")
+		}
 	})
 }
