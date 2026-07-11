@@ -96,6 +96,7 @@ event `source` field.
 
 ## Next steps
 
+- [Two-week live test](./live-test.md) — milestone 4 runbook and validation checklist
 - [MCP client setup](./mcp-client.md) — connect Cursor to query your journal
 - [iOS Shortcuts](./ios-shortcuts.md) — importable Shortcuts and capture recipes
 - [Roadmap](../roadmap.md) — what to build and in what order
