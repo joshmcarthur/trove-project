@@ -21,12 +21,17 @@ nav_order: 10
 
 ## Commands
 
+`make build` compiles the host binary to `bin/trove` and every first-party module
+to `modules/<name>/module`. Point `[modules].paths` at the parent `modules/`
+directory (or an install tree with the same layout) so discovery finds each
+`manifest.toml` next to its `module` binary.
+
 | Command | Purpose |
 |---------|---------|
 | `make fmt` | `go fmt` + goimports |
 | `make lint` | golangci-lint |
 | `make test` | `go test -race -cover ./...` |
-| `make build` | `bin/trove` |
+| `make build` | `bin/trove` and all first-party module binaries (`modules/*/module`) |
 | `make check` | fmt + lint + test |
 | `make docs` | build Lume site |
 | `make docs-serve` | serve docs locally |
