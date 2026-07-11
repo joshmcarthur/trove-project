@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -319,6 +320,7 @@ func (s *Store) notify(e Event) {
 		select {
 		case sub.ch <- e:
 		default:
+			log.Printf("journal: dropped event id=%s type=%s for slow subscriber", e.ID, e.Type)
 		}
 	}
 }
