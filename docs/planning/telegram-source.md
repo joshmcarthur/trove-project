@@ -60,7 +60,9 @@ Registered via `[[bot.commands]]` with `fast_path = true`:
 
 ## Config (`manifest.toml`)
 
-Module-specific keys (core ignores them):
+Module-specific keys (core ignores them). Settings may also be supplied via
+`[modules.settings.telegram-source]` or `[modules.config]` in `trove.toml` — see
+[Configuration](../getting-started/configuration.md#module-settings-overlays).
 
 ```toml
 name     = "telegram-source"

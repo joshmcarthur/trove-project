@@ -84,6 +84,34 @@ func TestConfigAllowedChat(t *testing.T) {
 	}
 }
 
+func TestLoadConfigFromDirAppliesSettingsOverlay(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `
+bot_token = "test-token"
+allowed_chat_ids = [1]
+
+[[bot.types]]
+label = "Quick note"
+target_type = "note.quick"
+`
+	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o600); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	overlayPath := filepath.Join(dir, "overlay.toml")
+	if err := os.WriteFile(overlayPath, []byte("allowed_chat_ids = [99]\n"), 0o600); err != nil {
+		t.Fatalf("write overlay: %v", err)
+	}
+	t.Setenv("TROVE_MODULE_SETTINGS", overlayPath)
+
+	cfg, err := loadConfigFromDir(dir)
+	if err != nil {
+		t.Fatalf("loadConfigFromDir() error = %v", err)
+	}
+	if len(cfg.AllowedChatIDs) != 1 || cfg.AllowedChatIDs[0] != 99 {
+		t.Fatalf("AllowedChatIDs = %#v, want [99]", cfg.AllowedChatIDs)
+	}
+}
+
 func TestFieldsForTarget(t *testing.T) {
 	t.Parallel()
 

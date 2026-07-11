@@ -418,12 +418,10 @@ func (s *botService) buildDraft(ctx context.Context, b *bot.Bot, msg *models.Mes
 	)
 
 	switch {
-	case msg.Photo != nil && len(msg.Photo) > 0:
+	case len(msg.Photo) > 0:
 		kind = "photo"
 		fileID = largestPhotoFileID(msg)
-		if len(msg.Photo) > 0 {
-			file = fileMetaFromPhoto(fileID, int64(msg.Photo[len(msg.Photo)-1].FileSize))
-		}
+		file = fileMetaFromPhoto(fileID, int64(msg.Photo[len(msg.Photo)-1].FileSize))
 	case msg.Document != nil:
 		kind = "document"
 		fileID = msg.Document.FileID

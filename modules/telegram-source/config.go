@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
 type fieldConfig struct {
@@ -39,6 +39,21 @@ type config struct {
 	Commands       []commandConfig `toml:"commands"`
 }
 
+type configRaw struct {
+	BotToken       string  `toml:"bot_token"`
+	BotTokenEnv    string  `toml:"bot_token_env"`
+	AllowedChatIDs []int64 `toml:"allowed_chat_ids"`
+	PollTimeoutSec int     `toml:"poll_timeout_sec"`
+	MaxFileBytes   int64   `toml:"max_file_bytes"`
+	SessionTTLMin  int     `toml:"session_ttl_min"`
+	Bot            struct {
+		Types    []typeOption    `toml:"types"`
+		Commands []commandConfig `toml:"commands"`
+	} `toml:"bot"`
+	Types    []typeOption    `toml:"types"`
+	Commands []commandConfig `toml:"commands"`
+}
+
 func loadConfig() (config, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -48,28 +63,9 @@ func loadConfig() (config, error) {
 }
 
 func loadConfigFromDir(dir string) (config, error) {
-	manifestPath := filepath.Join(dir, "manifest.toml")
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return config{}, fmt.Errorf("telegram-source: read manifest: %w", err)
-	}
-
-	var raw struct {
-		BotToken       string  `toml:"bot_token"`
-		BotTokenEnv    string  `toml:"bot_token_env"`
-		AllowedChatIDs []int64 `toml:"allowed_chat_ids"`
-		PollTimeoutSec int     `toml:"poll_timeout_sec"`
-		MaxFileBytes   int64   `toml:"max_file_bytes"`
-		SessionTTLMin  int     `toml:"session_ttl_min"`
-		Bot            struct {
-			Types    []typeOption    `toml:"types"`
-			Commands []commandConfig `toml:"commands"`
-		} `toml:"bot"`
-		Types    []typeOption    `toml:"types"`
-		Commands []commandConfig `toml:"commands"`
-	}
-	if _, err := toml.Decode(string(data), &raw); err != nil {
-		return config{}, fmt.Errorf("telegram-source: parse manifest: %w", err)
+	var raw configRaw
+	if err := trovemodule.LoadModuleConfig(dir, &raw); err != nil {
+		return config{}, fmt.Errorf("telegram-source: %w", err)
 	}
 
 	types := raw.Types

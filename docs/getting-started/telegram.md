@@ -30,7 +30,10 @@ direct messages.
 
 ## 3. Configure the module
 
-Edit `modules/telegram-source/manifest.toml`:
+You can configure in the module manifest or override from `trove.toml` (see
+[Configuration](./configuration.md#module-settings-overlays)).
+
+**Module manifest** — edit `modules/telegram-source/manifest.toml`:
 
 ```toml
 bot_token_env    = "TELEGRAM_BOT_TOKEN"
@@ -52,6 +55,17 @@ export TELEGRAM_BOT_TOKEN="123456:ABC…"
 ```
 
 Or set `bot_token` directly in the manifest (do not commit secrets).
+
+**`trove.toml` overlay** (optional) — keep secrets and chat IDs out of the repo:
+
+```toml
+[modules.settings.telegram-source]
+allowed_chat_ids = [123456789]
+bot_token_env    = "TELEGRAM_BOT_TOKEN"
+
+[modules.config]
+telegram-source = "/etc/trove/telegram.toml"
+```
 
 ## 4. Build and start
 
