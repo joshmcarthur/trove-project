@@ -29,10 +29,6 @@ func (f RunFunc) Run(ctx context.Context, core Core) error {
 	return f(ctx, core)
 }
 
-type coreClient struct {
-	client troverpc.CoreServicesClient
-}
-
 func connectCore(broker *plugin.GRPCBroker, handle uint32) (Core, error) {
 	if handle == 0 {
 		return nil, errCoreUnavailable
