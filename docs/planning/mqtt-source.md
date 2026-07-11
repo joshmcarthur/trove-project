@@ -34,8 +34,8 @@ becomes `mqtt.home.sensor.temp.received`.
 
 - [x] Subscribes to configured topics
 - [x] Each message appends one journal event
-- [ ] Survives broker disconnect/reconnect
-- [ ] Healthcheck reports subscription status
+- [x] Survives broker disconnect/reconnect
+- [x] Healthcheck reports subscription status
 
 ## Dependencies
 

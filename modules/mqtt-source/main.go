@@ -10,6 +10,7 @@ import (
 
 type mqttSourceModule struct {
 	ready atomic.Bool
+	state *subscriptionState
 }
 
 func (m *mqttSourceModule) Run(ctx context.Context, core trovemodule.Core) error {
@@ -17,16 +18,18 @@ func (m *mqttSourceModule) Run(ctx context.Context, core trovemodule.Core) error
 	if err != nil {
 		return err
 	}
+	m.state = newSubscriptionState(cfg.Topics)
 	m.ready.Store(true)
 	defer m.ready.Store(false)
-	return runMQTT(ctx, core, cfg)
+	return runMQTT(ctx, core, cfg, m.state)
 }
 
 func (m *mqttSourceModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {
-	if m.ready.Load() {
-		return &troverpc.HealthcheckResponse{Ok: true, Message: "mqtt client running"}, nil
+	if !m.ready.Load() || m.state == nil {
+		return &troverpc.HealthcheckResponse{Ok: false, Message: "mqtt client not running"}, nil
 	}
-	return &troverpc.HealthcheckResponse{Ok: false, Message: "mqtt client not running"}, nil
+	ok, message := m.state.healthMessage()
+	return &troverpc.HealthcheckResponse{Ok: ok, Message: message}, nil
 }
 
 func main() {
