@@ -37,15 +37,19 @@ See [spec §3](../spec.md#3-core-concepts) for the canonical definition.
 ## Type naming
 
 Use namespaced strings: `<source-family>.<subject>.<verb>`. There is **no central
-schema registry** — modules declare allowed types in `provides` (exact strings or
-glob patterns such as `note.*`). Optional JSON Schema files in the module manifest
-validate payloads when declared. If a shape changes, use naming discipline (e.g.
-`.v2` suffixes) rather than in-place mutation.
+schema registry** — modules declare allowed types in `provides` and subscriptions
+in `consumes` (exact strings or glob patterns such as `note.*`). Optional JSON
+Schema files in the module manifest validate payloads when declared. If a shape
+changes, use naming discipline (e.g. `.v2` suffixes) rather than in-place mutation.
 
 ## Immutability
 
 Events are never updated. Corrections and follow-ups are new events. The journal
 is append-only.
+
+Routing metadata (`seen` module lists, processing chain `root_id`) is passed to
+processors and sinks at dispatch time only — it is **not** stored on events in
+the journal.
 
 ## Derived events
 

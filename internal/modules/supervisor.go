@@ -15,14 +15,15 @@ const (
 	maxBackoff     = 30 * time.Second
 )
 
-// RunSources supervises source and HTTP modules until ctx is cancelled.
-func RunSources(
+// RunModules supervises discovered modules until ctx is cancelled.
+func RunModules(
 	ctx context.Context,
 	j journal.Journal,
 	mods []Module,
 	blobs blob.Store,
 	httpRegistry *HTTPRegistry,
 	mcpRegistry *MCPRegistry,
+	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 ) {
@@ -33,25 +34,33 @@ func RunSources(
 			log.Printf("modules: load manifest %q: %v", mod.Manifest.Name, err)
 			continue
 		}
-		if manifest.Kind != KindSource && len(manifest.HTTPRoutes()) == 0 && len(manifest.MCPTools()) == 0 {
+		if !shouldSupervise(manifest) {
 			continue
 		}
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, mcpTools, toolModules)
+			superviseModule(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
 		}(mod)
 	}
 	wg.Wait()
 }
 
-func superviseSource(
+func shouldSupervise(manifest Manifest) bool {
+	return manifest.Kind == KindSource ||
+		len(manifest.HTTPRoutes()) > 0 ||
+		len(manifest.MCPTools()) > 0 ||
+		manifest.EventRoutes()
+}
+
+func superviseModule(
 	ctx context.Context,
 	j journal.Journal,
 	mod Module,
 	blobs blob.Store,
 	httpRegistry *HTTPRegistry,
 	mcpRegistry *MCPRegistry,
+	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 ) {
@@ -63,7 +72,7 @@ func superviseSource(
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, mcpTools, toolModules)
+		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
 		if handle != nil {
 			select {
 			case <-ctx.Done():
@@ -73,7 +82,7 @@ func superviseSource(
 				_ = handle.Close()
 			}
 		} else if err != nil && ctx.Err() == nil {
-			log.Printf("modules: source %q start failed: %v; restarting in %s", name, err, backoff)
+			log.Printf("modules: module %q start failed: %v; restarting in %s", name, err, backoff)
 		}
 
 		if ctx.Err() != nil {
@@ -81,7 +90,7 @@ func superviseSource(
 		}
 
 		if err == nil {
-			log.Printf("modules: source %q exited; restarting in %s", name, backoff)
+			log.Printf("modules: module %q exited; restarting in %s", name, backoff)
 		}
 
 		if !sleepOrDone(ctx, backoff) {
@@ -93,6 +102,30 @@ func superviseSource(
 			backoff = maxBackoff
 		}
 	}
+}
+
+// RunSources supervises source, HTTP, and MCP modules until ctx is cancelled.
+func RunSources(
+	ctx context.Context,
+	j journal.Journal,
+	mods []Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) {
+	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules)
+}
+
+// RunProcessors supervises event-routing processors until ctx is cancelled.
+func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil)
+}
+
+// RunSinks supervises event-routing sinks until ctx is cancelled.
+func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil)
 }
 
 func sleepOrDone(ctx context.Context, d time.Duration) bool {

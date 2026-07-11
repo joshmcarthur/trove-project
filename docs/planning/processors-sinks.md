@@ -6,35 +6,62 @@ nav_order: 11
 
 # Processors and sinks
 
-**Status:** Later\
+**Status:** Supported\
 **Milestone:** After two-week live test\
 **Spec:** [Processors and sinks §7](../spec.md#7-processors-and-sinks)\
-**Package:** external modules
+**Package:** `internal/modules`, external modules
 
 ## Goal
 
-Optional derived-event processors and side-effect sinks — only when a concrete
-workflow needs them (e.g. thermal printer for trip summaries).
+Derived-event processors and side-effect sinks for journal event workflows
+(e.g. embeddings, notifications, printers).
 
 ## Interfaces
 
 ```
-Processor : core calls Process(event) -> []event synchronously
-Sink      : core calls Handle(event) -> ack
+Processor : core calls Process(event, DispatchContext) -> []event synchronously
+Sink      : core calls Handle(event, DispatchContext) -> ack
 ```
+
+## Manifest
+
+Event-routing modules declare subscriptions and emissions:
+
+```toml
+kind     = "processor"
+consumes = ["note.*"]
+provides = ["note.embedding.generated"]
+```
+
+See [modules concept](../concepts/modules.md) for per-kind rules. HTTP-only
+processors (for example `mcp-query`) use `[[http.routes]]` instead of `consumes`.
+
+## Event routing
+
+1. Source or processor emits an event → journal append
+2. Router matches `consumes` patterns
+3. Core calls `Process` / `Handle` with `DispatchContext{root_id, seen}`
+4. Processor-derived events are validated against `provides` and appended
+5. If a module name is already in `seen`, the event is skipped (loop prevention)
+
+Startup logs a warning when manifest declarations suggest a cyclic graph;
+runtime `seen` tracking is the safety net.
 
 ## Implementation notes
 
-- Processors may emit new events (e.g. embeddings) — treat AI output as one-shot
-  facts unless model/version snapshotted
-- Sinks: notifications, printers — out of scope until needed
-- Both use same module manifest `kind` field
+- Processors may emit derived events — treat AI output as one-shot facts unless
+  model/version snapshotted
+- Sinks: notifications, printers — add when a workflow demands them
+- Event-routing modules use the same go-plugin supervision as sources
+- HTTP-only processors remain on the gateway path and do not use the router
 
 ## Acceptance criteria
 
-- [ ] Processor module receives events and can emit derived events
-- [ ] Sink module receives events and acknowledges
-- [ ] Processor crash isolated like sources
+- [x] Processor module receives events and can emit derived events
+- [x] Sink module receives events and acknowledges
+- [x] Processor crash isolated like sources
+- [x] Manifest `consumes` / `provides` validation
+- [x] Loop prevention via `DispatchContext.seen`
 
 ## Dependencies
 

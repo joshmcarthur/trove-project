@@ -86,11 +86,21 @@ func main() {
 
 	httpRegistry := modules.NewHTTPRegistry()
 	mcpRegistry := modules.NewMCPRegistry()
+	eventRegistry := modules.NewEventRegistry()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go modules.RunSources(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, mcpTools, toolModules)
+	modules.WarnModuleCycles(mods)
+
+	go modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
+
+	router := modules.NewRouter(store, eventRegistry)
+	go func() {
+		if err := router.Run(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("trove: event router: %v", err)
+		}
+	}()
 
 	gw, err := gateway.New(gateway.Config{
 		Listen:       cfg.HTTP.Listen,
@@ -113,8 +123,12 @@ func main() {
 func supervisedModuleNames(mods []modules.Module) []string {
 	names := make([]string, 0, len(mods))
 	for _, mod := range mods {
-		if mod.Manifest.Kind == modules.KindSource || len(mod.Manifest.HTTPRoutes()) > 0 || len(mod.Manifest.MCPTools()) > 0 {
-			names = append(names, mod.Manifest.Name)
+		manifest := mod.Manifest
+		if manifest.Kind == modules.KindSource ||
+			len(manifest.HTTPRoutes()) > 0 ||
+			len(manifest.MCPTools()) > 0 ||
+			manifest.EventRoutes() {
+			names = append(names, manifest.Name)
 		}
 	}
 	return names

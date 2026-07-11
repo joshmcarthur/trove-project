@@ -50,3 +50,19 @@ func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
 		BlobRef: blobRef,
 	}, nil
 }
+
+func journalEventToRPC(e journal.Event) *troverpc.Event {
+	out := &troverpc.Event{
+		Id:      e.ID,
+		Type:    e.Type,
+		Source:  e.Source,
+		Payload: e.Payload,
+	}
+	if !e.Time.IsZero() {
+		out.Time = e.Time.UTC().Format(time.RFC3339)
+	}
+	if e.BlobRef != nil {
+		out.BlobRef = *e.BlobRef
+	}
+	return out
+}

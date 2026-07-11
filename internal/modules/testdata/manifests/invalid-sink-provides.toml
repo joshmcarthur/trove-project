@@ -1,0 +1,5 @@
+name     = "bad-sink"
+version  = "1.0"
+kind     = "sink"
+consumes = ["note.*"]
+provides = ["note.forwarded"]

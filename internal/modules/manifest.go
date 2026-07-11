@@ -45,10 +45,16 @@ type Manifest struct {
 	Version  string            `toml:"version"`
 	Kind     Kind              `toml:"kind"`
 	Provides []string          `toml:"provides"`
+	Consumes []string          `toml:"consumes"`
 	Schemas  map[string]string `toml:"schemas"`
 	HTTP     manifestHTTP      `toml:"http"`
 	MCP      manifestMCP       `toml:"mcp"`
 	Listen   string            `toml:"listen"`
+}
+
+// EventRoutes reports whether the module participates in journal event routing.
+func (m Manifest) EventRoutes() bool {
+	return len(m.Consumes) > 0
 }
 
 // HTTPRoutes returns declared HTTP routes from the manifest.
@@ -107,9 +113,17 @@ func validateManifest(m Manifest) error {
 	}
 
 	for _, pattern := range m.Provides {
-		if err := validateProvidesPattern(pattern); err != nil {
+		if err := validateTypePattern(pattern); err != nil {
 			return err
 		}
+	}
+	for _, pattern := range m.Consumes {
+		if err := validateTypePattern(pattern); err != nil {
+			return fmt.Errorf("modules: manifest: consumes: %w", err)
+		}
+	}
+	if err := validateKindPatterns(m); err != nil {
+		return err
 	}
 	for pattern := range m.Schemas {
 		if err := validateProvidesPattern(pattern); err != nil {
@@ -155,7 +169,40 @@ func validateHTTPRoute(route HTTPRoute) error {
 	return nil
 }
 
-func validateProvidesPattern(pattern string) error {
+func validateKindPatterns(m Manifest) error {
+	hasConsumes := len(m.Consumes) > 0
+	hasProvides := len(m.Provides) > 0
+	hasHTTP := len(m.HTTP.Routes) > 0
+	hasMCPTools := len(m.MCP.Tools) > 0
+
+	switch m.Kind {
+	case KindSource:
+		if hasConsumes {
+			return fmt.Errorf("modules: manifest: consumes is not allowed for source modules")
+		}
+	case KindSink:
+		if hasProvides {
+			return fmt.Errorf("modules: manifest: provides is not allowed for sink modules")
+		}
+		if !hasConsumes {
+			return fmt.Errorf("modules: manifest: consumes is required for sink modules")
+		}
+	case KindProcessor:
+		switch {
+		case hasConsumes:
+			// event-routing processor
+		case hasHTTP, hasMCPTools:
+			if hasProvides {
+				return fmt.Errorf("modules: manifest: provides is not allowed for HTTP/MCP-only processor modules")
+			}
+		default:
+			return fmt.Errorf("modules: manifest: processor %q must declare consumes, http.routes, and/or mcp.tools", m.Name)
+		}
+	}
+	return nil
+}
+
+func validateTypePattern(pattern string) error {
 	if pattern == "*" {
 		return fmt.Errorf("modules: manifest: pattern %q is not allowed", pattern)
 	}
@@ -163,6 +210,10 @@ func validateProvidesPattern(pattern string) error {
 		return fmt.Errorf("modules: manifest: invalid pattern %q: %w", pattern, err)
 	}
 	return nil
+}
+
+func validateProvidesPattern(pattern string) error {
+	return validateTypePattern(pattern)
 }
 
 // CollectHTTPRoutes gathers HTTP routes from discovered modules and rejects duplicates.

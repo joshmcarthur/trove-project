@@ -34,16 +34,43 @@ name     = "my-source"
 version  = "1.0"
 kind     = "source"
 provides = ["my-source.event.received", "my-source.*"]
-listen   = ":8080"   # optional module-specific setting (ignored by core)
 
 [schemas]
 "my-source.event.received" = "schemas/received.json"
 ```
 
-`kind` is `source`, `processor`, or `sink`. **`provides` is required for source
-modules** — each entry is an exact event type or a glob pattern (`note.*`,
-`mqtt.*.received`). The core rejects `Emit` calls for types outside this list.
-Bare `*` is not allowed.
+Event-routing processor example:
+
+```toml
+name     = "embedder"
+version  = "0.1.0"
+kind     = "processor"
+consumes = ["note.*"]
+provides = ["note.embedding.generated"]
+```
+
+Sink example:
+
+```toml
+name     = "webhook-sink"
+version  = "2.0"
+kind     = "sink"
+consumes = ["note.created"]
+```
+
+`kind` is `source`, `processor`, or `sink`.
+
+| Kind | `provides` | `consumes` |
+|------|------------|------------|
+| `source` | **required** | forbidden |
+| `processor` (event-routing) | required when emitting derived events | **required** |
+| `processor` (HTTP-only) | forbidden | forbidden; use `[[http.routes]]` |
+| `sink` | forbidden | **required** |
+
+Each pattern is an exact event type or a glob (`note.*`, `mqtt.*.received`).
+Bare `*` is not allowed. Per-module `listen` addresses are rejected — register
+`[[http.routes]]` and let the core [HTTP gateway](./planning/http-gateway.md)
+listen instead.
 
 Optional `[schemas]` maps a type or pattern to a JSON Schema file (relative to
 the module directory). When present, the core validates the payload before append.
@@ -68,10 +95,16 @@ Use `trovemodule.Serve` to register the module. Optional interfaces:
 
 - **HTTPHandler** — serve HTTP routes declared in the manifest
 - **MCPToolHandler** — handle MCP tools declared in `[[mcp.tools]]`
+- **EventProcessor** — `Process(event, dispatch)` for event-routing processors
+- **EventSink** — `Handle(event, dispatch)` for sinks
 - **HealthChecker** — report liveness to the parent
 
-The parent enforces ingest policy on `core.Emit`. Modules do not open
-`trove.db` or the blob directory directly.
+Event-routing processors and sinks implement `Run` with `trovemodule.WaitCore`
+when they do not stream from `Run` themselves. The parent passes a
+`DispatchContext` with `root_id` and `seen` module names for loop prevention.
+
+The parent enforces ingest policy on `core.Emit` and on derived events returned
+from `Process`. Modules do not open `trove.db` or the blob directory directly.
 
 ## Module-specific config
 

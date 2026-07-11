@@ -32,7 +32,17 @@ func TestParseManifestValid(t *testing.T) {
 				Name:     "enricher",
 				Version:  "0.1.0",
 				Kind:     KindProcessor,
-				Provides: []string{"http.ingest.received"},
+				Consumes: []string{"http.ingest.received"},
+				Provides: []string{"http.ingest.enriched"},
+			},
+		},
+		{
+			name: "http-only processor",
+			file: "valid-http-processor.toml",
+			want: Manifest{
+				Name:    "mcp-query",
+				Version: "1.0",
+				Kind:    KindProcessor,
 			},
 		},
 		{
@@ -42,7 +52,7 @@ func TestParseManifestValid(t *testing.T) {
 				Name:     "webhook-sink",
 				Version:  "2.0",
 				Kind:     KindSink,
-				Provides: []string{},
+				Consumes: []string{"note.*"},
 			},
 		},
 	}
@@ -70,6 +80,14 @@ func TestParseManifestValid(t *testing.T) {
 			for i := range tt.want.Provides {
 				if got.Provides[i] != tt.want.Provides[i] {
 					t.Errorf("Provides[%d] = %q, want %q", i, got.Provides[i], tt.want.Provides[i])
+				}
+			}
+			if len(got.Consumes) != len(tt.want.Consumes) {
+				t.Fatalf("Consumes len = %d, want %d", len(got.Consumes), len(tt.want.Consumes))
+			}
+			for i := range tt.want.Consumes {
+				if got.Consumes[i] != tt.want.Consumes[i] {
+					t.Errorf("Consumes[%d] = %q, want %q", i, got.Consumes[i], tt.want.Consumes[i])
 				}
 			}
 		})
@@ -117,6 +135,31 @@ func TestParseManifestInvalid(t *testing.T) {
 		{
 			name:    "bare star",
 			file:    "invalid-bare-star.toml",
+			wantErr: `pattern "*" is not allowed`,
+		},
+		{
+			name:    "sink provides",
+			file:    "invalid-sink-provides.toml",
+			wantErr: "provides is not allowed for sink modules",
+		},
+		{
+			name:    "sink without consumes",
+			file:    "invalid-sink-no-consumes.toml",
+			wantErr: "consumes is required for sink modules",
+		},
+		{
+			name:    "source consumes",
+			file:    "invalid-source-consumes.toml",
+			wantErr: "consumes is not allowed for source modules",
+		},
+		{
+			name:    "processor without routes",
+			file:    "invalid-processor-no-routes.toml",
+			wantErr: "must declare consumes, http.routes, and/or mcp.tools",
+		},
+		{
+			name:    "consumes bare star",
+			file:    "invalid-consumes-star.toml",
 			wantErr: `pattern "*" is not allowed`,
 		},
 	}

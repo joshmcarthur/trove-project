@@ -141,3 +141,38 @@ service SourceModule {
   rpc Run(RunRequest) returns (RunResponse);
   rpc Healthcheck(HealthcheckRequest) returns (HealthcheckResponse);
 }
+
+// DispatchContext carries routing metadata for event processors and sinks.
+// It is not persisted in the journal.
+message DispatchContext {
+  string root_id = 1;
+  repeated string seen = 2;
+}
+
+message ProcessRequest {
+  Event event = 1;
+  DispatchContext context = 2;
+}
+
+message ProcessResponse {
+  repeated Event events = 1;
+}
+
+message HandleRequest {
+  Event event = 1;
+  DispatchContext context = 2;
+}
+
+message HandleResponse {}
+
+// ProcessorModule is implemented by event-routing processor modules.
+service ProcessorModule {
+  rpc Process(ProcessRequest) returns (ProcessResponse);
+  rpc Healthcheck(HealthcheckRequest) returns (HealthcheckResponse);
+}
+
+// SinkModule is implemented by event-routing sink modules.
+service SinkModule {
+  rpc Handle(HandleRequest) returns (HandleResponse);
+  rpc Healthcheck(HealthcheckRequest) returns (HealthcheckResponse);
+}

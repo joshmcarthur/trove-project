@@ -19,30 +19,9 @@ import (
 var healthcheckInterval = 30 * time.Second
 
 // SourceHandle supervises a running source module subprocess.
-type SourceHandle struct {
-	client *plugin.Client
-	cancel context.CancelFunc
-	done   chan struct{}
-}
+type SourceHandle = ModuleHandle
 
-// Close stops the supervised module subprocess.
-func (h *SourceHandle) Close() error {
-	if h == nil {
-		return nil
-	}
-	if h.cancel != nil {
-		h.cancel()
-	}
-	if h.done != nil {
-		<-h.done
-	}
-	if h.client != nil {
-		h.client.Kill()
-	}
-	return nil
-}
-
-// StartSource launches a supervised module subprocess (sources and HTTP modules).
+// StartSource launches a supervised module subprocess.
 func StartSource(
 	ctx context.Context,
 	j journal.Journal,
@@ -50,6 +29,7 @@ func StartSource(
 	blobs blob.Store,
 	httpRegistry *HTTPRegistry,
 	mcpRegistry *MCPRegistry,
+	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 ) (*SourceHandle, error) {
@@ -60,14 +40,18 @@ func StartSource(
 
 	hasHTTP := len(manifest.HTTPRoutes()) > 0
 	hasMCPTools := len(manifest.MCPTools()) > 0
-	needsIngest := manifest.Kind == KindSource
+	needsSource := manifest.Kind == KindSource
+	hasProcessor := manifest.Kind == KindProcessor && manifest.EventRoutes()
+	hasSink := manifest.Kind == KindSink && manifest.EventRoutes()
 
 	switch {
-	case needsIngest:
+	case needsSource:
 	case hasHTTP:
 	case hasMCPTools:
+	case hasProcessor:
+	case hasSink:
 	default:
-		return nil, fmt.Errorf("modules: start %q: not a source and no http or mcp routes", mod.Manifest.Name)
+		return nil, fmt.Errorf("modules: start %q: not a supported module type", mod.Manifest.Name)
 	}
 
 	policy, err := LoadIngestPolicy(manifest, mod.Dir)
@@ -80,11 +64,18 @@ func StartSource(
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
+	caps := moduleCapabilities{
+		hasHTTP:      hasHTTP,
+		hasProcessor: hasProcessor,
+		hasSink:      hasSink,
+		hasMCPTools:  hasMCPTools,
+		needsSource:  needsSource,
+	}
+
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: trovemodule.Handshake,
 		Plugins: hostPluginSet(
-			j, policy, manifest.Name, blobs,
-			hasHTTP, hasMCPTools, mcpTools, toolModules, mcpRegistry,
+			j, policy, manifest.Name, blobs, caps, mcpTools, toolModules, mcpRegistry,
 		),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
@@ -103,7 +94,7 @@ func StartSource(
 		return nil, fmt.Errorf("modules: start source %q: dispense: %w", mod.Manifest.Name, err)
 	}
 
-	sourceModule, ok := raw.(*sourceModuleClient)
+	moduleClient, ok := raw.(*moduleClient)
 	if !ok {
 		client.Kill()
 		return nil, fmt.Errorf("modules: start source %q: unexpected plugin type %T", mod.Manifest.Name, raw)
@@ -113,10 +104,16 @@ func StartSource(
 	done := make(chan struct{})
 
 	if hasHTTP && httpRegistry != nil {
-		httpRegistry.Register(manifest.Name, sourceModule)
+		httpRegistry.Register(manifest.Name, moduleClient)
 	}
 	if hasMCPTools && mcpRegistry != nil {
-		mcpRegistry.Register(manifest.Name, sourceModule)
+		mcpRegistry.Register(manifest.Name, moduleClient)
+	}
+	if hasProcessor && eventRegistry != nil {
+		eventRegistry.RegisterProcessor(manifest.Name, manifest.Consumes, policy, moduleClient)
+	}
+	if hasSink && eventRegistry != nil {
+		eventRegistry.RegisterSink(manifest.Name, manifest.Consumes, moduleClient)
 	}
 
 	go func() {
@@ -127,14 +124,20 @@ func StartSource(
 		if hasMCPTools && mcpRegistry != nil {
 			defer mcpRegistry.Unregister(manifest.Name)
 		}
+		if hasProcessor && eventRegistry != nil {
+			defer eventRegistry.UnregisterProcessor(manifest.Name)
+		}
+		if hasSink && eventRegistry != nil {
+			defer eventRegistry.UnregisterSink(manifest.Name)
+		}
 
 		hcDone := make(chan struct{})
 		go func() {
 			defer close(hcDone)
-			runHealthchecks(runCtx, mod.Manifest.Name, sourceModule)
+			runHealthchecks(runCtx, mod.Manifest.Name, moduleClient)
 		}()
 
-		err := sourceModule.Run(runCtx)
+		err := moduleClient.Run(runCtx)
 		cancelRun()
 		<-hcDone
 

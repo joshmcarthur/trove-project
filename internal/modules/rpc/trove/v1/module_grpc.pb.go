@@ -8,7 +8,6 @@ package troverpc
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -745,6 +744,294 @@ var SourceModule_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Healthcheck",
 			Handler:    _SourceModule_Healthcheck_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "trove/v1/module.proto",
+}
+
+const (
+	ProcessorModule_Process_FullMethodName     = "/trove.v1.ProcessorModule/Process"
+	ProcessorModule_Healthcheck_FullMethodName = "/trove.v1.ProcessorModule/Healthcheck"
+)
+
+// ProcessorModuleClient is the client API for ProcessorModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// ProcessorModule is implemented by event-routing processor modules.
+type ProcessorModuleClient interface {
+	Process(ctx context.Context, in *ProcessRequest, opts ...grpc.CallOption) (*ProcessResponse, error)
+	Healthcheck(ctx context.Context, in *HealthcheckRequest, opts ...grpc.CallOption) (*HealthcheckResponse, error)
+}
+
+type processorModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewProcessorModuleClient(cc grpc.ClientConnInterface) ProcessorModuleClient {
+	return &processorModuleClient{cc}
+}
+
+func (c *processorModuleClient) Process(ctx context.Context, in *ProcessRequest, opts ...grpc.CallOption) (*ProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProcessResponse)
+	err := c.cc.Invoke(ctx, ProcessorModule_Process_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *processorModuleClient) Healthcheck(ctx context.Context, in *HealthcheckRequest, opts ...grpc.CallOption) (*HealthcheckResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthcheckResponse)
+	err := c.cc.Invoke(ctx, ProcessorModule_Healthcheck_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ProcessorModuleServer is the server API for ProcessorModule service.
+// All implementations must embed UnimplementedProcessorModuleServer
+// for forward compatibility.
+//
+// ProcessorModule is implemented by event-routing processor modules.
+type ProcessorModuleServer interface {
+	Process(context.Context, *ProcessRequest) (*ProcessResponse, error)
+	Healthcheck(context.Context, *HealthcheckRequest) (*HealthcheckResponse, error)
+	mustEmbedUnimplementedProcessorModuleServer()
+}
+
+// UnimplementedProcessorModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedProcessorModuleServer struct{}
+
+func (UnimplementedProcessorModuleServer) Process(context.Context, *ProcessRequest) (*ProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Process not implemented")
+}
+func (UnimplementedProcessorModuleServer) Healthcheck(context.Context, *HealthcheckRequest) (*HealthcheckResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Healthcheck not implemented")
+}
+func (UnimplementedProcessorModuleServer) mustEmbedUnimplementedProcessorModuleServer() {}
+func (UnimplementedProcessorModuleServer) testEmbeddedByValue()                         {}
+
+// UnsafeProcessorModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ProcessorModuleServer will
+// result in compilation errors.
+type UnsafeProcessorModuleServer interface {
+	mustEmbedUnimplementedProcessorModuleServer()
+}
+
+func RegisterProcessorModuleServer(s grpc.ServiceRegistrar, srv ProcessorModuleServer) {
+	// If the following call panics, it indicates UnimplementedProcessorModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ProcessorModule_ServiceDesc, srv)
+}
+
+func _ProcessorModule_Process_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProcessorModuleServer).Process(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProcessorModule_Process_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProcessorModuleServer).Process(ctx, req.(*ProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProcessorModule_Healthcheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthcheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProcessorModuleServer).Healthcheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProcessorModule_Healthcheck_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProcessorModuleServer).Healthcheck(ctx, req.(*HealthcheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ProcessorModule_ServiceDesc is the grpc.ServiceDesc for ProcessorModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ProcessorModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "trove.v1.ProcessorModule",
+	HandlerType: (*ProcessorModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Process",
+			Handler:    _ProcessorModule_Process_Handler,
+		},
+		{
+			MethodName: "Healthcheck",
+			Handler:    _ProcessorModule_Healthcheck_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "trove/v1/module.proto",
+}
+
+const (
+	SinkModule_Handle_FullMethodName      = "/trove.v1.SinkModule/Handle"
+	SinkModule_Healthcheck_FullMethodName = "/trove.v1.SinkModule/Healthcheck"
+)
+
+// SinkModuleClient is the client API for SinkModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// SinkModule is implemented by event-routing sink modules.
+type SinkModuleClient interface {
+	Handle(ctx context.Context, in *HandleRequest, opts ...grpc.CallOption) (*HandleResponse, error)
+	Healthcheck(ctx context.Context, in *HealthcheckRequest, opts ...grpc.CallOption) (*HealthcheckResponse, error)
+}
+
+type sinkModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSinkModuleClient(cc grpc.ClientConnInterface) SinkModuleClient {
+	return &sinkModuleClient{cc}
+}
+
+func (c *sinkModuleClient) Handle(ctx context.Context, in *HandleRequest, opts ...grpc.CallOption) (*HandleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HandleResponse)
+	err := c.cc.Invoke(ctx, SinkModule_Handle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sinkModuleClient) Healthcheck(ctx context.Context, in *HealthcheckRequest, opts ...grpc.CallOption) (*HealthcheckResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthcheckResponse)
+	err := c.cc.Invoke(ctx, SinkModule_Healthcheck_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SinkModuleServer is the server API for SinkModule service.
+// All implementations must embed UnimplementedSinkModuleServer
+// for forward compatibility.
+//
+// SinkModule is implemented by event-routing sink modules.
+type SinkModuleServer interface {
+	Handle(context.Context, *HandleRequest) (*HandleResponse, error)
+	Healthcheck(context.Context, *HealthcheckRequest) (*HealthcheckResponse, error)
+	mustEmbedUnimplementedSinkModuleServer()
+}
+
+// UnimplementedSinkModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSinkModuleServer struct{}
+
+func (UnimplementedSinkModuleServer) Handle(context.Context, *HandleRequest) (*HandleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Handle not implemented")
+}
+func (UnimplementedSinkModuleServer) Healthcheck(context.Context, *HealthcheckRequest) (*HealthcheckResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Healthcheck not implemented")
+}
+func (UnimplementedSinkModuleServer) mustEmbedUnimplementedSinkModuleServer() {}
+func (UnimplementedSinkModuleServer) testEmbeddedByValue()                    {}
+
+// UnsafeSinkModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SinkModuleServer will
+// result in compilation errors.
+type UnsafeSinkModuleServer interface {
+	mustEmbedUnimplementedSinkModuleServer()
+}
+
+func RegisterSinkModuleServer(s grpc.ServiceRegistrar, srv SinkModuleServer) {
+	// If the following call panics, it indicates UnimplementedSinkModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SinkModule_ServiceDesc, srv)
+}
+
+func _SinkModule_Handle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HandleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SinkModuleServer).Handle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SinkModule_Handle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SinkModuleServer).Handle(ctx, req.(*HandleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SinkModule_Healthcheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthcheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SinkModuleServer).Healthcheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SinkModule_Healthcheck_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SinkModuleServer).Healthcheck(ctx, req.(*HealthcheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SinkModule_ServiceDesc is the grpc.ServiceDesc for SinkModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SinkModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "trove.v1.SinkModule",
+	HandlerType: (*SinkModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Handle",
+			Handler:    _SinkModule_Handle_Handler,
+		},
+		{
+			MethodName: "Healthcheck",
+			Handler:    _SinkModule_Healthcheck_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

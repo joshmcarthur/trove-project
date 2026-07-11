@@ -191,18 +191,24 @@ type Source interface {
 
 ## 7. Processors and Sinks
 
-Kept deliberately minimal in v0.
-
 **Processors** consume events and may emit derived events or write blobs.
-Only build one if a concrete need shows up during validation:
-- embedding generator (feeds `sqlite-vec`, see §4)
-- if you build this: treat AI-derived events as one-shot facts, not
-  reproducible on replay, unless you snapshot model + prompt + version
-  alongside the output. Don't pretend replay determinism you don't have.
+Manifest fields:
+
+- `consumes` — event types the processor subscribes to (exact or glob)
+- `provides` — derived event types the processor may emit
 
 **Sinks** consume events and take an action (thermal printer, notification).
-Not needed for v0 validation — add only once there's a concrete workflow
-that wants one (e.g. printing a trip summary).
+They declare `consumes` only.
+
+The core dispatches journal events to matching modules and passes a
+`DispatchContext` with `root_id` and a `seen` list of module names already
+handled in the chain. If a module sees itself in `seen`, it skips the event.
+Derived events inherit `seen` so routing loops terminate.
+
+Treat AI-derived events as one-shot facts unless model + prompt + version are
+snapshotted alongside the output.
+
+See [concepts/modules.md](./concepts/modules.md) for routing details.
 
 ---
 
@@ -294,8 +300,8 @@ than trying to force one mechanism to cover both.
 
 ```
 Source    : core receives a stream of Emit(event) calls from the module
-Processor : core calls Process(event) -> []event synchronously
-Sink      : core calls Handle(event) -> ack
+Processor : core calls Process(event, DispatchContext) -> []event synchronously
+Sink      : core calls Handle(event, DispatchContext) -> ack
 All kinds : core calls Healthcheck() periodically
 ```
 

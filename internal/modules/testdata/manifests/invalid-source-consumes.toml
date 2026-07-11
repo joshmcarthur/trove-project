@@ -1,0 +1,5 @@
+name     = "bad-source"
+version  = "1.0"
+kind     = "source"
+provides = ["note.*"]
+consumes = ["note.*"]

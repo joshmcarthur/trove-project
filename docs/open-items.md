@@ -21,5 +21,12 @@ From [spec §13](../spec.md#13-open-items-not-yet-decided):
 | `summarize_range`: pre-aggregate at write vs query time | [mcp-query](./planning/mcp-query.md), [processors-sinks](./planning/processors-sinks.md) |
 | HTTP gateway: route registration, MCP migration, streaming RPC | [http-gateway](./planning/http-gateway.md) |
 
+## Resolved
+
+| Item | Decision | Date |
+|------|----------|------|
+| Manifest subscription model (`consumes`) | Modules declare `consumes` / `provides` with glob patterns; see [modules](../concepts/modules.md) | 2026-07-11 |
+| Circular event-routing prevention | `DispatchContext.seen` skips modules already in the chain; startup graph warning | 2026-07-11 |
+
 When you resolve an item, move the decision here with a date and link to the PR
 that implemented it.
