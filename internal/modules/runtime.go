@@ -19,44 +19,27 @@ import (
 var healthcheckInterval = 30 * time.Second
 
 // SourceHandle supervises a running source module subprocess.
-type SourceHandle struct {
-	client *plugin.Client
-	cancel context.CancelFunc
-	done   chan struct{}
-}
+type SourceHandle = ModuleHandle
 
-// Close stops the supervised module subprocess.
-func (h *SourceHandle) Close() error {
-	if h == nil {
-		return nil
-	}
-	if h.cancel != nil {
-		h.cancel()
-	}
-	if h.done != nil {
-		<-h.done
-	}
-	if h.client != nil {
-		h.client.Kill()
-	}
-	return nil
-}
-
-// StartSource launches a supervised module subprocess (sources and HTTP modules).
-func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) (*SourceHandle, error) {
+// StartSource launches a supervised module subprocess.
+func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, httpRegistry *HTTPRegistry, eventRegistry *EventRegistry) (*SourceHandle, error) {
 	manifest, err := loadModuleManifest(mod)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
 	hasHTTP := len(manifest.HTTPRoutes()) > 0
-	needsIngest := manifest.Kind == KindSource
+	needsSource := manifest.Kind == KindSource
+	hasProcessor := manifest.Kind == KindProcessor && manifest.EventRoutes()
+	hasSink := manifest.Kind == KindSink && manifest.EventRoutes()
 
 	switch {
-	case needsIngest:
+	case needsSource:
 	case hasHTTP:
+	case hasProcessor:
+	case hasSink:
 	default:
-		return nil, fmt.Errorf("modules: start %q: not a source and no http routes", mod.Manifest.Name)
+		return nil, fmt.Errorf("modules: start %q: not a supported module type", mod.Manifest.Name)
 	}
 
 	policy, err := LoadIngestPolicy(manifest, mod.Dir)
@@ -69,9 +52,16 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
+	caps := moduleCapabilities{
+		hasHTTP:      hasHTTP,
+		hasProcessor: hasProcessor,
+		hasSink:      hasSink,
+		needsSource:  needsSource,
+	}
+
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP),
+		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, caps),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),
@@ -89,7 +79,7 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 		return nil, fmt.Errorf("modules: start source %q: dispense: %w", mod.Manifest.Name, err)
 	}
 
-	sourceModule, ok := raw.(*sourceModuleClient)
+	moduleClient, ok := raw.(*moduleClient)
 	if !ok {
 		client.Kill()
 		return nil, fmt.Errorf("modules: start source %q: unexpected plugin type %T", mod.Manifest.Name, raw)
@@ -98,23 +88,35 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 	runCtx, cancelRun := context.WithCancel(ctx)
 	done := make(chan struct{})
 
-	if hasHTTP && registry != nil {
-		registry.Register(manifest.Name, sourceModule)
+	if hasHTTP && httpRegistry != nil {
+		httpRegistry.Register(manifest.Name, moduleClient)
+	}
+	if hasProcessor && eventRegistry != nil {
+		eventRegistry.RegisterProcessor(manifest.Name, manifest.Consumes, policy, moduleClient)
+	}
+	if hasSink && eventRegistry != nil {
+		eventRegistry.RegisterSink(manifest.Name, manifest.Consumes, moduleClient)
 	}
 
 	go func() {
 		defer close(done)
-		if hasHTTP && registry != nil {
-			defer registry.Unregister(manifest.Name)
+		if hasHTTP && httpRegistry != nil {
+			defer httpRegistry.Unregister(manifest.Name)
+		}
+		if hasProcessor && eventRegistry != nil {
+			defer eventRegistry.UnregisterProcessor(manifest.Name)
+		}
+		if hasSink && eventRegistry != nil {
+			defer eventRegistry.UnregisterSink(manifest.Name)
 		}
 
 		hcDone := make(chan struct{})
 		go func() {
 			defer close(hcDone)
-			runHealthchecks(runCtx, mod.Manifest.Name, sourceModule)
+			runHealthchecks(runCtx, mod.Manifest.Name, moduleClient)
 		}()
 
-		err := sourceModule.Run(runCtx)
+		err := moduleClient.Run(runCtx)
 		cancelRun()
 		<-hcDone
 

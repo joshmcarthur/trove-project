@@ -1,0 +1,4 @@
+name     = "bad-processor"
+version  = "1.0"
+kind     = "processor"
+consumes = ["*"]

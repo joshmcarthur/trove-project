@@ -64,7 +64,7 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := modules.StartSource(ctx, store, mod, blobStore, registry)
+		handle, err := modules.StartSource(ctx, store, mod, blobStore, registry, nil)
 		if err != nil && ctx.Err() == nil {
 			t.Errorf("StartSource() error = %v", err)
 		}

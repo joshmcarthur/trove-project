@@ -30,15 +30,15 @@ All kinds : core calls Healthcheck() periodically
 ## Implementation notes
 
 - Scan `[modules].paths` from config (standard Linux paths + home dir)
-- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`, optional `[schemas]`)
+- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`, `consumes`, optional `[schemas]`)
   — landed in `internal/modules/manifest.go`
 - Enforce `provides` allowlist and optional JSON Schema at `Emit` — landed in
-  `internal/modules/policy.go` and `internal/modules/ingest.go`
+  `internal/modules/policy.go` and `internal/modules/services.go`
+- Event router with `DispatchContext.seen` loop prevention — `internal/modules/router.go`
 - Filesystem discovery scanner — landed in `internal/modules/discover.go`
 - Integrate go-plugin for subprocess lifecycle
 - Supervise with restart + backoff on crash
-- Only `kind = "source"` modules are started at runtime; processor and sink
-  kinds are accepted in manifests but not wired yet
+- Start source, HTTP, and event-routing modules; HTTP-only processors skip the router
 - React to `SIGHUP` for reload (stretch)
 
 ## Acceptance criteria

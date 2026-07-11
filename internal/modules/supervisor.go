@@ -15,8 +15,8 @@ const (
 	maxBackoff     = 30 * time.Second
 )
 
-// RunSources supervises source and HTTP modules until ctx is cancelled.
-func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *HTTPRegistry) {
+// RunModules supervises discovered modules until ctx is cancelled.
+func RunModules(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, httpRegistry *HTTPRegistry, eventRegistry *EventRegistry) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
 		manifest, err := loadModuleManifest(mod)
@@ -24,19 +24,25 @@ func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blo
 			log.Printf("modules: load manifest %q: %v", mod.Manifest.Name, err)
 			continue
 		}
-		if manifest.Kind != KindSource && len(manifest.HTTPRoutes()) == 0 {
+		if !shouldSupervise(manifest) {
 			continue
 		}
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseSource(ctx, j, mod, blobs, registry)
+			superviseModule(ctx, j, mod, blobs, httpRegistry, eventRegistry)
 		}(mod)
 	}
 	wg.Wait()
 }
 
-func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) {
+func shouldSupervise(manifest Manifest) bool {
+	return manifest.Kind == KindSource ||
+		len(manifest.HTTPRoutes()) > 0 ||
+		manifest.EventRoutes()
+}
+
+func superviseModule(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, httpRegistry *HTTPRegistry, eventRegistry *EventRegistry) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
 
@@ -45,7 +51,7 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs b
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobs, registry)
+		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, eventRegistry)
 		if handle != nil {
 			select {
 			case <-ctx.Done():
@@ -55,7 +61,7 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs b
 				_ = handle.Close()
 			}
 		} else if err != nil && ctx.Err() == nil {
-			log.Printf("modules: source %q start failed: %v; restarting in %s", name, err, backoff)
+			log.Printf("modules: module %q start failed: %v; restarting in %s", name, err, backoff)
 		}
 
 		if ctx.Err() != nil {
@@ -63,7 +69,7 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs b
 		}
 
 		if err == nil {
-			log.Printf("modules: source %q exited; restarting in %s", name, backoff)
+			log.Printf("modules: module %q exited; restarting in %s", name, backoff)
 		}
 
 		if !sleepOrDone(ctx, backoff) {
@@ -75,6 +81,21 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs b
 			backoff = maxBackoff
 		}
 	}
+}
+
+// RunSources supervises source and HTTP modules until ctx is cancelled.
+func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *HTTPRegistry) {
+	RunModules(ctx, j, mods, blobs, registry, nil)
+}
+
+// RunProcessors supervises event-routing processors until ctx is cancelled.
+func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
+	RunModules(ctx, j, mods, blobs, nil, registry)
+}
+
+// RunSinks supervises event-routing sinks until ctx is cancelled.
+func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry) {
+	RunModules(ctx, j, mods, blobs, nil, registry)
 }
 
 func sleepOrDone(ctx context.Context, d time.Duration) bool {

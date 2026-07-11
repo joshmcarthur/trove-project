@@ -36,6 +36,39 @@ kind     = "source"        # source | processor | sink
 provides = ["mqtt.message.received"]
 ```
 
+## Declaring subscriptions and emissions
+
+Modules declare journal event types in the manifest:
+
+| Field | Role |
+|-------|------|
+| `provides` | Event types the module may emit (sources and event-routing processors) |
+| `consumes` | Event types the module subscribes to (event-routing processors and sinks) |
+
+Both fields accept exact type strings or glob patterns (`note.*`, `mqtt.*.received`).
+Bare `*` is not allowed.
+
+Event-routing processors and sinks must declare `consumes`. Sources must declare
+`provides`. HTTP-only processors (for example `mcp-query`) declare
+`[[http.routes]]` instead and do not participate in journal routing.
+
+## Event routing and loop prevention
+
+When an event is appended to the journal, the core dispatches it to every module
+whose `consumes` patterns match the event type. Processors may return derived
+events; the core validates those against `provides` and appends them.
+
+Routing metadata is **not** stored on journal events. The core passes a
+`DispatchContext` alongside each `Process` / `Handle` call:
+
+- `root_id` — journal ID of the event that started the processing chain
+- `seen` — module names that have already handled this chain
+
+If a module sees its own name in `seen`, it skips the event. Derived events
+inherit the parent's `seen` list so cycles such as `A → B → A` terminate. This
+follows the same principle as Meshtastic packet deduplication: track what has
+already handled the chain and do not process it again.
+
 ## Local vs remote
 
 | Path | Mechanism |
@@ -49,17 +82,21 @@ and transport once given a binary path.
 ## RPC surface
 
 ```
-Source    : module streams Emit(event) to core
-Processor : core calls Process(event) -> []event
-Sink      : core calls Handle(event) -> ack
-All kinds : core calls Healthcheck() periodically
+CoreServices : module calls Emit, BlobPut, and query RPCs on the parent
+SourceModule : parent calls Run to start a source subprocess
+ProcessorModule : parent calls Process(event, context) -> []event
+SinkModule     : parent calls Handle(event, context) -> ack
+HTTPModule     : gateway calls HandleHTTP for declared routes
+All kinds      : Healthcheck periodically
 ```
 
-At runtime today, only **source** modules are started. Processor and sink kinds
-are accepted in manifests but not wired yet.
+At runtime, **source**, **HTTP**, and **event-routing** modules are started.
+The core runs an event router that subscribes to the journal and dispatches to
+matching processors and sinks.
 
 ## Implementation
 
 - [Module runtime](../planning/module-runtime.md) — milestone 1
+- [Processors and sinks](../planning/processors-sinks.md) — event routing
 - [Remote modules](../planning/remote-modules.md) — later
 - [Building modules](../building-modules.md) — author guide

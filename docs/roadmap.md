@@ -24,7 +24,7 @@ Build order from spec §11:
 | 2b | Blob store (filesystem + HTTP upload) | Supported |
 | 3 | Minimal MCP query server | Supported |
 | 4 | Two-week live test | Planned |
-| 5 | HA tap, embeddings, remote modules, processors/sinks | Later |
+| 5 | HA tap, embeddings, remote modules | Later |
 
 ## Feature matrix
 
@@ -46,7 +46,7 @@ Build order from spec §11:
 | HA WebSocket tap | Later | §6 | [ha-source](./planning/ha-source.md) | external module |
 | Remote modules (Tailscale) | Later | §8 | [remote-modules](./planning/remote-modules.md) | `internal/modules` |
 | Semantic search (sqlite-vec) | Later | §4 | [embeddings](./planning/embeddings.md) | `internal/journal` |
-| Processors / sinks | Later | §7 | [processors-sinks](./planning/processors-sinks.md) | external modules |
+| Processors / sinks | Supported | §7 | [processors-sinks](./planning/processors-sinks.md) | `internal/modules` |
 | Alternative journal backends | Non-goal | §2, §12 | [non-goals](./non-goals.md) | — |
 | Multi-journal sync | Non-goal | §12 | [non-goals](./non-goals.md) | — |
 | WASM runtime | Non-goal | §12 | [non-goals](./non-goals.md) | — |
