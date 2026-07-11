@@ -60,3 +60,47 @@ internal/config/    — TOML config loader
 1. Mark acceptance criteria on the planning page.
 2. Update status in [docs/roadmap.md](docs/roadmap.md).
 3. Run `make check` before opening a PR.
+
+## Cursor Cloud specific instructions
+
+Toolchain is Go 1.26 + `golangci-lint` 2.12.2 (pinned in `.mise.toml`); both are
+preinstalled in the VM image. The base image also ships an older system `go`, so
+`go`/`golangci-lint` are symlinked from `/usr/local/bin` to take precedence — do
+not remove those symlinks. The startup script runs `go mod download` only.
+
+Standard commands are in [docs/contributing.md](docs/contributing.md) /
+`Makefile`: `make build`, `make lint`, `make test`, `make check`.
+
+Non-obvious caveats:
+
+- `make build` produces `bin/trove` plus each first-party module binary at
+  `modules/<name>/module` (all gitignored). The host binary only discovers a
+  module when its `module` binary sits next to its `manifest.toml`, so re-run
+  `make build` after editing any module before running `trove`.
+- `trove` requires `-config <path>` (there is no default); `trove -version` is
+  the only subcommand that runs without one. Minimal working config:
+
+  ```toml
+  [journal]
+  path = "/tmp/trove/trove.db"
+  [blobs]
+  backend = "filesystem"
+  path = "/tmp/trove/blobs"
+  [modules]
+  paths = ["/workspace/modules"]
+  [http]
+  listen = ":8080"
+  ```
+
+- On startup the `telegram-source` module exits and is restarted on a backoff
+  loop (`telegram bot not running`) unless a bot token is configured — this is
+  expected noise, not a failure. `mqtt-source` similarly needs a reachable
+  broker. The HTTP gateway, ingest, and MCP query paths work without any of that.
+- Smoke test the core loop: `POST /ingest/:source` (returns `204`) then query
+  `POST /mcp` (Streamable HTTP JSON-RPC) with the `search_events` tool.
+- `make test` runs `go test -race ./...`. `TestRouterCatchesUpViaPollAfterPubSubDrop`
+  in `internal/modules` can flake with SQLite `SQLITE_BUSY` under full parallel
+  race load; it passes reliably when run alone (`go test -race -run <name>
+  ./internal/modules/`).
+- Deno 2.9 (docs site under `./docs`, `make docs-serve`) is optional and not
+  installed by default; it is not needed to build/test/run the app.
