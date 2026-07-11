@@ -14,7 +14,7 @@ type module struct {
 	checks atomic.Int64
 }
 
-func (m *module) Run(ctx context.Context, _ trovemodule.Emitter) error {
+func (m *module) Run(ctx context.Context, _ trovemodule.Core) error {
 	<-ctx.Done()
 	return ctx.Err()
 }

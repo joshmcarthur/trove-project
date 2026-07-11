@@ -1,24 +1,14 @@
 package trovemodule
 
-import (
-	"context"
+import "context"
 
-	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
-)
-
-// BlobPutter stores blobs via the Trove core CoreServices RPC.
+// BlobPutter stores blobs via Core.BlobPut.
 type BlobPutter interface {
 	Put(ctx context.Context, data []byte) (ref string, err error)
 }
 
-type blobPutter struct {
-	client troverpc.CoreServicesClient
-}
-
-func (b *blobPutter) Put(ctx context.Context, data []byte) (string, error) {
-	resp, err := b.client.BlobPut(ctx, &troverpc.BlobPutRequest{Data: data})
-	if err != nil {
-		return "", err
-	}
-	return resp.GetBlobRef(), nil
+// BlobRunner is a legacy entry point for modules that emit events and store
+// blobs. Prefer implementing Module with Run(ctx, core Core).
+type BlobRunner interface {
+	RunWithBlobs(ctx context.Context, emit Emitter, blobs BlobPutter) error
 }

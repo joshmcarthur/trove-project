@@ -49,7 +49,7 @@ func (c *sourceModuleClient) Run(ctx context.Context) error {
 	})
 
 	_, err := c.client.Run(ctx, &troverpc.RunRequest{
-		ServicesBrokerId: servicesID,
+		ServicesBrokerId: servicesID, // parent-process handle for CoreServices
 	})
 	return err
 }
