@@ -32,6 +32,7 @@ func StartSource(
 	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
+	settings *SettingsStore,
 ) (*SourceHandle, error) {
 	manifest, err := loadModuleManifest(mod)
 	if err != nil {
@@ -59,7 +60,7 @@ func StartSource(
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
-	cmd, err := moduleExecCmd(mod)
+	cmd, err := moduleExecCmd(mod, settings)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}

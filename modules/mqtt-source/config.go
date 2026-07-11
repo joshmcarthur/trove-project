@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/BurntSushi/toml"
+	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
 type config struct {
@@ -27,15 +27,9 @@ func loadConfig() (config, error) {
 }
 
 func loadConfigFromDir(dir string) (config, error) {
-	manifestPath := filepath.Join(dir, "manifest.toml")
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return config{}, fmt.Errorf("mqtt-source: read manifest: %w", err)
-	}
-
 	var cfg config
-	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		return config{}, fmt.Errorf("mqtt-source: parse manifest: %w", err)
+	if err := trovemodule.LoadModuleConfig(dir, &cfg); err != nil {
+		return config{}, fmt.Errorf("mqtt-source: %w", err)
 	}
 
 	if cfg.ClientID == "" {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/BurntSushi/toml"
+	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
 const defaultMaxBodyBytes = 10 << 20 // 10 MiB
@@ -25,15 +25,9 @@ func loadConfig() (config, error) {
 }
 
 func loadConfigFromDir(dir string) (config, error) {
-	manifestPath := filepath.Join(dir, "manifest.toml")
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return config{}, fmt.Errorf("http-ingest: read manifest: %w", err)
-	}
-
 	var cfg config
-	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		return config{}, fmt.Errorf("http-ingest: parse manifest: %w", err)
+	if err := trovemodule.LoadModuleConfig(dir, &cfg); err != nil {
+		return config{}, fmt.Errorf("http-ingest: %w", err)
 	}
 
 	if cfg.MaxBodyBytes <= 0 {

@@ -29,8 +29,17 @@ type BlobsConfig struct {
 
 // ModulesConfig holds module discovery and remote listener settings.
 type ModulesConfig struct {
-	Paths  []string     `toml:"paths"`
-	Remote RemoteConfig `toml:"remote"`
+	Paths    []string                  `toml:"paths"`
+	Remote   RemoteConfig              `toml:"remote"`
+	Config   map[string]string         `toml:"config"`
+	Settings map[string]map[string]any `toml:"-"`
+}
+
+type modulesConfigRaw struct {
+	Paths    []string                  `toml:"paths"`
+	Remote   RemoteConfig              `toml:"remote"`
+	Config   map[string]string         `toml:"config"`
+	Settings map[string]toml.Primitive `toml:"settings"`
 }
 
 // RemoteConfig holds remote module transport settings.
@@ -52,9 +61,31 @@ func Load(path string) (Config, error) {
 	}
 
 	var cfg Config
-	md, err := toml.Decode(string(data), &cfg)
+	var modulesRaw modulesConfigRaw
+	var decode struct {
+		Journal JournalConfig    `toml:"journal"`
+		Blobs   BlobsConfig      `toml:"blobs"`
+		Modules modulesConfigRaw `toml:"modules"`
+		HTTP    HTTPConfig       `toml:"http"`
+	}
+	md, err := toml.Decode(string(data), &decode)
 	if err != nil {
 		return Config{}, fmt.Errorf("config: parse %q: %w", path, err)
+	}
+	cfg.Journal = decode.Journal
+	cfg.Blobs = decode.Blobs
+	cfg.HTTP = decode.HTTP
+	modulesRaw = decode.Modules
+
+	settings, err := decodeModuleSettings(md, modulesRaw.Settings)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Modules = ModulesConfig{
+		Paths:    modulesRaw.Paths,
+		Remote:   modulesRaw.Remote,
+		Config:   modulesRaw.Config,
+		Settings: settings,
 	}
 
 	if md.IsDefined("journal", "path") && cfg.Journal.Path == "" {
@@ -96,6 +127,27 @@ func applyDefaults(cfg *Config) {
 	if cfg.Modules.Paths == nil {
 		cfg.Modules.Paths = []string{}
 	}
+	if cfg.Modules.Config == nil {
+		cfg.Modules.Config = map[string]string{}
+	}
+	if cfg.Modules.Settings == nil {
+		cfg.Modules.Settings = map[string]map[string]any{}
+	}
+}
+
+func decodeModuleSettings(md toml.MetaData, raw map[string]toml.Primitive) (map[string]map[string]any, error) {
+	if len(raw) == 0 {
+		return map[string]map[string]any{}, nil
+	}
+	out := make(map[string]map[string]any, len(raw))
+	for name, prim := range raw {
+		var table map[string]any
+		if err := md.PrimitiveDecode(prim, &table); err != nil {
+			return nil, fmt.Errorf("config: modules.settings[%q]: %w", name, err)
+		}
+		out[name] = table
+	}
+	return out, nil
 }
 
 func expandPaths(cfg *Config) error {
@@ -115,6 +167,13 @@ func expandPaths(cfg *Config) error {
 		cfg.Modules.Paths[i], err = expandPath(p)
 		if err != nil {
 			return fmt.Errorf("config: modules.paths[%d]: %w", i, err)
+		}
+	}
+
+	for name, path := range cfg.Modules.Config {
+		cfg.Modules.Config[name], err = expandPath(path)
+		if err != nil {
+			return fmt.Errorf("config: modules.config[%q]: %w", name, err)
 		}
 	}
 

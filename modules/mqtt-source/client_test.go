@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -130,6 +132,29 @@ password = "secret"
 	}
 	if cfg.Username != "user" {
 		t.Errorf("Username = %q", cfg.Username)
+	}
+}
+
+func TestLoadConfigFromDirAppliesSettingsOverlay(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `broker = "tcp://localhost:1883"
+topics = ["home/#"]
+`
+	if err := writeFile(t, dir, "manifest.toml", manifest); err != nil {
+		t.Fatal(err)
+	}
+	overlayPath := filepath.Join(dir, "overlay.toml")
+	if err := os.WriteFile(overlayPath, []byte(`broker = "tcp://override:1883"`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TROVE_MODULE_SETTINGS", overlayPath)
+
+	cfg, err := loadConfigFromDir(dir)
+	if err != nil {
+		t.Fatalf("loadConfigFromDir() error = %v", err)
+	}
+	if cfg.Broker != "tcp://override:1883" {
+		t.Fatalf("Broker = %q, want override", cfg.Broker)
 	}
 }
 

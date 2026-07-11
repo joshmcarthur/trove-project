@@ -88,12 +88,19 @@ func main() {
 	mcpRegistry := modules.NewMCPRegistry()
 	eventRegistry := modules.NewEventRegistry()
 
+	settingsStore, err := modules.NewSettingsStore(cfg.Modules)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer settingsStore.Close()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	modules.WarnModuleCycles(mods)
 
-	go modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules)
+	go modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
 
 	router := modules.NewRouter(store, eventRegistry)
 	go func() {
