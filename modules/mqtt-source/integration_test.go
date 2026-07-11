@@ -110,8 +110,9 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
+	state := newSubscriptionState(cfg.Topics)
 	go func() {
-		errCh <- runMQTT(ctx, emit, cfg)
+		errCh <- runMQTT(ctx, emit, cfg, state)
 	}()
 
 	publisher := pahomqtt.NewClient(pahomqtt.NewClientOptions().AddBroker(broker).SetClientID("publisher"))

@@ -12,28 +12,14 @@ import (
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
-func runMQTT(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
-	opts := mqtt.NewClientOptions().
-		AddBroker(cfg.Broker).
-		SetClientID(cfg.ClientID).
-		SetAutoReconnect(false).
-		SetConnectTimeout(10 * time.Second)
+const (
+	mqttConnectTimeout = 10 * time.Second
+	mqttTokenTimeout   = 10 * time.Second
+	mqttRetryInterval  = 2 * time.Second
+	mqttMaxRetry       = 30 * time.Second
+)
 
-	if cfg.Username != "" {
-		opts.SetUsername(cfg.Username)
-		opts.SetPassword(cfg.Password)
-	}
-
-	client := mqtt.NewClient(opts)
-	token := client.Connect()
-	if !token.WaitTimeout(10 * time.Second) {
-		return fmt.Errorf("mqtt-source: connect to %s: timeout", cfg.Broker)
-	}
-	if err := token.Error(); err != nil {
-		return fmt.Errorf("mqtt-source: connect to %s: %w", cfg.Broker, err)
-	}
-	defer client.Disconnect(250)
-
+func runMQTT(ctx context.Context, emit trovemodule.Emitter, cfg config, state *subscriptionState) error {
 	messageHandler := func(_ mqtt.Client, msg mqtt.Message) {
 		event, err := buildEvent(msg.Topic(), msg.Payload())
 		if err != nil {
@@ -42,15 +28,69 @@ func runMQTT(ctx context.Context, emit trovemodule.Emitter, cfg config) error {
 		_ = emit.Emit(ctx, event)
 	}
 
-	for _, topic := range cfg.Topics {
-		token := client.Subscribe(topic, cfg.QoS, messageHandler)
-		if !token.WaitTimeout(10 * time.Second) {
-			return fmt.Errorf("mqtt-source: subscribe %q: timeout", topic)
+	subscribeTopics := func(client mqtt.Client) error {
+		for _, topic := range cfg.Topics {
+			token := client.Subscribe(topic, cfg.QoS, messageHandler)
+			if !token.WaitTimeout(mqttTokenTimeout) {
+				state.setSubscribed(topic, false)
+				return fmt.Errorf("mqtt-source: subscribe %q: timeout", topic)
+			}
+			if err := token.Error(); err != nil {
+				state.setSubscribed(topic, false)
+				return fmt.Errorf("mqtt-source: subscribe %q: %w", topic, err)
+			}
+			state.setSubscribed(topic, true)
 		}
-		if err := token.Error(); err != nil {
-			return fmt.Errorf("mqtt-source: subscribe %q: %w", topic, err)
+		return nil
+	}
+
+	readyCh := make(chan struct{}, 1)
+	signalReady := func() {
+		select {
+		case readyCh <- struct{}{}:
+		default:
 		}
 	}
+
+	opts := mqtt.NewClientOptions().
+		AddBroker(cfg.Broker).
+		SetClientID(cfg.ClientID).
+		SetAutoReconnect(true).
+		SetConnectRetry(true).
+		SetConnectRetryInterval(mqttRetryInterval).
+		SetMaxReconnectInterval(mqttMaxRetry).
+		SetConnectTimeout(mqttConnectTimeout).
+		SetConnectionLostHandler(func(_ mqtt.Client, _ error) {
+			state.setConnected(false)
+		}).
+		SetOnConnectHandler(func(client mqtt.Client) {
+			state.setConnected(true)
+			if err := subscribeTopics(client); err != nil {
+				state.setConnected(false)
+				return
+			}
+			signalReady()
+		})
+
+	if cfg.Username != "" {
+		opts.SetUsername(cfg.Username)
+		opts.SetPassword(cfg.Password)
+	}
+
+	client := mqtt.NewClient(opts)
+	token := client.Connect()
+	if !token.WaitTimeout(mqttConnectTimeout) {
+		return fmt.Errorf("mqtt-source: connect to %s: timeout", cfg.Broker)
+	}
+	if err := token.Error(); err != nil {
+		return fmt.Errorf("mqtt-source: connect to %s: %w", cfg.Broker, err)
+	}
+	select {
+	case <-readyCh:
+	case <-time.After(mqttTokenTimeout):
+		return fmt.Errorf("mqtt-source: subscription setup timeout")
+	}
+	defer client.Disconnect(250)
 
 	<-ctx.Done()
 	return nil
