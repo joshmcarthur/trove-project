@@ -199,20 +199,20 @@ func TestDiscoverSkipsNonExecutableBinary(t *testing.T) {
 func TestDiscoverEmptyPaths(t *testing.T) {
 	t.Parallel()
 
-	mods, err := Discover(nil)
+	mods, err := discoverPaths(nil)
 	if err != nil {
-		t.Fatalf("Discover(nil) error = %v", err)
+		t.Fatalf("discoverPaths(nil) error = %v", err)
 	}
 	if mods != nil {
-		t.Fatalf("Discover(nil) = %v, want nil", mods)
+		t.Fatalf("discoverPaths(nil) = %v, want nil", mods)
 	}
 
-	mods, err = Discover([]string{})
+	mods, err = discoverPaths([]string{})
 	if err != nil {
-		t.Fatalf("Discover([]) error = %v", err)
+		t.Fatalf("discoverPaths([]) error = %v", err)
 	}
 	if mods != nil {
-		t.Fatalf("Discover([]) = %v, want nil", mods)
+		t.Fatalf("discoverPaths([]) = %v, want nil", mods)
 	}
 }
 

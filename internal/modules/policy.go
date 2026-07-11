@@ -19,7 +19,16 @@ type IngestPolicy struct {
 }
 
 // LoadIngestPolicy builds a policy from manifest and module directory.
-func LoadIngestPolicy(m Manifest, dir string) (IngestPolicy, error) {
+func LoadIngestPolicy(m Manifest, dir string, bundled bool) (IngestPolicy, error) {
+	if bundled && dir == "" {
+		return IngestPolicy{
+			patterns:   append([]string(nil), m.Provides...),
+			schemaKeys: schemaKeys(m.Schemas),
+			schemas:    make(map[string]*jsonschema.Resolved),
+			moduleName: m.Name,
+		}, nil
+	}
+
 	policy := IngestPolicy{
 		patterns:   append([]string(nil), m.Provides...),
 		schemaKeys: schemaKeys(m.Schemas),

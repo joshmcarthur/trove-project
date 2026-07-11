@@ -16,12 +16,19 @@ import (
 	"github.com/joshmcarthur/trove/internal/gateway"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
+	"github.com/joshmcarthur/trove/internal/modules/bundled"
+	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
 var version = "dev"
 
 func main() {
+	if name := strings.TrimSpace(os.Getenv(trovemodule.BundledModuleEnv)); name != "" {
+		bundled.Serve(name)
+		return
+	}
+
 	showVersion := flag.Bool("version", false, "print version and exit")
 	configPath := flag.String("config", "", "path to trove.toml")
 	flag.Parse()

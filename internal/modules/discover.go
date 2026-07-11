@@ -19,12 +19,51 @@ type Module struct {
 	Dir      string
 	Binary   string
 	Manifest Manifest
+	Bundled  bool
 }
 
-// Discover scans paths and returns valid modules. Invalid entries are skipped;
-// per-path read errors are aggregated into a returned error (if any modules
-// were still found, return both slice and error).
+var bundledDiscover func() ([]Module, error)
+
+// Discover scans paths and appends built-in modules not overridden on disk.
 func Discover(paths []string) ([]Module, error) {
+	mods, err := discoverPaths(paths)
+	if err != nil {
+		return mods, err
+	}
+
+	bundled, err := bundledModules()
+	if err != nil {
+		return mods, err
+	}
+
+	seen := make(map[string]struct{}, len(mods))
+	for _, mod := range mods {
+		seen[mod.Manifest.Name] = struct{}{}
+	}
+
+	for _, mod := range bundled {
+		if _, exists := seen[mod.Manifest.Name]; exists {
+			continue
+		}
+		mods = append(mods, mod)
+	}
+
+	return mods, nil
+}
+
+func bundledModules() ([]Module, error) {
+	if bundledDiscover == nil {
+		return nil, nil
+	}
+	return bundledDiscover()
+}
+
+// SetBundledDiscover registers the built-in module provider.
+func SetBundledDiscover(fn func() ([]Module, error)) {
+	bundledDiscover = fn
+}
+
+func discoverPaths(paths []string) ([]Module, error) {
 	var modules []Module
 	seen := make(map[string]struct{})
 	var errs []error

@@ -31,7 +31,7 @@ func testPolicy(t *testing.T, name string, provides []string) IngestPolicy {
 		Kind:     KindProcessor,
 		Provides: provides,
 		Consumes: []string{"unused"},
-	}, t.TempDir())
+	}, t.TempDir(), false)
 	if err != nil {
 		t.Fatalf("LoadIngestPolicy() error = %v", err)
 	}

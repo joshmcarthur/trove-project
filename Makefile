@@ -26,7 +26,7 @@ build-http-gateway:
 	chmod +x modules/http-gateway/module
 
 build-http-ingest:
-	go build -o modules/http-ingest/module ./modules/http-ingest
+	go build -o modules/http-ingest/module ./modules/http-ingest/cmd
 	chmod +x modules/http-ingest/module
 
 build-mqtt-source:
@@ -38,7 +38,7 @@ build-telegram-source:
 	chmod +x modules/telegram-source/module
 
 build-mcp-query:
-	go build -o modules/mcp-query/module ./modules/mcp-query
+	go build -o modules/mcp-query/module ./modules/mcp-query/cmd
 	chmod +x modules/mcp-query/module
 
 build-capture-classifier:

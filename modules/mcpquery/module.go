@@ -1,22 +1,33 @@
-package main
+package mcpquery
 
 import (
 	"context"
+	_ "embed"
 	"net/http"
 	"sync/atomic"
 	"time"
 
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
+	"github.com/joshmcarthur/trove/internal/modules"
 	"github.com/joshmcarthur/trove/internal/query"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
-type mcpQueryModule struct {
+//go:embed manifest.toml
+var manifestBytes []byte
+
+// Module serves MCP over the HTTP gateway.
+type Module struct {
 	ready   atomic.Bool
 	handler http.Handler
 }
 
-func (m *mcpQueryModule) Run(ctx context.Context, core trovemodule.Core) error {
+// New constructs an mcp-query module instance.
+func New() trovemodule.Module {
+	return &Module{}
+}
+
+func (m *Module) Run(ctx context.Context, core trovemodule.Core) error {
 	tools, err := core.ListMCPTools(ctx)
 	if err != nil {
 		return err
@@ -32,7 +43,7 @@ func (m *mcpQueryModule) Run(ctx context.Context, core trovemodule.Core) error {
 	return nil
 }
 
-func (m *mcpQueryModule) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+func (m *Module) HandleHTTP(ctx context.Context, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
 	if !m.ready.Load() || m.handler == nil {
 		return &troverpc.HTTPResponse{
 			Status: http.StatusServiceUnavailable,
@@ -48,11 +59,16 @@ func (m *mcpQueryModule) HandleHTTP(ctx context.Context, req *troverpc.HTTPReque
 	return trovemodule.ServeHTTPViaRPC(m.handler, req), nil
 }
 
-func (m *mcpQueryModule) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {
+func (m *Module) Healthcheck(context.Context) (*troverpc.HealthcheckResponse, error) {
 	if m.ready.Load() {
 		return &troverpc.HealthcheckResponse{Ok: true, Message: "mcp handler ready"}, nil
 	}
 	return &troverpc.HealthcheckResponse{Ok: false, Message: "mcp handler not ready"}, nil
+}
+
+// Manifest returns the embedded module manifest.
+func Manifest() (modules.Manifest, error) {
+	return modules.ParseManifest(manifestBytes)
 }
 
 type queryAdapter struct {
@@ -172,8 +188,4 @@ func formatOptionalTime(t *time.Time) string {
 		return ""
 	}
 	return t.Format(time.RFC3339)
-}
-
-func main() {
-	trovemodule.Serve(&mcpQueryModule{})
 }

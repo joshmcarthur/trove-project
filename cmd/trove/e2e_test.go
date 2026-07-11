@@ -212,7 +212,11 @@ func buildE2EModules(t *testing.T, repoRoot string) string {
 			t.Fatalf("write manifest %s: %v", mod, err)
 		}
 		binary := filepath.Join(dst, "module")
-		cmd := exec.Command("go", "build", "-o", binary, "./modules/"+mod)
+		src := "./modules/http-ingest/cmd"
+		if mod == "mcp-query" {
+			src = "./modules/mcp-query/cmd"
+		}
+		cmd := exec.Command("go", "build", "-o", binary, src)
 		cmd.Dir = repoRoot
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("build %s: %v\n%s", mod, err, out)

@@ -1,4 +1,4 @@
-package main
+package httpingest
 
 import (
 	"bytes"

@@ -57,7 +57,7 @@ func StartSource(
 		return nil, fmt.Errorf("modules: start %q: not a supported module type", mod.Manifest.Name)
 	}
 
-	policy, err := LoadIngestPolicy(manifest, mod.Dir)
+	policy, err := LoadIngestPolicy(manifest, mod.Dir, mod.Bundled)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
@@ -158,6 +158,10 @@ func StartSource(
 }
 
 func loadModuleManifest(mod Module) (Manifest, error) {
+	if mod.Bundled {
+		return mod.Manifest, nil
+	}
+
 	manifestPath := filepath.Join(mod.Dir, manifestFileName)
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {

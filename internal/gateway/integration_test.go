@@ -168,7 +168,7 @@ path = "/blobs"
 		t.Fatalf("write manifest: %v", err)
 	}
 
-	cmd := exec.Command("go", "build", "-o", binary, "./modules/http-ingest")
+	cmd := exec.Command("go", "build", "-o", binary, "./modules/http-ingest/cmd")
 	cmd.Dir = moduleRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

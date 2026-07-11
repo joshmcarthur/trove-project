@@ -150,8 +150,8 @@ func TestCLI(t *testing.T) {
 		}
 
 		stderr := errBuf.String()
-		if !strings.Contains(stderr, "no modules discovered") {
-			t.Errorf("stderr = %q, want substring %q", stderr, "no modules discovered")
+		if !strings.Contains(stderr, "starting modules: http-ingest, mcp-query") {
+			t.Errorf("stderr = %q, want bundled modules started", stderr)
 		}
 		if !strings.Contains(stderr, "http gateway listening on :8080") {
 			t.Errorf("stderr = %q, want substring %q", stderr, "http gateway listening on :8080")
