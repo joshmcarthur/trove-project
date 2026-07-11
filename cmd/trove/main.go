@@ -89,12 +89,23 @@ func main() {
 	}
 	toolModules := modules.MCPToolModuleIndex(mcpTools)
 
+	authValidatorRefs, err := modules.CollectAuthValidatorRefs(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := modules.ValidateAuthConfig(cfg.HTTP.Auth.Validator, routes, authValidatorRefs); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	if err := gateway.ValidateRoutes(routes, nil); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
 	httpRegistry := modules.NewHTTPRegistry()
+	authRegistry := modules.NewAuthRegistry()
 	mcpRegistry := modules.NewMCPRegistry()
 	eventRegistry := modules.NewEventRegistry()
 
@@ -120,9 +131,10 @@ func main() {
 	}()
 
 	gw, err := gateway.New(gateway.Config{
-		Listen:       cfg.HTTP.Listen,
-		MaxBodyBytes: cfg.HTTP.MaxBodyBytes,
-	}, routes, httpRegistry, nil)
+		Listen:        cfg.HTTP.Listen,
+		MaxBodyBytes:  cfg.HTTP.MaxBodyBytes,
+		AuthValidator: cfg.HTTP.Auth.Validator,
+	}, routes, httpRegistry, authRegistry, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -138,7 +150,7 @@ func main() {
 
 	modulesDone := make(chan struct{})
 	go func() {
-		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
+		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, authRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
 		close(modulesDone)
 	}()
 
@@ -156,6 +168,7 @@ func supervisedModuleNames(mods []modules.Module) []string {
 		manifest := mod.Manifest
 		if manifest.Kind == modules.KindSource ||
 			len(manifest.HTTPRoutes()) > 0 ||
+			len(manifest.AuthValidators()) > 0 ||
 			len(manifest.MCPTools()) > 0 ||
 			manifest.EventRoutes() {
 			names = append(names, manifest.Name)

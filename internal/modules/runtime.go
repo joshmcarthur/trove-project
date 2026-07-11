@@ -28,6 +28,7 @@ func StartSource(
 	mod Module,
 	blobs blob.Store,
 	httpRegistry *HTTPRegistry,
+	authRegistry *AuthRegistry,
 	mcpRegistry *MCPRegistry,
 	eventRegistry *EventRegistry,
 	mcpTools []MCPToolEntry,
@@ -40,6 +41,7 @@ func StartSource(
 	}
 
 	hasHTTP := len(manifest.HTTPRoutes()) > 0
+	hasAuth := len(manifest.AuthValidators()) > 0
 	hasMCPTools := len(manifest.MCPTools()) > 0
 	needsSource := manifest.Kind == KindSource
 	hasProcessor := manifest.Kind == KindProcessor && manifest.EventRoutes()
@@ -48,6 +50,7 @@ func StartSource(
 	switch {
 	case needsSource:
 	case hasHTTP:
+	case hasAuth:
 	case hasMCPTools:
 	case hasProcessor:
 	case hasSink:
@@ -67,6 +70,7 @@ func StartSource(
 
 	caps := moduleCapabilities{
 		hasHTTP:      hasHTTP,
+		hasAuth:      hasAuth,
 		hasProcessor: hasProcessor,
 		hasSink:      hasSink,
 		hasMCPTools:  hasMCPTools,
@@ -107,6 +111,9 @@ func StartSource(
 	if hasHTTP && httpRegistry != nil {
 		httpRegistry.Register(manifest.Name, moduleClient)
 	}
+	if hasAuth && authRegistry != nil {
+		authRegistry.Register(manifest.Name, moduleClient, manifest.AuthValidators())
+	}
 	if hasMCPTools && mcpRegistry != nil {
 		mcpRegistry.Register(manifest.Name, moduleClient)
 	}
@@ -121,6 +128,9 @@ func StartSource(
 		defer close(done)
 		if hasHTTP && httpRegistry != nil {
 			defer httpRegistry.Unregister(manifest.Name)
+		}
+		if hasAuth && authRegistry != nil {
+			defer authRegistry.Unregister(manifest.Name, manifest.AuthValidators())
 		}
 		if hasMCPTools && mcpRegistry != nil {
 			defer mcpRegistry.Unregister(manifest.Name)

@@ -62,8 +62,10 @@ Content-Type: application/json
 
 ## Network and auth
 
-v0 HTTP ingest has **no authentication** — see
-[open items](../open-items.md) and [network auth planning](../planning/auth.md). For a home server, common setups are:
+By default HTTP ingest has **no authentication**. When `[http.auth].validator` is
+set (e.g. `module.http-gateway.bearer`), add an `Authorization` header with
+`Bearer <token>` to ingest and blob requests. See
+[network auth planning](../planning/auth.md). For a home server, common setups are:
 
 - **Local network** — `http://192.168.x.x:8080/ingest/shortcuts` (Wi‑Fi only;
   Shortcuts may block plain HTTP on cellular).
@@ -159,8 +161,8 @@ For images, use the [photo flow](#share-sheet-with-photo) above.
 
 ## Limitations
 
-- **No authentication** on HTTP ingest, blob upload, or MCP — use localhost or a
-  trusted tailnet only until [network auth](../planning/auth.md) lands.
+- **No authentication by default** — enable `[http.auth].validator` or use localhost /
+  a trusted tailnet. See [network auth](../planning/auth.md).
 - **10 MiB** request body limit (`max_body_bytes` in HTTP ingest manifest).
 - **Photos in Share Sheet** — use the [photo flow](#share-sheet-with-photo); the
   importable Shortcut captures text/URL metadata by default.

@@ -29,7 +29,7 @@ func TestGatewayNotFound(t *testing.T) {
 	t.Parallel()
 
 	registry := modules.NewHTTPRegistry()
-	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, nil, registry, nil)
+	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, nil, registry, nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -51,7 +51,7 @@ func TestGatewayMethodNotAllowed(t *testing.T) {
 		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
 		Module: "http-ingest",
 	}}
-	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
+	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -78,7 +78,7 @@ func TestGatewayDispatchesToModule(t *testing.T) {
 		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
 		Module: "http-ingest",
 	}}
-	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
+	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -113,7 +113,7 @@ func TestGatewayServiceUnavailable(t *testing.T) {
 		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
 		Module: "http-ingest",
 	}}
-	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
+	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -138,7 +138,7 @@ func TestGatewayBodyLimit(t *testing.T) {
 		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}", MaxBodyBytes: 8},
 		Module: "http-ingest",
 	}}
-	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
+	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -149,6 +149,117 @@ func TestGatewayBodyLimit(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+type stubAuthClient struct {
+	resp *troverpc.AuthResponse
+	err  error
+	last *troverpc.AuthRequest
+}
+
+func (c *stubAuthClient) ValidateAuth(_ context.Context, req *troverpc.AuthRequest) (*troverpc.AuthResponse, error) {
+	c.last = req
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.resp, nil
+}
+
+func TestGatewayAuthRejectsMissingToken(t *testing.T) {
+	t.Parallel()
+
+	client := &stubHTTPClient{resp: &troverpc.HTTPResponse{Status: http.StatusNoContent}}
+	authClient := &stubAuthClient{resp: &troverpc.AuthResponse{Allowed: false, Status: http.StatusUnauthorized, Message: "unauthorized"}}
+	registry := modules.NewHTTPRegistry()
+	registry.Register("http-ingest", client)
+	authRegistry := modules.NewAuthRegistry()
+	authRegistry.Register("http-gateway", authClient, []modules.AuthValidatorDecl{{ID: "bearer"}})
+
+	routes := []modules.HTTPRouteEntry{{
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Module: "http-ingest",
+	}}
+	gw, err := New(Config{
+		Listen:        ":0",
+		MaxBodyBytes:  1024,
+		AuthValidator: "module.http-gateway.bearer",
+	}, routes, registry, authRegistry, nil)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	rec := httptest.NewRecorder()
+	gw.handle(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if client.last != nil {
+		t.Fatal("HandleHTTP should not be called without auth")
+	}
+}
+
+func TestGatewayAuthAcceptsBearerToken(t *testing.T) {
+	t.Parallel()
+
+	client := &stubHTTPClient{resp: &troverpc.HTTPResponse{Status: http.StatusNoContent}}
+	authClient := &stubAuthClient{resp: &troverpc.AuthResponse{Allowed: true}}
+	registry := modules.NewHTTPRegistry()
+	registry.Register("http-ingest", client)
+	authRegistry := modules.NewAuthRegistry()
+	authRegistry.Register("http-gateway", authClient, []modules.AuthValidatorDecl{{ID: "bearer"}})
+
+	routes := []modules.HTTPRouteEntry{{
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Module: "http-ingest",
+	}}
+	gw, err := New(Config{
+		Listen:        ":0",
+		MaxBodyBytes:  1024,
+		AuthValidator: "module.http-gateway.bearer",
+	}, routes, registry, authRegistry, nil)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	gw.handle(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestGatewayAuthNoneBypassesValidator(t *testing.T) {
+	t.Parallel()
+
+	client := &stubHTTPClient{resp: &troverpc.HTTPResponse{Status: http.StatusNoContent}}
+	registry := modules.NewHTTPRegistry()
+	registry.Register("http-ingest", client)
+
+	routes := []modules.HTTPRouteEntry{{
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}", Auth: modules.AuthNone},
+		Module: "http-ingest",
+	}}
+	gw, err := New(Config{
+		Listen:        ":0",
+		MaxBodyBytes:  1024,
+		AuthValidator: "module.http-gateway.bearer",
+	}, routes, registry, modules.NewAuthRegistry(), nil)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	rec := httptest.NewRecorder()
+	gw.handle(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNoContent)
 	}
 }
 

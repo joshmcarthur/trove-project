@@ -155,7 +155,7 @@ func TestParseManifestInvalid(t *testing.T) {
 		{
 			name:    "processor without routes",
 			file:    "invalid-processor-no-routes.toml",
-			wantErr: "must declare consumes, http.routes, and/or mcp.tools",
+			wantErr: "must declare consumes, http.routes, auth.validators, and/or mcp.tools",
 		},
 		{
 			name:    "consumes bare star",

@@ -23,21 +23,24 @@ type BuiltinRoute struct {
 
 // Config holds gateway listener settings.
 type Config struct {
-	Listen       string
-	MaxBodyBytes int64
+	Listen        string
+	MaxBodyBytes  int64
+	AuthValidator string
 }
 
 // Gateway routes HTTP requests to module HandleHTTP RPC clients.
 type Gateway struct {
-	listen       string
-	maxBodyBytes int64
-	routes       []modules.HTTPRouteEntry
-	registry     *modules.HTTPRegistry
-	builtins     []BuiltinRoute
+	listen        string
+	maxBodyBytes  int64
+	authValidator string
+	routes        []modules.HTTPRouteEntry
+	registry      *modules.HTTPRegistry
+	authRegistry  *modules.AuthRegistry
+	builtins      []BuiltinRoute
 }
 
 // New constructs a Gateway. builtins may be nil.
-func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegistry, builtins []BuiltinRoute) (*Gateway, error) {
+func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegistry, authRegistry *modules.AuthRegistry, builtins []BuiltinRoute) (*Gateway, error) {
 	if cfg.Listen == "" {
 		return nil, fmt.Errorf("gateway: listen is required")
 	}
@@ -49,11 +52,13 @@ func New(cfg Config, routes []modules.HTTPRouteEntry, registry *modules.HTTPRegi
 		maxBody = 10 << 20
 	}
 	return &Gateway{
-		listen:       cfg.Listen,
-		maxBodyBytes: maxBody,
-		routes:       routes,
-		registry:     registry,
-		builtins:     builtins,
+		listen:        cfg.Listen,
+		maxBodyBytes:  maxBody,
+		authValidator: cfg.AuthValidator,
+		routes:        routes,
+		registry:      registry,
+		authRegistry:  authRegistry,
+		builtins:      builtins,
 	}, nil
 }
 
@@ -105,6 +110,11 @@ func (g *Gateway) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	headers := copyHeaders(r.Header)
+	if err := g.authorize(w, r, route, pathValues, headers); err != nil {
+		return
+	}
+
 	maxBody := g.maxBodyBytes
 	if route.Route.MaxBodyBytes > 0 {
 		maxBody = route.Route.MaxBodyBytes
@@ -121,7 +131,7 @@ func (g *Gateway) handle(w http.ResponseWriter, r *http.Request) {
 		Path:           r.URL.Path,
 		MatchedPattern: route.Route.Path,
 		PathValues:     pathValues,
-		Headers:        copyHeaders(r.Header),
+		Headers:        headers,
 		Body:           body,
 	}
 
@@ -137,6 +147,63 @@ func (g *Gateway) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeHTTPResponse(w, resp)
+}
+
+func (g *Gateway) authorize(w http.ResponseWriter, r *http.Request, route modules.HTTPRouteEntry, pathValues map[string]string, headers map[string]string) error {
+	validatorRef, skip, err := modules.ResolveRouteAuth(route.Route.Auth, g.authValidator)
+	if err != nil {
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+		return err
+	}
+	if skip {
+		return nil
+	}
+	if g.authRegistry == nil {
+		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		return fmt.Errorf("gateway: auth registry is required")
+	}
+
+	moduleName, validatorID, err := modules.ParseAuthValidatorRef(validatorRef)
+	if err != nil {
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+		return err
+	}
+
+	client, ok := g.authRegistry.Get(validatorRef)
+	if !ok {
+		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		return fmt.Errorf("gateway: auth validator %q unavailable", validatorRef)
+	}
+
+	resp, err := client.ValidateAuth(r.Context(), &troverpc.AuthRequest{
+		ValidatorId:    validatorID,
+		Method:         r.Method,
+		Path:           r.URL.Path,
+		MatchedPattern: route.Route.Path,
+		PathValues:     pathValues,
+		Headers:        copyHeaders(r.Header),
+		RouteModule:    route.Module,
+	})
+	if err != nil {
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+		return err
+	}
+	if resp == nil || !resp.Allowed {
+		status := http.StatusUnauthorized
+		if resp != nil && resp.Status > 0 {
+			status = int(resp.Status)
+		}
+		message := "unauthorized"
+		if resp != nil && resp.Message != "" {
+			message = resp.Message
+		}
+		http.Error(w, message, status)
+		return fmt.Errorf("gateway: unauthorized by %s.%s", moduleName, validatorID)
+	}
+	for key, value := range resp.Headers {
+		headers[key] = value
+	}
+	return nil
 }
 
 func (g *Gateway) matchRoute(method, urlPath string) (modules.HTTPRouteEntry, map[string]string, bool) {

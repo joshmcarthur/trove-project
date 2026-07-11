@@ -50,8 +50,14 @@ type RemoteConfig struct {
 
 // HTTPConfig holds the core HTTP gateway listener settings.
 type HTTPConfig struct {
-	Listen       string `toml:"listen"`
-	MaxBodyBytes int64  `toml:"max_body_bytes"`
+	Listen       string    `toml:"listen"`
+	MaxBodyBytes int64     `toml:"max_body_bytes"`
+	Auth         HTTPAuth  `toml:"auth"`
+}
+
+// HTTPAuth holds gateway auth validator configuration.
+type HTTPAuth struct {
+	Validator string `toml:"validator"`
 }
 
 // Load reads and validates configuration from path.
@@ -215,9 +221,32 @@ func validate(cfg *Config) error {
 	if cfg.HTTP.Listen == "" {
 		return fmt.Errorf("config: http.listen is required")
 	}
+	if cfg.HTTP.Auth.Validator != "" {
+		if err := validateAuthValidatorRef(cfg.HTTP.Auth.Validator); err != nil {
+			return fmt.Errorf("config: http.auth.validator: %w", err)
+		}
+	}
 	if cfg.Journal.RetentionDays < 0 {
 		return fmt.Errorf("config: journal.retention_days must be >= 0")
 	}
 
 	return nil
+}
+
+func validateAuthValidatorRef(ref string) error {
+	const prefix = "module."
+	if len(ref) <= len(prefix) || ref[:len(prefix)] != prefix {
+		return fmt.Errorf("invalid auth validator ref %q (want module.<name>.<validator>)", ref)
+	}
+	rest := ref[len(prefix):]
+	for i := 0; i < len(rest); i++ {
+		if rest[i] != '.' {
+			continue
+		}
+		if rest[:i] == "" || rest[i+1:] == "" {
+			break
+		}
+		return nil
+	}
+	return fmt.Errorf("invalid auth validator ref %q (want module.<name>.<validator>)", ref)
 }

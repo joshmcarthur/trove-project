@@ -65,6 +65,7 @@ consumes = ["note.created"]
 | `source` | **required** | forbidden |
 | `processor` (event-routing) | required when emitting derived events | **required** |
 | `processor` (HTTP-only) | forbidden | forbidden; use `[[http.routes]]` |
+| `processor` (auth-only) | forbidden | forbidden; use `[[auth.validators]]` |
 | `sink` | forbidden | **required** |
 
 Each pattern is an exact event type or a glob (`note.*`, `mqtt.*.received`).
@@ -94,6 +95,7 @@ func (m *myModule) Run(ctx context.Context, core trovemodule.Core) error {
 Use `trovemodule.Serve` to register the module. Optional interfaces:
 
 - **HTTPHandler** — serve HTTP routes declared in the manifest
+- **AuthHandler** — validate gateway requests for `[[auth.validators]]` entries
 - **MCPToolHandler** — handle MCP tools declared in `[[mcp.tools]]`
 - **EventProcessor** — `Process(event, dispatch)` for event-routing processors
 - **EventSink** — `Handle(event, dispatch)` for sinks
