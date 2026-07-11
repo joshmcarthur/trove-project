@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,9 +22,16 @@ type Querier interface {
 	SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (Summary, error)
 }
 
-// MCPHandler returns the MCP streamable HTTP handler for q.
-func MCPHandler(q Querier) http.Handler {
-	return newMCPHandler(q)
+// MCPDeps bundles dependencies for the MCP HTTP handler.
+type MCPDeps struct {
+	Querier Querier
+	Tools   []trovemodule.MCPToolDescriptor
+	Caller  trovemodule.MCPToolCaller
+}
+
+// MCPHandler returns the MCP streamable HTTP handler.
+func MCPHandler(deps MCPDeps) http.Handler {
+	return newMCPHandler(deps)
 }
 
 // Serve starts the MCP query server on listen until ctx is cancelled.
@@ -32,7 +40,7 @@ func Serve(ctx context.Context, listen string, svc *Service) error {
 		return fmt.Errorf("query: service is required")
 	}
 
-	handler := MCPHandler(svc)
+	handler := MCPHandler(MCPDeps{Querier: svc})
 
 	httpServer := &http.Server{
 		Addr:    listen,
@@ -55,19 +63,30 @@ func Serve(ctx context.Context, listen string, svc *Service) error {
 	return err
 }
 
-func newMCPHandler(q Querier) http.Handler {
-	server := newMCPServer(q)
+func newMCPHandler(deps MCPDeps) http.Handler {
+	server := newMCPServer(deps)
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
 	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
 }
 
-func newMCPServer(q Querier) *mcp.Server {
+func newMCPServer(deps MCPDeps) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "trove",
 		Version: "0.1.0",
 	}, nil)
 
+	if deps.Querier != nil {
+		registerQueryTools(server, deps.Querier)
+	}
+	if deps.Caller != nil {
+		registerModuleTools(server, deps.Tools, deps.Caller)
+	}
+
+	return server
+}
+
+func registerQueryTools(server *mcp.Server, q Querier) {
 	type getEventParams struct {
 		ID string `json:"id" jsonschema:"ULID of the event to retrieve"`
 	}
@@ -80,15 +99,7 @@ func newMCPServer(q Querier) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		data, err := json.Marshal(event)
-		if err != nil {
-			return nil, nil, err
-		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: string(data)},
-			},
-		}, nil, nil
+		return textToolResult(event)
 	})
 
 	type searchEventsParams struct {
@@ -111,15 +122,7 @@ func newMCPServer(q Querier) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		data, err := json.Marshal(events)
-		if err != nil {
-			return nil, nil, err
-		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: string(data)},
-			},
-		}, nil, nil
+		return textToolResult(events)
 	})
 
 	type getEventsByTypeParams struct {
@@ -144,15 +147,7 @@ func newMCPServer(q Querier) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		data, err := json.Marshal(events)
-		if err != nil {
-			return nil, nil, err
-		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: string(data)},
-			},
-		}, nil, nil
+		return textToolResult(events)
 	})
 
 	type summarizeRangeParams struct {
@@ -172,18 +167,48 @@ func newMCPServer(q Querier) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		data, err := json.Marshal(summary)
-		if err != nil {
-			return nil, nil, err
-		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: string(data)},
-			},
-		}, nil, nil
+		return textToolResult(summary)
 	})
+}
 
-	return server
+func registerModuleTools(server *mcp.Server, tools []trovemodule.MCPToolDescriptor, caller trovemodule.MCPToolCaller) {
+	for _, tool := range tools {
+		tool := tool
+		mcp.AddTool(server, &mcp.Tool{
+			Name:        tool.Name,
+			Description: tool.Description,
+		}, func(ctx context.Context, req *mcp.CallToolRequest, params map[string]any) (*mcp.CallToolResult, any, error) {
+			_ = req
+			args, err := json.Marshal(params)
+			if err != nil {
+				return nil, nil, err
+			}
+			result, err := caller.CallMCPTool(ctx, tool.Name, args)
+			if err != nil {
+				return nil, nil, err
+			}
+			if len(result) == 0 {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{&mcp.TextContent{Text: "{}"}},
+				}, nil, nil
+			}
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: string(result)}},
+			}, nil, nil
+		})
+	}
+}
+
+func textToolResult(v any) (*mcp.CallToolResult, any, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: string(data)},
+		},
+	}, nil, nil
 }
 
 func searchParamsFromMCP(typePrefix, source, timeFrom, timeTo string) (SearchParams, error) {

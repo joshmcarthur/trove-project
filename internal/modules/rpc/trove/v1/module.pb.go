@@ -7,11 +7,12 @@
 package troverpc
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -726,9 +727,262 @@ func (x *HTTPResponse) GetBody() []byte {
 	return nil
 }
 
+type MCPToolDescriptor struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Module        string                 `protobuf:"bytes,3,opt,name=module,proto3" json:"module,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MCPToolDescriptor) Reset() {
+	*x = MCPToolDescriptor{}
+	mi := &file_trove_v1_module_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MCPToolDescriptor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MCPToolDescriptor) ProtoMessage() {}
+
+func (x *MCPToolDescriptor) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MCPToolDescriptor.ProtoReflect.Descriptor instead.
+func (*MCPToolDescriptor) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *MCPToolDescriptor) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MCPToolDescriptor) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *MCPToolDescriptor) GetModule() string {
+	if x != nil {
+		return x.Module
+	}
+	return ""
+}
+
+type ListMCPToolsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMCPToolsRequest) Reset() {
+	*x = ListMCPToolsRequest{}
+	mi := &file_trove_v1_module_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMCPToolsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMCPToolsRequest) ProtoMessage() {}
+
+func (x *ListMCPToolsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMCPToolsRequest.ProtoReflect.Descriptor instead.
+func (*ListMCPToolsRequest) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{13}
+}
+
+type ListMCPToolsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tools         []*MCPToolDescriptor   `protobuf:"bytes,1,rep,name=tools,proto3" json:"tools,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMCPToolsResponse) Reset() {
+	*x = ListMCPToolsResponse{}
+	mi := &file_trove_v1_module_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMCPToolsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMCPToolsResponse) ProtoMessage() {}
+
+func (x *ListMCPToolsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMCPToolsResponse.ProtoReflect.Descriptor instead.
+func (*ListMCPToolsResponse) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ListMCPToolsResponse) GetTools() []*MCPToolDescriptor {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
+type MCPToolCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ArgumentsJson []byte                 `protobuf:"bytes,2,opt,name=arguments_json,json=argumentsJson,proto3" json:"arguments_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MCPToolCallRequest) Reset() {
+	*x = MCPToolCallRequest{}
+	mi := &file_trove_v1_module_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MCPToolCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MCPToolCallRequest) ProtoMessage() {}
+
+func (x *MCPToolCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MCPToolCallRequest.ProtoReflect.Descriptor instead.
+func (*MCPToolCallRequest) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *MCPToolCallRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MCPToolCallRequest) GetArgumentsJson() []byte {
+	if x != nil {
+		return x.ArgumentsJson
+	}
+	return nil
+}
+
+type MCPToolCallResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ResultJson    []byte                 `protobuf:"bytes,1,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
+	IsError       bool                   `protobuf:"varint,2,opt,name=is_error,json=isError,proto3" json:"is_error,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MCPToolCallResponse) Reset() {
+	*x = MCPToolCallResponse{}
+	mi := &file_trove_v1_module_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MCPToolCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MCPToolCallResponse) ProtoMessage() {}
+
+func (x *MCPToolCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_trove_v1_module_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MCPToolCallResponse.ProtoReflect.Descriptor instead.
+func (*MCPToolCallResponse) Descriptor() ([]byte, []int) {
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *MCPToolCallResponse) GetResultJson() []byte {
+	if x != nil {
+		return x.ResultJson
+	}
+	return nil
+}
+
+func (x *MCPToolCallResponse) GetIsError() bool {
+	if x != nil {
+		return x.IsError
+	}
+	return false
+}
+
+func (x *MCPToolCallResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type RunRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Broker ID for CoreServices (Emit, BlobPut, Query).
+	// Internal plugin wire format: parent-process handle for CoreServices.
+	// Module authors use trovemodule.Core instead.
 	ServicesBrokerId uint32 `protobuf:"varint,1,opt,name=services_broker_id,json=servicesBrokerId,proto3" json:"services_broker_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -736,7 +990,7 @@ type RunRequest struct {
 
 func (x *RunRequest) Reset() {
 	*x = RunRequest{}
-	mi := &file_trove_v1_module_proto_msgTypes[12]
+	mi := &file_trove_v1_module_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -748,7 +1002,7 @@ func (x *RunRequest) String() string {
 func (*RunRequest) ProtoMessage() {}
 
 func (x *RunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trove_v1_module_proto_msgTypes[12]
+	mi := &file_trove_v1_module_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -761,7 +1015,7 @@ func (x *RunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
 func (*RunRequest) Descriptor() ([]byte, []int) {
-	return file_trove_v1_module_proto_rawDescGZIP(), []int{12}
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RunRequest) GetServicesBrokerId() uint32 {
@@ -779,7 +1033,7 @@ type RunResponse struct {
 
 func (x *RunResponse) Reset() {
 	*x = RunResponse{}
-	mi := &file_trove_v1_module_proto_msgTypes[13]
+	mi := &file_trove_v1_module_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -791,7 +1045,7 @@ func (x *RunResponse) String() string {
 func (*RunResponse) ProtoMessage() {}
 
 func (x *RunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trove_v1_module_proto_msgTypes[13]
+	mi := &file_trove_v1_module_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -804,7 +1058,7 @@ func (x *RunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunResponse.ProtoReflect.Descriptor instead.
 func (*RunResponse) Descriptor() ([]byte, []int) {
-	return file_trove_v1_module_proto_rawDescGZIP(), []int{13}
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{18}
 }
 
 type HealthcheckRequest struct {
@@ -815,7 +1069,7 @@ type HealthcheckRequest struct {
 
 func (x *HealthcheckRequest) Reset() {
 	*x = HealthcheckRequest{}
-	mi := &file_trove_v1_module_proto_msgTypes[14]
+	mi := &file_trove_v1_module_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -827,7 +1081,7 @@ func (x *HealthcheckRequest) String() string {
 func (*HealthcheckRequest) ProtoMessage() {}
 
 func (x *HealthcheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trove_v1_module_proto_msgTypes[14]
+	mi := &file_trove_v1_module_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -840,7 +1094,7 @@ func (x *HealthcheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthcheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthcheckRequest) Descriptor() ([]byte, []int) {
-	return file_trove_v1_module_proto_rawDescGZIP(), []int{14}
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{19}
 }
 
 type HealthcheckResponse struct {
@@ -853,7 +1107,7 @@ type HealthcheckResponse struct {
 
 func (x *HealthcheckResponse) Reset() {
 	*x = HealthcheckResponse{}
-	mi := &file_trove_v1_module_proto_msgTypes[15]
+	mi := &file_trove_v1_module_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -865,7 +1119,7 @@ func (x *HealthcheckResponse) String() string {
 func (*HealthcheckResponse) ProtoMessage() {}
 
 func (x *HealthcheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trove_v1_module_proto_msgTypes[15]
+	mi := &file_trove_v1_module_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -878,7 +1132,7 @@ func (x *HealthcheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthcheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthcheckResponse) Descriptor() ([]byte, []int) {
-	return file_trove_v1_module_proto_rawDescGZIP(), []int{15}
+	return file_trove_v1_module_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *HealthcheckResponse) GetOk() bool {
@@ -959,7 +1213,22 @@ const file_trove_v1_module_proto_rawDesc = "" +
 	"\x04body\x18\x03 \x01(\fR\x04body\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\":\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"a\n" +
+	"\x11MCPToolDescriptor\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06module\x18\x03 \x01(\tR\x06module\"\x15\n" +
+	"\x13ListMCPToolsRequest\"I\n" +
+	"\x14ListMCPToolsResponse\x121\n" +
+	"\x05tools\x18\x01 \x03(\v2\x1b.trove.v1.MCPToolDescriptorR\x05tools\"O\n" +
+	"\x12MCPToolCallRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12%\n" +
+	"\x0earguments_json\x18\x02 \x01(\fR\rargumentsJson\"k\n" +
+	"\x13MCPToolCallResponse\x12\x1f\n" +
+	"\vresult_json\x18\x01 \x01(\fR\n" +
+	"resultJson\x12\x19\n" +
+	"\bis_error\x18\x02 \x01(\bR\aisError\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\":\n" +
 	"\n" +
 	"RunRequest\x12,\n" +
 	"\x12services_broker_id\x18\x01 \x01(\rR\x10servicesBrokerId\"\r\n" +
@@ -967,18 +1236,22 @@ const file_trove_v1_module_proto_rawDesc = "" +
 	"\x12HealthcheckRequest\"?\n" +
 	"\x13HealthcheckResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xa1\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xbc\x04\n" +
 	"\fCoreServices\x12/\n" +
 	"\x04Emit\x12\x0f.trove.v1.Event\x1a\x16.trove.v1.EmitResponse\x12>\n" +
 	"\aBlobPut\x12\x18.trove.v1.BlobPutRequest\x1a\x19.trove.v1.BlobPutResponse\x126\n" +
 	"\bGetEvent\x12\x19.trove.v1.GetEventRequest\x1a\x0f.trove.v1.Event\x12M\n" +
 	"\fSearchEvents\x12\x1d.trove.v1.SearchEventsRequest\x1a\x1e.trove.v1.SearchEventsResponse\x12S\n" +
 	"\x0fGetEventsByType\x12 .trove.v1.GetEventsByTypeRequest\x1a\x1e.trove.v1.SearchEventsResponse\x12D\n" +
-	"\x0eSummarizeRange\x12\x1f.trove.v1.SummarizeRangeRequest\x1a\x11.trove.v1.Summary2I\n" +
+	"\x0eSummarizeRange\x12\x1f.trove.v1.SummarizeRangeRequest\x1a\x11.trove.v1.Summary\x12M\n" +
+	"\fListMCPTools\x12\x1d.trove.v1.ListMCPToolsRequest\x1a\x1e.trove.v1.ListMCPToolsResponse\x12J\n" +
+	"\vCallMCPTool\x12\x1c.trove.v1.MCPToolCallRequest\x1a\x1d.trove.v1.MCPToolCallResponse2I\n" +
 	"\n" +
 	"HTTPModule\x12;\n" +
 	"\n" +
-	"HandleHTTP\x12\x15.trove.v1.HTTPRequest\x1a\x16.trove.v1.HTTPResponse2\x8e\x01\n" +
+	"HandleHTTP\x12\x15.trove.v1.HTTPRequest\x1a\x16.trove.v1.HTTPResponse2T\n" +
+	"\tMCPModule\x12G\n" +
+	"\bCallTool\x12\x1c.trove.v1.MCPToolCallRequest\x1a\x1d.trove.v1.MCPToolCallResponse2\x8e\x01\n" +
 	"\fSourceModule\x122\n" +
 	"\x03Run\x12\x14.trove.v1.RunRequest\x1a\x15.trove.v1.RunResponse\x12J\n" +
 	"\vHealthcheck\x12\x1c.trove.v1.HealthcheckRequest\x1a\x1d.trove.v1.HealthcheckResponseB=Z;github.com/joshmcarthur/trove/internal/modules/rpc;troverpcb\x06proto3"
@@ -995,7 +1268,7 @@ func file_trove_v1_module_proto_rawDescGZIP() []byte {
 	return file_trove_v1_module_proto_rawDescData
 }
 
-var file_trove_v1_module_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_trove_v1_module_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_trove_v1_module_proto_goTypes = []any{
 	(*Event)(nil),                  // 0: trove.v1.Event
 	(*EmitResponse)(nil),           // 1: trove.v1.EmitResponse
@@ -1009,45 +1282,57 @@ var file_trove_v1_module_proto_goTypes = []any{
 	(*Summary)(nil),                // 9: trove.v1.Summary
 	(*HTTPRequest)(nil),            // 10: trove.v1.HTTPRequest
 	(*HTTPResponse)(nil),           // 11: trove.v1.HTTPResponse
-	(*RunRequest)(nil),             // 12: trove.v1.RunRequest
-	(*RunResponse)(nil),            // 13: trove.v1.RunResponse
-	(*HealthcheckRequest)(nil),     // 14: trove.v1.HealthcheckRequest
-	(*HealthcheckResponse)(nil),    // 15: trove.v1.HealthcheckResponse
-	nil,                            // 16: trove.v1.Summary.ByTypeEntry
-	nil,                            // 17: trove.v1.HTTPRequest.PathValuesEntry
-	nil,                            // 18: trove.v1.HTTPRequest.HeadersEntry
-	nil,                            // 19: trove.v1.HTTPResponse.HeadersEntry
+	(*MCPToolDescriptor)(nil),      // 12: trove.v1.MCPToolDescriptor
+	(*ListMCPToolsRequest)(nil),    // 13: trove.v1.ListMCPToolsRequest
+	(*ListMCPToolsResponse)(nil),   // 14: trove.v1.ListMCPToolsResponse
+	(*MCPToolCallRequest)(nil),     // 15: trove.v1.MCPToolCallRequest
+	(*MCPToolCallResponse)(nil),    // 16: trove.v1.MCPToolCallResponse
+	(*RunRequest)(nil),             // 17: trove.v1.RunRequest
+	(*RunResponse)(nil),            // 18: trove.v1.RunResponse
+	(*HealthcheckRequest)(nil),     // 19: trove.v1.HealthcheckRequest
+	(*HealthcheckResponse)(nil),    // 20: trove.v1.HealthcheckResponse
+	nil,                            // 21: trove.v1.Summary.ByTypeEntry
+	nil,                            // 22: trove.v1.HTTPRequest.PathValuesEntry
+	nil,                            // 23: trove.v1.HTTPRequest.HeadersEntry
+	nil,                            // 24: trove.v1.HTTPResponse.HeadersEntry
 }
 var file_trove_v1_module_proto_depIdxs = []int32{
 	0,  // 0: trove.v1.SearchEventsResponse.events:type_name -> trove.v1.Event
-	16, // 1: trove.v1.Summary.by_type:type_name -> trove.v1.Summary.ByTypeEntry
+	21, // 1: trove.v1.Summary.by_type:type_name -> trove.v1.Summary.ByTypeEntry
 	0,  // 2: trove.v1.Summary.notable:type_name -> trove.v1.Event
-	17, // 3: trove.v1.HTTPRequest.path_values:type_name -> trove.v1.HTTPRequest.PathValuesEntry
-	18, // 4: trove.v1.HTTPRequest.headers:type_name -> trove.v1.HTTPRequest.HeadersEntry
-	19, // 5: trove.v1.HTTPResponse.headers:type_name -> trove.v1.HTTPResponse.HeadersEntry
-	0,  // 6: trove.v1.CoreServices.Emit:input_type -> trove.v1.Event
-	2,  // 7: trove.v1.CoreServices.BlobPut:input_type -> trove.v1.BlobPutRequest
-	4,  // 8: trove.v1.CoreServices.GetEvent:input_type -> trove.v1.GetEventRequest
-	5,  // 9: trove.v1.CoreServices.SearchEvents:input_type -> trove.v1.SearchEventsRequest
-	7,  // 10: trove.v1.CoreServices.GetEventsByType:input_type -> trove.v1.GetEventsByTypeRequest
-	8,  // 11: trove.v1.CoreServices.SummarizeRange:input_type -> trove.v1.SummarizeRangeRequest
-	10, // 12: trove.v1.HTTPModule.HandleHTTP:input_type -> trove.v1.HTTPRequest
-	12, // 13: trove.v1.SourceModule.Run:input_type -> trove.v1.RunRequest
-	14, // 14: trove.v1.SourceModule.Healthcheck:input_type -> trove.v1.HealthcheckRequest
-	1,  // 15: trove.v1.CoreServices.Emit:output_type -> trove.v1.EmitResponse
-	3,  // 16: trove.v1.CoreServices.BlobPut:output_type -> trove.v1.BlobPutResponse
-	0,  // 17: trove.v1.CoreServices.GetEvent:output_type -> trove.v1.Event
-	6,  // 18: trove.v1.CoreServices.SearchEvents:output_type -> trove.v1.SearchEventsResponse
-	6,  // 19: trove.v1.CoreServices.GetEventsByType:output_type -> trove.v1.SearchEventsResponse
-	9,  // 20: trove.v1.CoreServices.SummarizeRange:output_type -> trove.v1.Summary
-	11, // 21: trove.v1.HTTPModule.HandleHTTP:output_type -> trove.v1.HTTPResponse
-	13, // 22: trove.v1.SourceModule.Run:output_type -> trove.v1.RunResponse
-	15, // 23: trove.v1.SourceModule.Healthcheck:output_type -> trove.v1.HealthcheckResponse
-	15, // [15:24] is the sub-list for method output_type
-	6,  // [6:15] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	22, // 3: trove.v1.HTTPRequest.path_values:type_name -> trove.v1.HTTPRequest.PathValuesEntry
+	23, // 4: trove.v1.HTTPRequest.headers:type_name -> trove.v1.HTTPRequest.HeadersEntry
+	24, // 5: trove.v1.HTTPResponse.headers:type_name -> trove.v1.HTTPResponse.HeadersEntry
+	12, // 6: trove.v1.ListMCPToolsResponse.tools:type_name -> trove.v1.MCPToolDescriptor
+	0,  // 7: trove.v1.CoreServices.Emit:input_type -> trove.v1.Event
+	2,  // 8: trove.v1.CoreServices.BlobPut:input_type -> trove.v1.BlobPutRequest
+	4,  // 9: trove.v1.CoreServices.GetEvent:input_type -> trove.v1.GetEventRequest
+	5,  // 10: trove.v1.CoreServices.SearchEvents:input_type -> trove.v1.SearchEventsRequest
+	7,  // 11: trove.v1.CoreServices.GetEventsByType:input_type -> trove.v1.GetEventsByTypeRequest
+	8,  // 12: trove.v1.CoreServices.SummarizeRange:input_type -> trove.v1.SummarizeRangeRequest
+	13, // 13: trove.v1.CoreServices.ListMCPTools:input_type -> trove.v1.ListMCPToolsRequest
+	15, // 14: trove.v1.CoreServices.CallMCPTool:input_type -> trove.v1.MCPToolCallRequest
+	10, // 15: trove.v1.HTTPModule.HandleHTTP:input_type -> trove.v1.HTTPRequest
+	15, // 16: trove.v1.MCPModule.CallTool:input_type -> trove.v1.MCPToolCallRequest
+	17, // 17: trove.v1.SourceModule.Run:input_type -> trove.v1.RunRequest
+	19, // 18: trove.v1.SourceModule.Healthcheck:input_type -> trove.v1.HealthcheckRequest
+	1,  // 19: trove.v1.CoreServices.Emit:output_type -> trove.v1.EmitResponse
+	3,  // 20: trove.v1.CoreServices.BlobPut:output_type -> trove.v1.BlobPutResponse
+	0,  // 21: trove.v1.CoreServices.GetEvent:output_type -> trove.v1.Event
+	6,  // 22: trove.v1.CoreServices.SearchEvents:output_type -> trove.v1.SearchEventsResponse
+	6,  // 23: trove.v1.CoreServices.GetEventsByType:output_type -> trove.v1.SearchEventsResponse
+	9,  // 24: trove.v1.CoreServices.SummarizeRange:output_type -> trove.v1.Summary
+	14, // 25: trove.v1.CoreServices.ListMCPTools:output_type -> trove.v1.ListMCPToolsResponse
+	16, // 26: trove.v1.CoreServices.CallMCPTool:output_type -> trove.v1.MCPToolCallResponse
+	11, // 27: trove.v1.HTTPModule.HandleHTTP:output_type -> trove.v1.HTTPResponse
+	16, // 28: trove.v1.MCPModule.CallTool:output_type -> trove.v1.MCPToolCallResponse
+	18, // 29: trove.v1.SourceModule.Run:output_type -> trove.v1.RunResponse
+	20, // 30: trove.v1.SourceModule.Healthcheck:output_type -> trove.v1.HealthcheckResponse
+	19, // [19:31] is the sub-list for method output_type
+	7,  // [7:19] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_trove_v1_module_proto_init() }
@@ -1061,9 +1346,9 @@ func file_trove_v1_module_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_trove_v1_module_proto_rawDesc), len(file_trove_v1_module_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   25,
 			NumExtensions: 0,
-			NumServices:   3,
+			NumServices:   4,
 		},
 		GoTypes:           file_trove_v1_module_proto_goTypes,
 		DependencyIndexes: file_trove_v1_module_proto_depIdxs,

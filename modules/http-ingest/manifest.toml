@@ -5,6 +5,7 @@ provides = [
   "http.ingest.received",
   "note.*",
   "shortcut.*",
+  "shortcuts.*",
 ]
 max_body_bytes = 10485760
 

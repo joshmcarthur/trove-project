@@ -29,6 +29,16 @@ type manifestHTTP struct {
 	Routes []HTTPRoute `toml:"routes"`
 }
 
+type manifestMCP struct {
+	Tools []MCPTool `toml:"tools"`
+}
+
+// MCPTool declares an MCP tool provided by a module.
+type MCPTool struct {
+	Name        string `toml:"name"`
+	Description string `toml:"description"`
+}
+
 // Manifest describes a Trove module from manifest.toml.
 type Manifest struct {
 	Name     string            `toml:"name"`
@@ -37,12 +47,18 @@ type Manifest struct {
 	Provides []string          `toml:"provides"`
 	Schemas  map[string]string `toml:"schemas"`
 	HTTP     manifestHTTP      `toml:"http"`
+	MCP      manifestMCP       `toml:"mcp"`
 	Listen   string            `toml:"listen"`
 }
 
 // HTTPRoutes returns declared HTTP routes from the manifest.
 func (m Manifest) HTTPRoutes() []HTTPRoute {
 	return m.HTTP.Routes
+}
+
+// MCPTools returns declared MCP tools from the manifest.
+func (m Manifest) MCPTools() []MCPTool {
+	return m.MCP.Tools
 }
 
 // ParseManifest parses and validates manifest TOML from data.
@@ -107,6 +123,22 @@ func validateManifest(m Manifest) error {
 		}
 	}
 
+	for i, tool := range m.MCP.Tools {
+		if err := validateMCPTool(tool); err != nil {
+			return fmt.Errorf("modules: manifest: mcp.tools[%d]: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+func validateMCPTool(tool MCPTool) error {
+	if strings.TrimSpace(tool.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if strings.TrimSpace(tool.Description) == "" {
+		return fmt.Errorf("description is required")
+	}
 	return nil
 }
 
@@ -162,4 +194,43 @@ func CollectHTTPRoutes(mods []Module) ([]HTTPRouteEntry, error) {
 type HTTPRouteEntry struct {
 	Route  HTTPRoute
 	Module string
+}
+
+// MCPToolEntry binds a manifest MCP tool to its module.
+type MCPToolEntry struct {
+	Tool   MCPTool
+	Module string
+}
+
+// CollectMCPTools gathers MCP tools from discovered modules and rejects duplicates.
+func CollectMCPTools(mods []Module) ([]MCPToolEntry, error) {
+	seen := make(map[string]struct{})
+	var tools []MCPToolEntry
+
+	for _, mod := range mods {
+		manifest, err := loadModuleManifest(mod)
+		if err != nil {
+			return nil, err
+		}
+		for _, tool := range manifest.MCPTools() {
+			if _, exists := seen[tool.Name]; exists {
+				return nil, fmt.Errorf("modules: duplicate mcp tool %q for module %q", tool.Name, manifest.Name)
+			}
+			seen[tool.Name] = struct{}{}
+			tools = append(tools, MCPToolEntry{
+				Tool:   tool,
+				Module: manifest.Name,
+			})
+		}
+	}
+	return tools, nil
+}
+
+// MCPToolModuleIndex maps MCP tool names to providing module names.
+func MCPToolModuleIndex(entries []MCPToolEntry) map[string]string {
+	index := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		index[entry.Tool.Name] = entry.Module
+	}
+	return index
 }

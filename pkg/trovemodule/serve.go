@@ -10,7 +10,7 @@ import (
 )
 
 // Serve starts a Trove module plugin subprocess. mod must implement Module and
-// may also implement HTTPHandler and HealthChecker.
+// may also implement HTTPHandler, MCPToolHandler, and HealthChecker.
 func Serve(mod Module) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
@@ -37,6 +37,9 @@ func (p *sourceGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 	})
 	if _, ok := p.mod.(HTTPHandler); ok {
 		troverpc.RegisterHTTPModuleServer(s, &httpModuleServer{mod: p.mod})
+	}
+	if _, ok := p.mod.(MCPToolHandler); ok {
+		troverpc.RegisterMCPModuleServer(s, &mcpModuleServer{mod: p.mod})
 	}
 	return nil
 }
@@ -80,6 +83,26 @@ func (s *httpModuleServer) HandleHTTP(ctx context.Context, req *troverpc.HTTPReq
 		return nil, fmt.Errorf("trovemodule: module does not implement HTTPHandler")
 	}
 	return h.HandleHTTP(ctx, req)
+}
+
+type mcpModuleServer struct {
+	troverpc.UnimplementedMCPModuleServer
+	mod Module
+}
+
+func (s *mcpModuleServer) CallTool(ctx context.Context, req *troverpc.MCPToolCallRequest) (*troverpc.MCPToolCallResponse, error) {
+	h, ok := s.mod.(MCPToolHandler)
+	if !ok {
+		return nil, fmt.Errorf("trovemodule: module does not implement MCPToolHandler")
+	}
+	result, err := h.CallTool(ctx, req.GetName(), req.GetArgumentsJson())
+	if err != nil {
+		return &troverpc.MCPToolCallResponse{
+			IsError: true,
+			Message: err.Error(),
+		}, nil
+	}
+	return &troverpc.MCPToolCallResponse{ResultJson: result}, nil
 }
 
 var _ plugin.GRPCPlugin = (*sourceGRPCPlugin)(nil)

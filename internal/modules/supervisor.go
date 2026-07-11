@@ -16,7 +16,16 @@ const (
 )
 
 // RunSources supervises source and HTTP modules until ctx is cancelled.
-func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *HTTPRegistry) {
+func RunSources(
+	ctx context.Context,
+	j journal.Journal,
+	mods []Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
 		manifest, err := loadModuleManifest(mod)
@@ -24,19 +33,28 @@ func RunSources(ctx context.Context, j journal.Journal, mods []Module, blobs blo
 			log.Printf("modules: load manifest %q: %v", mod.Manifest.Name, err)
 			continue
 		}
-		if manifest.Kind != KindSource && len(manifest.HTTPRoutes()) == 0 {
+		if manifest.Kind != KindSource && len(manifest.HTTPRoutes()) == 0 && len(manifest.MCPTools()) == 0 {
 			continue
 		}
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseSource(ctx, j, mod, blobs, registry)
+			superviseSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, mcpTools, toolModules)
 		}(mod)
 	}
 	wg.Wait()
 }
 
-func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) {
+func superviseSource(
+	ctx context.Context,
+	j journal.Journal,
+	mod Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
 
@@ -45,7 +63,7 @@ func superviseSource(ctx context.Context, j journal.Journal, mod Module, blobs b
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobs, registry)
+		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, mcpTools, toolModules)
 		if handle != nil {
 			select {
 			case <-ctx.Done():

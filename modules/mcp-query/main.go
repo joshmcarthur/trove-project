@@ -17,7 +17,15 @@ type mcpQueryModule struct {
 }
 
 func (m *mcpQueryModule) Run(ctx context.Context, core trovemodule.Core) error {
-	m.handler = query.MCPHandler(&queryAdapter{q: core})
+	tools, err := core.ListMCPTools(ctx)
+	if err != nil {
+		return err
+	}
+	m.handler = query.MCPHandler(query.MCPDeps{
+		Querier: &queryAdapter{q: core},
+		Tools:   tools,
+		Caller:  core,
+	})
 	m.ready.Store(true)
 	defer m.ready.Store(false)
 	<-ctx.Done()

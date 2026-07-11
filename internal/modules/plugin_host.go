@@ -14,6 +14,7 @@ import (
 )
 
 var errHTTPNotSupported = errors.New("modules: module does not support HTTP")
+var errMCPNotSupported = errors.New("modules: module does not support MCP tools")
 
 // SourceModule is the host-side client for a running module plugin.
 type SourceModule interface {
@@ -22,13 +23,18 @@ type SourceModule interface {
 }
 
 type sourceModuleClient struct {
-	client     troverpc.SourceModuleClient
-	httpClient troverpc.HTTPModuleClient
-	broker     *plugin.GRPCBroker
-	journal    journal.Journal
-	policy     IngestPolicy
-	blobs      blob.Store
-	hasHTTP    bool
+	client      troverpc.SourceModuleClient
+	httpClient  troverpc.HTTPModuleClient
+	mcpClient   troverpc.MCPModuleClient
+	broker      *plugin.GRPCBroker
+	journal     journal.Journal
+	policy      IngestPolicy
+	blobs       blob.Store
+	mcpTools    []MCPToolEntry
+	toolModules map[string]string
+	mcpRegistry *MCPRegistry
+	hasHTTP     bool
+	hasMCPTools bool
 }
 
 func (c *sourceModuleClient) Run(ctx context.Context) error {
@@ -40,10 +46,13 @@ func (c *sourceModuleClient) Run(ctx context.Context) error {
 			querySvc = &query.Service{Journal: c.journal}
 		}
 		troverpc.RegisterCoreServicesServer(s, &coreServicesServer{
-			journal: c.journal,
-			policy:  c.policy,
-			blobs:   c.blobs,
-			query:   querySvc,
+			journal:     c.journal,
+			policy:      c.policy,
+			blobs:       c.blobs,
+			query:       querySvc,
+			mcpTools:    c.mcpTools,
+			toolModules: c.toolModules,
+			mcpRegistry: c.mcpRegistry,
 		})
 		return s
 	})
@@ -65,24 +74,40 @@ func (c *sourceModuleClient) HandleHTTP(ctx context.Context, req *troverpc.HTTPR
 	return c.httpClient.HandleHTTP(ctx, req)
 }
 
+func (c *sourceModuleClient) CallTool(ctx context.Context, req *troverpc.MCPToolCallRequest) (*troverpc.MCPToolCallResponse, error) {
+	if !c.hasMCPTools {
+		return nil, errMCPNotSupported
+	}
+	return c.mcpClient.CallTool(ctx, req)
+}
+
 type sourceModuleGRPCPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	journal    journal.Journal
-	policy     IngestPolicy
-	moduleName string
-	blobs      blob.Store
-	hasHTTP    bool
+	journal     journal.Journal
+	policy      IngestPolicy
+	moduleName  string
+	blobs       blob.Store
+	mcpTools    []MCPToolEntry
+	toolModules map[string]string
+	mcpRegistry *MCPRegistry
+	hasHTTP     bool
+	hasMCPTools bool
 }
 
 func (p *sourceModuleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (any, error) {
 	return &sourceModuleClient{
-		client:     troverpc.NewSourceModuleClient(c),
-		httpClient: troverpc.NewHTTPModuleClient(c),
-		broker:     broker,
-		journal:    p.journal,
-		policy:     p.policy,
-		blobs:      p.blobs,
-		hasHTTP:    p.hasHTTP,
+		client:      troverpc.NewSourceModuleClient(c),
+		httpClient:  troverpc.NewHTTPModuleClient(c),
+		mcpClient:   troverpc.NewMCPModuleClient(c),
+		broker:      broker,
+		journal:     p.journal,
+		policy:      p.policy,
+		blobs:       p.blobs,
+		mcpTools:    p.mcpTools,
+		toolModules: p.toolModules,
+		mcpRegistry: p.mcpRegistry,
+		hasHTTP:     p.hasHTTP,
+		hasMCPTools: p.hasMCPTools,
 	}, nil
 }
 
@@ -90,14 +115,28 @@ func (p *sourceModuleGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.S
 	return nil
 }
 
-func hostPluginSet(j journal.Journal, policy IngestPolicy, moduleName string, blobs blob.Store, hasHTTP bool) map[string]plugin.Plugin {
+func hostPluginSet(
+	j journal.Journal,
+	policy IngestPolicy,
+	moduleName string,
+	blobs blob.Store,
+	hasHTTP bool,
+	hasMCPTools bool,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+	mcpRegistry *MCPRegistry,
+) map[string]plugin.Plugin {
 	return map[string]plugin.Plugin{
 		trovemodule.PluginName: &sourceModuleGRPCPlugin{
-			journal:    j,
-			policy:     policy,
-			moduleName: moduleName,
-			blobs:      blobs,
-			hasHTTP:    hasHTTP,
+			journal:     j,
+			policy:      policy,
+			moduleName:  moduleName,
+			blobs:       blobs,
+			mcpTools:    mcpTools,
+			toolModules: toolModules,
+			mcpRegistry: mcpRegistry,
+			hasHTTP:     hasHTTP,
+			hasMCPTools: hasMCPTools,
 		},
 	}
 }

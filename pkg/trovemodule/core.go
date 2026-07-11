@@ -2,18 +2,19 @@ package trovemodule
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hashicorp/go-plugin"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
 // Core is the module's connection to the Trove parent process. Use it to append
-// events, store blobs, and read the journal. The plugin runtime opens this
-// connection on behalf of the module; authors do not dial brokers or handles.
+// events, store blobs, read the journal, and invoke module MCP tools.
 type Core interface {
 	Emitter
 	BlobPutter
 	Querier
+	MCPToolCaller
 }
 
 // Module is the main entry contract for trovemodule.Serve. Implement Run to
@@ -88,4 +89,46 @@ func (c *coreConn) GetEventsByType(ctx context.Context, req *troverpc.GetEventsB
 
 func (c *coreConn) SummarizeRange(ctx context.Context, req *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
 	return c.client.SummarizeRange(ctx, req)
+}
+
+func (c *coreConn) ListMCPTools(ctx context.Context) ([]MCPToolDescriptor, error) {
+	resp, err := c.client.ListMCPTools(ctx, &troverpc.ListMCPToolsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	tools := make([]MCPToolDescriptor, 0, len(resp.GetTools()))
+	for _, tool := range resp.GetTools() {
+		tools = append(tools, MCPToolDescriptor{
+			Name:        tool.GetName(),
+			Description: tool.GetDescription(),
+			Module:      tool.GetModule(),
+		})
+	}
+	return tools, nil
+}
+
+func (c *coreConn) CallMCPTool(ctx context.Context, name string, arguments json.RawMessage) (json.RawMessage, error) {
+	resp, err := c.client.CallMCPTool(ctx, &troverpc.MCPToolCallRequest{
+		Name:          name,
+		ArgumentsJson: arguments,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetIsError() {
+		msg := resp.GetMessage()
+		if msg == "" {
+			msg = "mcp tool call failed"
+		}
+		return nil, &mcpToolError{msg: msg}
+	}
+	return resp.GetResultJson(), nil
+}
+
+type mcpToolError struct {
+	msg string
+}
+
+func (e *mcpToolError) Error() string {
+	return e.msg
 }

@@ -106,8 +106,22 @@ Use explicit `type` values so MCP search can find captures later:
 | URL bookmark | `shortcuts.url.saved` | `url`, `title` |
 | Location check-in | `shortcuts.location.checked` | `latitude`, `longitude`, `label` |
 | Clipboard save | `shortcuts.clipboard.saved` | `text` |
+| Quick capture (classify later) | *(via capture-classifier)* | POST `https://<host>/capture/shortcuts` with arbitrary JSON body |
 
 Example payloads: [`examples/ios-shortcuts/payloads/`](../examples/ios-shortcuts/payloads/).
+
+### Quick capture (classify later)
+
+Use the [capture-classifier](../planning/deferred-capture.md) module when you want
+to store data before choosing a semantic type:
+
+1. **Trigger:** App icon or Siri.
+2. **Ask for Input** — multiline text.
+3. **Dictionary** — `text`: Provided Input.
+4. **Get Contents of URL** — Method POST, URL `https://YOUR_HOST/capture/shortcuts`,
+   Headers `Content-Type: application/json`, Request Body: Dictionary.
+
+Classify later via MCP `classify_event` or `POST /classify`.
 
 ## Manual recipes
 

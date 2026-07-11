@@ -43,20 +43,31 @@ func (h *SourceHandle) Close() error {
 }
 
 // StartSource launches a supervised module subprocess (sources and HTTP modules).
-func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.Store, registry *HTTPRegistry) (*SourceHandle, error) {
+func StartSource(
+	ctx context.Context,
+	j journal.Journal,
+	mod Module,
+	blobs blob.Store,
+	httpRegistry *HTTPRegistry,
+	mcpRegistry *MCPRegistry,
+	mcpTools []MCPToolEntry,
+	toolModules map[string]string,
+) (*SourceHandle, error) {
 	manifest, err := loadModuleManifest(mod)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}
 
 	hasHTTP := len(manifest.HTTPRoutes()) > 0
+	hasMCPTools := len(manifest.MCPTools()) > 0
 	needsIngest := manifest.Kind == KindSource
 
 	switch {
 	case needsIngest:
 	case hasHTTP:
+	case hasMCPTools:
 	default:
-		return nil, fmt.Errorf("modules: start %q: not a source and no http routes", mod.Manifest.Name)
+		return nil, fmt.Errorf("modules: start %q: not a source and no http or mcp routes", mod.Manifest.Name)
 	}
 
 	policy, err := LoadIngestPolicy(manifest, mod.Dir)
@@ -70,8 +81,11 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 	}
 
 	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig:  trovemodule.Handshake,
-		Plugins:          hostPluginSet(j, policy, manifest.Name, blobs, hasHTTP),
+		HandshakeConfig: trovemodule.Handshake,
+		Plugins: hostPluginSet(
+			j, policy, manifest.Name, blobs,
+			hasHTTP, hasMCPTools, mcpTools, toolModules, mcpRegistry,
+		),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.NewNullLogger(),
@@ -98,14 +112,20 @@ func StartSource(ctx context.Context, j journal.Journal, mod Module, blobs blob.
 	runCtx, cancelRun := context.WithCancel(ctx)
 	done := make(chan struct{})
 
-	if hasHTTP && registry != nil {
-		registry.Register(manifest.Name, sourceModule)
+	if hasHTTP && httpRegistry != nil {
+		httpRegistry.Register(manifest.Name, sourceModule)
+	}
+	if hasMCPTools && mcpRegistry != nil {
+		mcpRegistry.Register(manifest.Name, sourceModule)
 	}
 
 	go func() {
 		defer close(done)
-		if hasHTTP && registry != nil {
-			defer registry.Unregister(manifest.Name)
+		if hasHTTP && httpRegistry != nil {
+			defer httpRegistry.Unregister(manifest.Name)
+		}
+		if hasMCPTools && mcpRegistry != nil {
+			defer mcpRegistry.Unregister(manifest.Name)
 		}
 
 		hcDone := make(chan struct{})
