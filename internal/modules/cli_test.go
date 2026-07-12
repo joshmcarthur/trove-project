@@ -31,22 +31,37 @@ description = "types"
 }
 
 func TestCollectCLICommandsRejectsReservedName(t *testing.T) {
-	manifest, err := modules.ParseManifest([]byte(`
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		command string
+	}{
+		{name: "version", command: "version"},
+		{name: "init", command: "init"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := modules.ParseManifest([]byte(`
 name = "bad"
 version = "1.0"
 kind = "processor"
 
 [[cli.commands]]
-name = "version"
+name = "` + tt.command + `"
 description = "shadow core"
 `))
-	if err == nil {
-		t.Fatal("ParseManifest() error = nil, want reserved name error")
+			if err == nil {
+				t.Fatal("ParseManifest() error = nil, want reserved name error")
+			}
+			if !strings.Contains(err.Error(), "reserved") {
+				t.Fatalf("ParseManifest() error = %v, want reserved", err)
+			}
+		})
 	}
-	if !strings.Contains(err.Error(), "reserved") {
-		t.Fatalf("ParseManifest() error = %v, want reserved", err)
-	}
-	_ = manifest
 }
 
 func TestParseManifestCLIOnlyProcessor(t *testing.T) {

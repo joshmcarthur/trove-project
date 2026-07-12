@@ -130,7 +130,7 @@ func TestCLI(t *testing.T) {
 				return nil
 			},
 			wantExit:   1,
-			wantStderr: "-config is required",
+			wantStderr: "trove init",
 		},
 		{
 			name: "invalid config",
