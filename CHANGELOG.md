@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/joshmcarthur/trove-project/compare/v1.0.0...v1.0.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* goreleaser stable release brew and windows binary names ([#93](https://github.com/joshmcarthur/trove-project/issues/93)) ([3b0de10](https://github.com/joshmcarthur/trove-project/commit/3b0de1095fcd7e7f9cc83eafb0f6c303bd3046c2))
+
 ## 1.0.0 (2026-07-12)
 
 
