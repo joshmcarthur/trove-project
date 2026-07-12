@@ -18,8 +18,10 @@ is still only one journal.
 ## Central schema registry service / formal schema evolution
 
 A shared registry service or cross-module schema negotiation is out of scope.
-Per-module `provides` allowlists and a local type catalog (TTD files via
-`[[types]]`, merged at startup) are supported instead.
+Trove builds a **local type catalog** at startup instead: `trove://` type URIs,
+Trove Type Definitions (TTD) with RFC 8927 JTD payload contracts, blob-stored
+schema bytes, and `schema_ref` on validated events. See
+[type catalog](./concepts/type-catalog.md).
 
 ## WASM guest runtime
 

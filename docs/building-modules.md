@@ -82,9 +82,9 @@ addresses are rejected — register `[[http.routes]]` and let the core
 [HTTP gateway](./planning/http-gateway.md) listen instead.
 
 `[[types]]` entries declare payload contracts for types the module provides. At
-startup the core loads TTD files into the type catalog and validates payloads on
-`Emit`. Types listed only in `provides` are allowlisted but not payload-validated
-until a matching `[[types]]` entry is present.
+startup the core loads TTD files into the [type catalog](./concepts/type-catalog.md)
+and validates payloads on every emit, stamping `schema_ref` on success. Legacy
+`[schemas]` JSON Schema entries are not supported.
 
 Module-specific keys such as `listen` are read by the module binary; the core
 parser ignores unknown fields.
@@ -172,7 +172,7 @@ After `make build`, configure broker and topics in
 `modules/mqtt-source/manifest.toml` (default broker `tcp://localhost:1883`,
 topics `["home/#"]`). Add `modules/` to `[modules].paths` and start `trove`.
 Each MQTT message becomes a journal event with `type`
-`mqtt.<topic>.received` (slashes become dots), `source` set to the topic, and
+`trove://type/mqtt/message/received/1`, `source` set to the topic, and
 `payload.metadata.topic` preserving the original MQTT topic, with the MQTT
 body in `payload.message` (JSON) or `payload.raw` (non-JSON).
 
