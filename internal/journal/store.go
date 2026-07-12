@@ -40,9 +40,10 @@ type subscriber struct {
 
 // Store is a SQLite-backed journal.
 type Store struct {
-	db   *sql.DB
-	mu   sync.Mutex
-	subs []subscriber
+	db             *sql.DB
+	mu             sync.Mutex
+	subs           []subscriber
+	appendWatchers []chan struct{}
 }
 
 // Open opens or creates the journal database at path.
@@ -99,6 +100,10 @@ func (s *Store) Close() error {
 		close(sub.ch)
 	}
 	s.subs = nil
+	for _, ch := range s.appendWatchers {
+		close(ch)
+	}
+	s.appendWatchers = nil
 	s.mu.Unlock()
 
 	if s.db == nil {
@@ -311,7 +316,8 @@ func (s *Store) Get(ctx context.Context, id string) (Event, error) {
 }
 
 // Subscribe streams new events matching f. Only events appended after Subscribe
-// returns are delivered; there is no historical replay.
+// returns are delivered; there is no historical replay. Delivery is best-effort:
+// slow subscribers may miss events when the buffer is full.
 func (s *Store) Subscribe(ctx context.Context, f Filter) (<-chan Event, error) {
 	if f.Type != "" && f.TypePrefix != "" {
 		return nil, ErrConflictingFilter
@@ -349,6 +355,8 @@ func (s *Store) removeSubscriber(ch chan Event) {
 }
 
 func (s *Store) notify(e Event) {
+	s.signalAppendWatchers()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -18,6 +18,7 @@ const routerPollInterval = 500 * time.Millisecond
 type routingJournal interface {
 	journal.Journal
 	QueryAfter(ctx context.Context, afterID string, limit int) ([]journal.Event, error)
+	WatchAppends(ctx context.Context) (<-chan struct{}, error)
 	LoadRouterWatermark(ctx context.Context) (string, error)
 	SaveRouterWatermark(ctx context.Context, id string) error
 	SaveEventDispatch(ctx context.Context, eventID, rootID string, seen []string) error
@@ -42,17 +43,17 @@ func NewRouter(j journal.Journal, registry *EventRegistry) *Router {
 }
 
 // Run pulls events from the journal in ULID order and dispatches them until ctx
-// is cancelled. Subscribe is used only as a wakeup signal; dispatch correctness
-// does not depend on pub/sub channel delivery.
+// is cancelled. WatchAppends provides low-latency wakeups; a poll interval is
+// the fallback when a coalesced signal is missed.
 func (r *Router) Run(ctx context.Context) error {
 	routeStore, ok := r.journal.(routingJournal)
 	if !ok {
 		return fmt.Errorf("modules: router requires routing-capable journal store")
 	}
 
-	ch, err := r.journal.Subscribe(ctx, journal.Filter{})
+	wakeCh, err := routeStore.WatchAppends(ctx)
 	if err != nil {
-		return fmt.Errorf("modules: router subscribe: %w", err)
+		return fmt.Errorf("modules: router watch appends: %w", err)
 	}
 
 	watermark, err := routeStore.LoadRouterWatermark(ctx)
@@ -89,10 +90,7 @@ func (r *Router) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case _, ok := <-ch:
-			if !ok {
-				return nil
-			}
+		case <-wakeCh:
 		case <-poll.C:
 		}
 	}

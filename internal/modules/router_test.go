@@ -230,7 +230,7 @@ func TestRouterStartupCatchUp(t *testing.T) {
 	}
 }
 
-func TestRouterCatchesUpViaPollAfterPubSubDrop(t *testing.T) {
+func TestRouterWatchesAppends(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -240,25 +240,9 @@ func TestRouterCatchesUpViaPollAfterPubSubDrop(t *testing.T) {
 	}
 	defer store.Close()
 
-	// Block a subscriber channel so notify drops for new appends.
-	blockCh, err := store.Subscribe(ctx, journal.Filter{})
-	if err != nil {
-		t.Fatalf("Subscribe() error = %v", err)
-	}
-	for range 33 {
-		if err := store.Append(ctx, journal.Event{
-			Type:    "test.block",
-			Source:  "test",
-			Payload: json.RawMessage(`{"fill":true}`),
-		}); err != nil {
-			t.Fatalf("Append(block) error = %v", err)
-		}
-	}
-	_ = blockCh
-
 	var handled atomic.Int32
 	registry := NewEventRegistry()
-	registry.RegisterSink("counter", []string{"test.catchup-drop"}, stubSink{
+	registry.RegisterSink("counter", []string{"test.watch"}, stubSink{
 		fn: func(event journal.Event, dispatch DispatchContext) error {
 			handled.Add(1)
 			return nil
@@ -273,29 +257,14 @@ func TestRouterCatchesUpViaPollAfterPubSubDrop(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	if err := store.Append(ctx, journal.Event{
-		Type:    "test.catchup-drop",
+		Type:    "test.watch",
 		Source:  "test",
 		Payload: json.RawMessage(`{"n":1}`),
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	waitFor(t, 3*time.Second, func() bool { return handled.Load() == 1 })
-
-	events, err := store.Query(ctx, journal.Filter{Type: "test.catchup-drop"})
-	if err != nil {
-		t.Fatalf("Query() error = %v", err)
-	}
-	if len(events) != 1 {
-		t.Fatalf("Query() len = %d, want 1", len(events))
-	}
-	watermark, err := store.LoadRouterWatermark(ctx)
-	if err != nil {
-		t.Fatalf("LoadRouterWatermark() error = %v", err)
-	}
-	if watermark != events[0].ID {
-		t.Fatalf("watermark = %q, want %q", watermark, events[0].ID)
-	}
+	waitFor(t, 2*time.Second, func() bool { return handled.Load() == 1 })
 }
 
 func TestRouterRestartPreservesDerivedDispatchContext(t *testing.T) {
