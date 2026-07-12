@@ -91,6 +91,12 @@ IDs, secrets paths) rather than duplicating the full manifest.
 
 ## Local development
 
+Initialize a working directory:
+
+```bash
+trove init
+```
+
 Pass the config file path with `-config`:
 
 ```bash

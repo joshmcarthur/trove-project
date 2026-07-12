@@ -228,7 +228,7 @@ func validateCLICommand(command CLICommand) error {
 
 func isReservedCLICommand(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "version", "config", "help":
+	case "version", "config", "help", "init":
 		return true
 	default:
 		return false

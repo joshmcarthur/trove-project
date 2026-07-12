@@ -60,7 +60,12 @@ Verify:
 
 ### Create a config file
 
-Save this as `trove.toml` in your working directory:
+Run `trove init` in your working directory (or `trove init --dir /path/to/data`).
+It writes a default `trove.toml` and creates a `blobs/` directory. When a
+`modules/` subdirectory is present (for example in a source checkout), `./modules`
+is included in `[modules].paths` automatically.
+
+Alternatively, save this as `trove.toml` in your working directory:
 
 ```toml
 [journal]
