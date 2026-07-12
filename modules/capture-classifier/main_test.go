@@ -50,6 +50,22 @@ func (s *stubCore) CallMCPTool(context.Context, string, json.RawMessage) (json.R
 	return nil, nil
 }
 
+func (s *stubCore) ListTypes(context.Context, string) ([]trovemodule.TypeSummary, error) {
+	return nil, nil
+}
+
+func (s *stubCore) GetType(context.Context, string) (trovemodule.TypeSummary, json.RawMessage, error) {
+	return trovemodule.TypeSummary{}, nil, nil
+}
+
+func (s *stubCore) ExportType(context.Context, string) ([]byte, string, error) {
+	return nil, "", nil
+}
+
+func (s *stubCore) ValidateTypeDefinition(context.Context, []byte) (bool, string, string, error) {
+	return false, "", "", nil
+}
+
 func TestCaptureClassifierHandleHTTPWhenReady(t *testing.T) {
 	t.Parallel()
 
@@ -206,4 +222,16 @@ func (notFoundCore) ListMCPTools(context.Context) ([]trovemodule.MCPToolDescript
 }
 func (notFoundCore) CallMCPTool(context.Context, string, json.RawMessage) (json.RawMessage, error) {
 	return nil, nil
+}
+func (notFoundCore) ListTypes(context.Context, string) ([]trovemodule.TypeSummary, error) {
+	return nil, nil
+}
+func (notFoundCore) GetType(context.Context, string) (trovemodule.TypeSummary, json.RawMessage, error) {
+	return trovemodule.TypeSummary{}, nil, status.Error(codes.NotFound, "not found")
+}
+func (notFoundCore) ExportType(context.Context, string) ([]byte, string, error) {
+	return nil, "", nil
+}
+func (notFoundCore) ValidateTypeDefinition(context.Context, []byte) (bool, string, string, error) {
+	return false, "", "", nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
+	"github.com/joshmcarthur/trove/internal/types"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc"
 )
@@ -67,6 +68,7 @@ type moduleClient struct {
 	journal         journal.Journal
 	policy          EmitPolicy
 	blobs           blob.Store
+	catalog         *types.Catalog
 	mcpTools        []MCPToolEntry
 	toolModules     map[string]string
 	mcpRegistry     *MCPRegistry
@@ -91,6 +93,7 @@ func (c *moduleClient) Run(ctx context.Context) error {
 			journal:     c.journal,
 			policy:      c.policy,
 			blobs:       c.blobs,
+			catalog:     c.catalog,
 			query:       querySvc,
 			mcpTools:    c.mcpTools,
 			toolModules: c.toolModules,
@@ -176,6 +179,7 @@ type moduleGRPCPlugin struct {
 	policy      EmitPolicy
 	moduleName  string
 	blobs       blob.Store
+	catalog     *types.Catalog
 	mcpTools    []MCPToolEntry
 	toolModules map[string]string
 	mcpRegistry *MCPRegistry
@@ -194,6 +198,7 @@ func (p *moduleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBr
 		journal:         p.journal,
 		policy:          p.policy,
 		blobs:           p.blobs,
+		catalog:         p.catalog,
 		mcpTools:        p.mcpTools,
 		toolModules:     p.toolModules,
 		mcpRegistry:     p.mcpRegistry,
@@ -214,6 +219,7 @@ func hostPluginSet(
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	mcpRegistry *MCPRegistry,
+	catalog *types.Catalog,
 ) map[string]plugin.Plugin {
 	return map[string]plugin.Plugin{
 		trovemodule.PluginName: &moduleGRPCPlugin{
@@ -221,6 +227,7 @@ func hostPluginSet(
 			policy:      policy,
 			moduleName:  moduleName,
 			blobs:       blobs,
+			catalog:     catalog,
 			mcpTools:    mcpTools,
 			toolModules: toolModules,
 			mcpRegistry: mcpRegistry,

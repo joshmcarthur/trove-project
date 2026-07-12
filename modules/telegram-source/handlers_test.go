@@ -48,6 +48,22 @@ func (s *stubCore) CallMCPTool(_ context.Context, _ string, _ json.RawMessage) (
 	return nil, nil
 }
 
+func (s *stubCore) ListTypes(context.Context, string) ([]trovemodule.TypeSummary, error) {
+	return nil, nil
+}
+
+func (s *stubCore) GetType(context.Context, string) (trovemodule.TypeSummary, json.RawMessage, error) {
+	return trovemodule.TypeSummary{}, nil, nil
+}
+
+func (s *stubCore) ExportType(context.Context, string) ([]byte, string, error) {
+	return nil, "", nil
+}
+
+func (s *stubCore) ValidateTypeDefinition(context.Context, []byte) (bool, string, string, error) {
+	return false, "", "", nil
+}
+
 var _ trovemodule.Core = (*stubCore)(nil)
 
 type stubJournal struct {

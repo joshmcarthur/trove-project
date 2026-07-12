@@ -9,6 +9,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
+	"github.com/joshmcarthur/trove/internal/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,6 +19,7 @@ type coreServicesServer struct {
 	journal     journal.Journal
 	policy      EmitPolicy
 	blobs       blob.Store
+	catalog     *types.Catalog
 	query       *query.Service
 	mcpTools    []MCPToolEntry
 	toolModules map[string]string
@@ -169,6 +171,102 @@ func (s *coreServicesServer) CallMCPTool(ctx context.Context, req *troverpc.MCPT
 		return nil, status.Errorf(codes.Unavailable, "mcp module %q is not available", module)
 	}
 	return dispatcher.CallTool(ctx, req)
+}
+
+func (s *coreServicesServer) ListTypes(ctx context.Context, req *troverpc.ListTypesRequest) (*troverpc.ListTypesResponse, error) {
+	_ = ctx
+	if s.catalog == nil {
+		return nil, status.Error(codes.Unavailable, "type catalog is not configured")
+	}
+	filter := ""
+	if req != nil {
+		filter = req.GetSourceFilter()
+	}
+	summaries := make([]*troverpc.TypeSummary, 0)
+	for _, entry := range s.catalog.List() {
+		summary := typeSummaryFromEntry(entry)
+		if filter != "" && summary.Source != filter {
+			continue
+		}
+		summaries = append(summaries, summary)
+	}
+	return &troverpc.ListTypesResponse{Types: summaries}, nil
+}
+
+func (s *coreServicesServer) GetType(ctx context.Context, req *troverpc.GetTypeRequest) (*troverpc.GetTypeResponse, error) {
+	if s.catalog == nil {
+		return nil, status.Error(codes.Unavailable, "type catalog is not configured")
+	}
+	if req == nil || req.GetUri() == "" {
+		return nil, status.Error(codes.InvalidArgument, "uri is required")
+	}
+	entry, ok := s.catalog.Lookup(req.GetUri())
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "type %q is not registered in catalog", req.GetUri())
+	}
+	var definition []byte
+	if entry.Compiled != nil {
+		definition = entry.Compiled.Definition.Definition
+	}
+	return &troverpc.GetTypeResponse{
+		Summary:        typeSummaryFromEntry(entry),
+		DefinitionJson: definition,
+	}, nil
+}
+
+func (s *coreServicesServer) ExportType(ctx context.Context, req *troverpc.ExportTypeRequest) (*troverpc.ExportTypeResponse, error) {
+	if s.catalog == nil {
+		return nil, status.Error(codes.Unavailable, "type catalog is not configured")
+	}
+	if s.blobs == nil {
+		return nil, status.Error(codes.Unavailable, "blob store is not configured")
+	}
+	if req == nil || req.GetUri() == "" {
+		return nil, status.Error(codes.InvalidArgument, "uri is required")
+	}
+	entry, ok := s.catalog.Lookup(req.GetUri())
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "type %q is not registered in catalog", req.GetUri())
+	}
+	data, err := s.catalog.Export(ctx, s.blobs, req.GetUri())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "%v", err)
+	}
+	return &troverpc.ExportTypeResponse{
+		TtdJson:   data,
+		SchemaRef: entry.SchemaRef,
+	}, nil
+}
+
+func (s *coreServicesServer) ValidateTypeDefinition(ctx context.Context, req *troverpc.ValidateTypeDefinitionRequest) (*troverpc.ValidateTypeDefinitionResponse, error) {
+	_ = ctx
+	if req == nil || len(req.GetTtdJson()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "ttd_json is required")
+	}
+	td, err := types.ValidateTypeDefinition(req.GetTtdJson())
+	if err != nil {
+		return &troverpc.ValidateTypeDefinitionResponse{
+			Valid: false,
+			Error: err.Error(),
+		}, nil
+	}
+	return &troverpc.ValidateTypeDefinitionResponse{
+		Valid: true,
+		Uri:   td.ID,
+	}, nil
+}
+
+func typeSummaryFromEntry(entry types.Entry) *troverpc.TypeSummary {
+	summary := types.SummaryFromEntry(entry)
+	return &troverpc.TypeSummary{
+		Uri:         summary.URI,
+		Title:       summary.Title,
+		Description: summary.Description,
+		Source:      summary.Source,
+		SourcePath:  summary.SourcePath,
+		SchemaRef:   summary.SchemaRef,
+		Status:      summary.Status,
+	}
 }
 
 func queryGRPCError(err error) error {

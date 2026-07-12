@@ -19,14 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CoreServices_Emit_FullMethodName            = "/trove.v1.CoreServices/Emit"
-	CoreServices_BlobPut_FullMethodName         = "/trove.v1.CoreServices/BlobPut"
-	CoreServices_GetEvent_FullMethodName        = "/trove.v1.CoreServices/GetEvent"
-	CoreServices_SearchEvents_FullMethodName    = "/trove.v1.CoreServices/SearchEvents"
-	CoreServices_GetEventsByType_FullMethodName = "/trove.v1.CoreServices/GetEventsByType"
-	CoreServices_SummarizeRange_FullMethodName  = "/trove.v1.CoreServices/SummarizeRange"
-	CoreServices_ListMCPTools_FullMethodName    = "/trove.v1.CoreServices/ListMCPTools"
-	CoreServices_CallMCPTool_FullMethodName     = "/trove.v1.CoreServices/CallMCPTool"
+	CoreServices_Emit_FullMethodName                   = "/trove.v1.CoreServices/Emit"
+	CoreServices_BlobPut_FullMethodName                = "/trove.v1.CoreServices/BlobPut"
+	CoreServices_GetEvent_FullMethodName               = "/trove.v1.CoreServices/GetEvent"
+	CoreServices_SearchEvents_FullMethodName           = "/trove.v1.CoreServices/SearchEvents"
+	CoreServices_GetEventsByType_FullMethodName        = "/trove.v1.CoreServices/GetEventsByType"
+	CoreServices_SummarizeRange_FullMethodName         = "/trove.v1.CoreServices/SummarizeRange"
+	CoreServices_ListMCPTools_FullMethodName           = "/trove.v1.CoreServices/ListMCPTools"
+	CoreServices_CallMCPTool_FullMethodName            = "/trove.v1.CoreServices/CallMCPTool"
+	CoreServices_ListTypes_FullMethodName              = "/trove.v1.CoreServices/ListTypes"
+	CoreServices_GetType_FullMethodName                = "/trove.v1.CoreServices/GetType"
+	CoreServices_ExportType_FullMethodName             = "/trove.v1.CoreServices/ExportType"
+	CoreServices_ValidateTypeDefinition_FullMethodName = "/trove.v1.CoreServices/ValidateTypeDefinition"
 )
 
 // CoreServicesClient is the client API for CoreServices service.
@@ -45,6 +49,10 @@ type CoreServicesClient interface {
 	SummarizeRange(ctx context.Context, in *SummarizeRangeRequest, opts ...grpc.CallOption) (*Summary, error)
 	ListMCPTools(ctx context.Context, in *ListMCPToolsRequest, opts ...grpc.CallOption) (*ListMCPToolsResponse, error)
 	CallMCPTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error)
+	ListTypes(ctx context.Context, in *ListTypesRequest, opts ...grpc.CallOption) (*ListTypesResponse, error)
+	GetType(ctx context.Context, in *GetTypeRequest, opts ...grpc.CallOption) (*GetTypeResponse, error)
+	ExportType(ctx context.Context, in *ExportTypeRequest, opts ...grpc.CallOption) (*ExportTypeResponse, error)
+	ValidateTypeDefinition(ctx context.Context, in *ValidateTypeDefinitionRequest, opts ...grpc.CallOption) (*ValidateTypeDefinitionResponse, error)
 }
 
 type coreServicesClient struct {
@@ -135,6 +143,46 @@ func (c *coreServicesClient) CallMCPTool(ctx context.Context, in *MCPToolCallReq
 	return out, nil
 }
 
+func (c *coreServicesClient) ListTypes(ctx context.Context, in *ListTypesRequest, opts ...grpc.CallOption) (*ListTypesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTypesResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ListTypes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) GetType(ctx context.Context, in *GetTypeRequest, opts ...grpc.CallOption) (*GetTypeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTypeResponse)
+	err := c.cc.Invoke(ctx, CoreServices_GetType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) ExportType(ctx context.Context, in *ExportTypeRequest, opts ...grpc.CallOption) (*ExportTypeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportTypeResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ExportType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) ValidateTypeDefinition(ctx context.Context, in *ValidateTypeDefinitionRequest, opts ...grpc.CallOption) (*ValidateTypeDefinitionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateTypeDefinitionResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ValidateTypeDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoreServicesServer is the server API for CoreServices service.
 // All implementations must embed UnimplementedCoreServicesServer
 // for forward compatibility.
@@ -151,6 +199,10 @@ type CoreServicesServer interface {
 	SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error)
 	ListMCPTools(context.Context, *ListMCPToolsRequest) (*ListMCPToolsResponse, error)
 	CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error)
+	ListTypes(context.Context, *ListTypesRequest) (*ListTypesResponse, error)
+	GetType(context.Context, *GetTypeRequest) (*GetTypeResponse, error)
+	ExportType(context.Context, *ExportTypeRequest) (*ExportTypeResponse, error)
+	ValidateTypeDefinition(context.Context, *ValidateTypeDefinitionRequest) (*ValidateTypeDefinitionResponse, error)
 	mustEmbedUnimplementedCoreServicesServer()
 }
 
@@ -184,6 +236,18 @@ func (UnimplementedCoreServicesServer) ListMCPTools(context.Context, *ListMCPToo
 }
 func (UnimplementedCoreServicesServer) CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CallMCPTool not implemented")
+}
+func (UnimplementedCoreServicesServer) ListTypes(context.Context, *ListTypesRequest) (*ListTypesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTypes not implemented")
+}
+func (UnimplementedCoreServicesServer) GetType(context.Context, *GetTypeRequest) (*GetTypeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetType not implemented")
+}
+func (UnimplementedCoreServicesServer) ExportType(context.Context, *ExportTypeRequest) (*ExportTypeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportType not implemented")
+}
+func (UnimplementedCoreServicesServer) ValidateTypeDefinition(context.Context, *ValidateTypeDefinitionRequest) (*ValidateTypeDefinitionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidateTypeDefinition not implemented")
 }
 func (UnimplementedCoreServicesServer) mustEmbedUnimplementedCoreServicesServer() {}
 func (UnimplementedCoreServicesServer) testEmbeddedByValue()                      {}
@@ -350,6 +414,78 @@ func _CoreServices_CallMCPTool_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoreServices_ListTypes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTypesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ListTypes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ListTypes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ListTypes(ctx, req.(*ListTypesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_GetType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).GetType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_GetType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).GetType(ctx, req.(*GetTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_ExportType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ExportType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ExportType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ExportType(ctx, req.(*ExportTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_ValidateTypeDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateTypeDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ValidateTypeDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ValidateTypeDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ValidateTypeDefinition(ctx, req.(*ValidateTypeDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoreServices_ServiceDesc is the grpc.ServiceDesc for CoreServices service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -388,6 +524,22 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CallMCPTool",
 			Handler:    _CoreServices_CallMCPTool_Handler,
+		},
+		{
+			MethodName: "ListTypes",
+			Handler:    _CoreServices_ListTypes_Handler,
+		},
+		{
+			MethodName: "GetType",
+			Handler:    _CoreServices_GetType_Handler,
+		},
+		{
+			MethodName: "ExportType",
+			Handler:    _CoreServices_ExportType_Handler,
+		},
+		{
+			MethodName: "ValidateTypeDefinition",
+			Handler:    _CoreServices_ValidateTypeDefinition_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
