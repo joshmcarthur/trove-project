@@ -26,15 +26,20 @@ description = "List, export, and validate Trove type schemas"
 ```
 
 - Command names must be unique across all discovered modules (startup fails on duplicates)
-- Reserved names: `version`, `config`, `help`
+- Reserved names: `version`, `config`, `help`, `init`
 - Module subprocess implements `trovemodule.CLIHandler`
 
 ## Invocation
 
 ```bash
+trove init
+trove init --dir /path/to/data
 trove -config trove.toml types list
 trove -config trove.toml types validate --file ./my-type.ttd.json
 ```
+
+`init` writes a default `trove.toml` and `blobs/` directory in the working
+directory (or `--dir`). It does not require `-config`.
 
 When the first positional argument after flags matches a collected CLI command,
 the host builds the type catalog, starts only the owning module subprocess,
@@ -51,7 +56,7 @@ host falls through to the long-running daemon path.
 - [x] `[[cli.commands]]` parsed and validated from manifest
 - [x] Duplicate command names and reserved names rejected at startup
 - [x] `trove -config <path> <command> ...` dispatches to the owning module
-- [x] Core `-version` and `-config` daemon behavior unchanged when no module command matches
+- [x] Core `-version`, `init`, and `-config` daemon behavior unchanged when no module command matches
 
 ## See also
 

@@ -69,6 +69,42 @@ func TestCLI(t *testing.T) {
 
 	bin := troveBin(t)
 
+	t.Run("init", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		cmd := exec.Command(bin, "init", "--dir", dir)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("run init: %v\nstderr: %s", err, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "trove.toml") {
+			t.Errorf("stdout = %q, want trove.toml mentioned", stdout.String())
+		}
+		configPath := filepath.Join(dir, "trove.toml")
+		if _, err := os.Stat(configPath); err != nil {
+			t.Fatalf("config file: %v", err)
+		}
+		if info, err := os.Stat(filepath.Join(dir, "blobs")); err != nil || !info.IsDir() {
+			t.Fatalf("blobs dir: err=%v", err)
+		}
+	})
+
+	t.Run("init refuses existing config", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "trove.toml"), []byte("[journal]\npath = \"x\"\n"), 0o644); err != nil {
+			t.Fatalf("write config: %v", err)
+		}
+		_, code := runTrove(t, bin, "init", "--dir", dir)
+		if code != 1 {
+			t.Errorf("exit code = %d, want 1", code)
+		}
+	})
+
 	t.Run("version", func(t *testing.T) {
 		t.Parallel()
 
@@ -94,7 +130,7 @@ func TestCLI(t *testing.T) {
 				return nil
 			},
 			wantExit:   1,
-			wantStderr: "-config is required",
+			wantStderr: "trove init",
 		},
 		{
 			name: "invalid config",

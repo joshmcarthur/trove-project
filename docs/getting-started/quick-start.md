@@ -31,6 +31,14 @@ blobs, capture, classify, MCP) until interrupted:
 
 ```bash
 make build
+trove init
+trove -config ./trove.toml
+```
+
+Or pass an existing config path:
+
+```bash
+make build
 trove -config /path/to/trove.toml
 ```
 

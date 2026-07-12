@@ -38,8 +38,12 @@ func main() {
 	}
 
 	args := flag.Args()
+	if len(args) > 0 && args[0] == "init" {
+		os.Exit(runInit(args[1:]))
+	}
+
 	if *configPath == "" {
-		fmt.Fprintln(os.Stderr, "trove: -config is required")
+		fmt.Fprintln(os.Stderr, "trove: -config is required (run `trove init` to create a default trove.toml)")
 		os.Exit(1)
 	}
 
