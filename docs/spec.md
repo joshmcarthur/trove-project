@@ -110,12 +110,14 @@ type Journal interface {
     Append(ctx context.Context, e Event) error
     Query(ctx context.Context, f Filter) ([]Event, error)
     Get(ctx context.Context, id string) (Event, error)
-    Subscribe(ctx context.Context, f Filter) (<-chan Event, error)
+    WatchAppends(ctx context.Context) (<-chan struct{}, error)
 }
 ```
 
 `Filter` supports type prefix, source, time range, and free-text match
-(via SQLite FTS5) at minimum.
+(via SQLite FTS5) at minimum. `WatchAppends` signals coalesced wakeups after
+each append; consumers pull events via `Query` (the router uses a durable
+cursor for guaranteed dispatch).
 
 **Semantic search** (optional, add once basic search proves insufficient):
 `sqlite-vec` as a virtual table alongside `events`, populated by an

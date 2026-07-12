@@ -18,7 +18,6 @@ const routerPollInterval = 500 * time.Millisecond
 type routingJournal interface {
 	journal.Journal
 	QueryAfter(ctx context.Context, afterID string, limit int) ([]journal.Event, error)
-	WatchAppends(ctx context.Context) (<-chan struct{}, error)
 	LoadRouterWatermark(ctx context.Context) (string, error)
 	SaveRouterWatermark(ctx context.Context, id string) error
 	SaveEventDispatch(ctx context.Context, eventID, rootID string, seen []string) error

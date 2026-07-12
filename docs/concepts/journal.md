@@ -24,16 +24,16 @@ type Journal interface {
     Append(ctx context.Context, e Event) error
     Query(ctx context.Context, f Filter) ([]Event, error)
     Get(ctx context.Context, id string) (Event, error)
-    Subscribe(ctx context.Context, f Filter) (<-chan Event, error)
+    WatchAppends(ctx context.Context) (<-chan struct{}, error)
 }
 ```
 
 `Filter` supports type prefix, source, time range, and free-text match at
 minimum.
 
-Persistence and routing are separate: every accepted append is durable in
-SQLite. The event router pulls undispatched events via a stored cursor and
-wakes on `WatchAppends`; `Subscribe` is for best-effort live streaming only.
+New appends signal `WatchAppends` watchers; consumers pull data via `Query`.
+The event router combines `WatchAppends` with a durable cursor for guaranteed
+dispatch to processors and sinks.
 
 ## Why SQLite
 
