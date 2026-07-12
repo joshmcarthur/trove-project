@@ -37,10 +37,13 @@ See [spec §3](../spec.md#3-core-concepts) for the canonical definition.
 ## Type naming
 
 Use namespaced strings: `<source-family>.<subject>.<verb>`. There is **no central
-schema registry** — modules declare allowed types in `provides` and subscriptions
-in `consumes` (exact strings or glob patterns such as `note.*`). Optional JSON
-Schema files in the module manifest validate payloads when declared. If a shape
-changes, use naming discipline (e.g. `.v2` suffixes) rather than in-place mutation.
+schema registry service** — modules declare allowed types in `provides` and
+subscriptions in `consumes` (exact `trove://type/...` URIs or glob patterns such
+as `trove://type/note/*`). Optional `[[types]]` entries in module manifests point
+at Trove Type Definition (TTD) files; the core loads them into a local type
+catalog and validates payloads on `Emit`, stamping `schema_ref` on validated
+events. If a shape changes, add a new type version rather than mutating events
+in place.
 
 ## Immutability
 
@@ -70,8 +73,8 @@ event when classified later.
 
 ## Implementation
 
-Events are persisted by the [journal](./journal.md). Type allowlists and optional
-schema validation are enforced at the module `Emit` boundary — see
+Events are persisted by the [journal](./journal.md). Type allowlists and TTD-backed
+payload validation are enforced at the module `Emit` boundary — see
 [building modules](../building-modules.md). See
 [planning/journal.md](../planning/journal.md) for the SQLite schema and
 `Journal` interface.

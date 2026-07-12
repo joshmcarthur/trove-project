@@ -35,11 +35,17 @@ external modules; built-in ingest and MCP work with an empty `paths` list.
 name     = "my-source"
 version  = "1.0"
 kind     = "source"
-provides = ["my-source.event.received", "my-source.*"]
+provides = ["trove://type/my-source/event/received/1", "trove://type/my-source/*"]
 
-[schemas]
-"my-source.event.received" = "schemas/received.json"
+[[types]]
+name    = "my-source.event.received"
+version = 1
+schema  = "types/received.ttd.json"
 ```
+
+Each `[[types]]` entry points at a Trove Type Definition (TTD) JSON file relative to
+the module directory. The TTD envelope uses RFC 8927 JTD in `definition` and a
+`trove://type/...` `$id` that must match a `provides` pattern.
 
 Event-routing processor example:
 
@@ -70,14 +76,15 @@ consumes = ["note.created"]
 | `processor` (auth-only) | forbidden | forbidden; use `[[auth.validators]]` |
 | `sink` | forbidden | **required** |
 
-Each pattern is an exact event type or a glob (`note.*`, `mqtt.*.received`).
-Bare `*` is not allowed. Per-module `listen` addresses are rejected — register
-`[[http.routes]]` and let the core [HTTP gateway](./planning/http-gateway.md)
-listen instead.
+Each pattern is an exact `trove://type/...` URI or a glob (`trove://type/note/*`,
+`trove://type/mqtt/*/received/*`). Bare `*` is not allowed. Per-module `listen`
+addresses are rejected — register `[[http.routes]]` and let the core
+[HTTP gateway](./planning/http-gateway.md) listen instead.
 
-Optional `[schemas]` maps a type or pattern to a JSON Schema file (relative to
-the module directory). When present, the core validates the payload before append.
-Types without a schema entry are allowlisted but not payload-validated.
+`[[types]]` entries declare payload contracts for types the module provides. At
+startup the core loads TTD files into the type catalog and validates payloads on
+`Emit`. Types listed only in `provides` are allowlisted but not payload-validated
+until a matching `[[types]]` entry is present.
 
 Module-specific keys such as `listen` are read by the module binary; the core
 parser ignores unknown fields.

@@ -15,11 +15,11 @@ Not solving edge-node ↔ home-journal reconciliation as a general problem.
 Remote modules can stream events to one central journal over Tailscale, but there
 is still only one journal.
 
-## Central schema registry / formal schema evolution
+## Central schema registry service / formal schema evolution
 
 A shared registry service or cross-module schema negotiation is out of scope.
-Per-module `provides` allowlists and optional colocated JSON Schema files are
-supported instead.
+Per-module `provides` allowlists and a local type catalog (TTD files via
+`[[types]]`, merged at startup) are supported instead.
 
 ## WASM guest runtime
 
