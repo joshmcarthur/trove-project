@@ -16,12 +16,13 @@ import (
 
 const schemaDDL = `
 CREATE TABLE IF NOT EXISTS events (
-  id        TEXT PRIMARY KEY,
-  time      TEXT NOT NULL,
-  type      TEXT NOT NULL,
-  source    TEXT NOT NULL,
-  payload   TEXT NOT NULL,
-  blob_ref  TEXT
+  id         TEXT PRIMARY KEY,
+  time       TEXT NOT NULL,
+  type       TEXT NOT NULL,
+  schema_ref TEXT NOT NULL,
+  source     TEXT NOT NULL,
+  payload    TEXT NOT NULL,
+  blob_ref   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(time);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
@@ -47,6 +48,11 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schemaDDL); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("journal: init schema: %w", err)
+	}
+
+	if err := migrateSchema(db); err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 
 	if _, err := db.Exec(routingSchemaDDL); err != nil {
@@ -168,11 +174,12 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO events (id, time, type, source, payload, blob_ref)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		INSERT INTO events (id, time, type, schema_ref, source, payload, blob_ref)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Type,
+		e.SchemaRef,
 		e.Source,
 		string(e.Payload),
 		blobRef,
@@ -216,14 +223,14 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 	ftsQuery := formatFTSQuery(f.Text)
 	if ftsQuery != "" {
 		query = `
-			SELECT e.id, e.time, e.type, e.source, e.payload, e.blob_ref
+			SELECT e.id, e.time, e.type, e.schema_ref, e.source, e.payload, e.blob_ref
 			FROM events e
 			INNER JOIN events_fts ON events_fts.event_id = e.id`
 		predicates = append(predicates, "events_fts MATCH ?")
 		args = append(args, ftsQuery)
 	} else {
 		query = `
-			SELECT id, time, type, source, payload, blob_ref
+			SELECT id, time, type, schema_ref, source, payload, blob_ref
 			FROM events`
 	}
 
@@ -287,7 +294,7 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 // Get returns the event with id.
 func (s *Store) Get(ctx context.Context, id string) (Event, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, time, type, source, payload, blob_ref
+		SELECT id, time, type, schema_ref, source, payload, blob_ref
 		FROM events
 		WHERE id = ?`, id)
 
@@ -318,6 +325,7 @@ func scanEvent(row rowScanner) (Event, error) {
 		&e.ID,
 		&timeStr,
 		&e.Type,
+		&e.SchemaRef,
 		&e.Source,
 		&payload,
 		&blobRef,

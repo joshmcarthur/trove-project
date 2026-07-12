@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +41,35 @@ func TestOpenCreatesDatabase(t *testing.T) {
 	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events_fts'`).Scan(&name)
 	if err != nil {
 		t.Fatalf("events_fts table missing: %v", err)
+	}
+}
+
+func TestAppendPersistsSchemaRef(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	ref := "sha256-" + strings.Repeat("a", 64)
+	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	want := Event{
+		ID:        id,
+		Type:      "trove://type/note/created/1",
+		SchemaRef: ref,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"title":"x"}`),
+	}
+
+	if err := store.Append(ctx, want); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got, err := store.Get(ctx, id)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.SchemaRef != ref {
+		t.Fatalf("SchemaRef = %q, want %q", got.SchemaRef, ref)
 	}
 }
 
@@ -436,7 +466,15 @@ func TestMigrateFTSBackfill(t *testing.T) {
 		t.Fatalf("sql.Open() error = %v", err)
 	}
 
-	if _, err := db.Exec(schemaDDL); err != nil {
+	if _, err := db.Exec(`
+CREATE TABLE IF NOT EXISTS events (
+  id        TEXT PRIMARY KEY,
+  time      TEXT NOT NULL,
+  type      TEXT NOT NULL,
+  source    TEXT NOT NULL,
+  payload   TEXT NOT NULL,
+  blob_ref  TEXT
+);`); err != nil {
 		t.Fatalf("create events schema: %v", err)
 	}
 

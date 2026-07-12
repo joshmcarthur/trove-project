@@ -14,12 +14,13 @@ var ErrConflictingFilter = errors.New("journal: type and type_prefix are mutuall
 
 // Event is an immutable journal record.
 type Event struct {
-	ID      string
-	Time    time.Time
-	Type    string
-	Source  string
-	Payload json.RawMessage
-	BlobRef *string
+	ID        string
+	Time      time.Time
+	Type      string
+	SchemaRef string
+	Source    string
+	Payload   json.RawMessage
+	BlobRef   *string
 }
 
 // Filter constrains journal reads. Text performs FTS5 keyword search when set.
