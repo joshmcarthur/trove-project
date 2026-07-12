@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -14,8 +13,6 @@ import (
 	"github.com/oklog/ulid"
 	_ "modernc.org/sqlite"
 )
-
-const subscriberBuffer = 32
 
 const schemaDDL = `
 CREATE TABLE IF NOT EXISTS events (
@@ -33,16 +30,10 @@ CREATE INDEX IF NOT EXISTS idx_events_source ON events(source);
 
 var _ Journal = (*Store)(nil)
 
-type subscriber struct {
-	filter Filter
-	ch     chan Event
-}
-
 // Store is a SQLite-backed journal.
 type Store struct {
 	db             *sql.DB
 	mu             sync.Mutex
-	subs           []subscriber
 	appendWatchers []chan struct{}
 }
 
@@ -96,10 +87,6 @@ func configureDB(db *sql.DB) error {
 // Close closes active subscriptions and the underlying database.
 func (s *Store) Close() error {
 	s.mu.Lock()
-	for _, sub := range s.subs {
-		close(sub.ch)
-	}
-	s.subs = nil
 	for _, ch := range s.appendWatchers {
 		close(ch)
 	}
@@ -210,7 +197,7 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 		return fmt.Errorf("journal: append: commit: %w", err)
 	}
 
-	s.notify(e)
+	s.signalAppendWatchers()
 	return nil
 }
 
@@ -313,92 +300,6 @@ func (s *Store) Get(ctx context.Context, id string) (Event, error) {
 	}
 
 	return e, nil
-}
-
-// Subscribe streams new events matching f. Only events appended after Subscribe
-// returns are delivered; there is no historical replay. Delivery is best-effort:
-// slow subscribers may miss events when the buffer is full.
-func (s *Store) Subscribe(ctx context.Context, f Filter) (<-chan Event, error) {
-	if f.Type != "" && f.TypePrefix != "" {
-		return nil, ErrConflictingFilter
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("journal: subscribe: %w", err)
-	}
-
-	ch := make(chan Event, subscriberBuffer)
-	sub := subscriber{filter: f, ch: ch}
-
-	s.mu.Lock()
-	s.subs = append(s.subs, sub)
-	s.mu.Unlock()
-
-	go func() {
-		<-ctx.Done()
-		s.removeSubscriber(ch)
-	}()
-
-	return ch, nil
-}
-
-func (s *Store) removeSubscriber(ch chan Event) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i, sub := range s.subs {
-		if sub.ch == ch {
-			s.subs = append(s.subs[:i], s.subs[i+1:]...)
-			close(ch)
-			return
-		}
-	}
-}
-
-func (s *Store) notify(e Event) {
-	s.signalAppendWatchers()
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for _, sub := range s.subs {
-		if !s.matchesFilter(e, sub.filter) {
-			continue
-		}
-		// Non-blocking send: a slow consumer must not stall ingest.
-		select {
-		case sub.ch <- e:
-		default:
-			log.Printf("journal: dropped event id=%s type=%s for slow subscriber", e.ID, e.Type)
-		}
-	}
-}
-
-func (s *Store) matchesFilter(e Event, f Filter) bool {
-	if f.Type != "" && e.Type != f.Type {
-		return false
-	}
-	if f.TypePrefix != "" && !strings.HasPrefix(e.Type, f.TypePrefix) {
-		return false
-	}
-	if f.Source != "" && e.Source != f.Source {
-		return false
-	}
-	if f.TimeFrom != nil && e.Time.Before(f.TimeFrom.UTC()) {
-		return false
-	}
-	if f.TimeTo != nil && e.Time.After(f.TimeTo.UTC()) {
-		return false
-	}
-	if ftsQuery := formatFTSQuery(f.Text); ftsQuery != "" {
-		var count int
-		err := s.db.QueryRow(`
-			SELECT COUNT(*) FROM events_fts
-			WHERE event_id = ? AND events_fts MATCH ?`, e.ID, ftsQuery).Scan(&count)
-		if err != nil || count == 0 {
-			return false
-		}
-	}
-	return true
 }
 
 type rowScanner interface {

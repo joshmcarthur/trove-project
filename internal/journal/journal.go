@@ -7,5 +7,5 @@ type Journal interface {
 	Append(ctx context.Context, e Event) error
 	Query(ctx context.Context, f Filter) ([]Event, error)
 	Get(ctx context.Context, id string) (Event, error)
-	Subscribe(ctx context.Context, f Filter) (<-chan Event, error)
+	WatchAppends(ctx context.Context) (<-chan struct{}, error)
 }
