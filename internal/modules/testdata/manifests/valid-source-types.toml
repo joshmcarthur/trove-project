@@ -1,0 +1,9 @@
+name = "test-source"
+version = "1.0"
+kind = "source"
+provides = ["trove://type/mqtt/message/received/*"]
+
+[[types]]
+name = "mqtt.message.received"
+version = 1
+schema = "types/mqtt.ttd.json"

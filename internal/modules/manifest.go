@@ -50,18 +50,26 @@ type MCPTool struct {
 	Description string `toml:"description"`
 }
 
+// ManifestTypeDecl declares a type contributed by a module manifest.
+type ManifestTypeDecl struct {
+	Name    string `toml:"name"`
+	Version int    `toml:"version"`
+	Schema  string `toml:"schema"`
+}
+
 // Manifest describes a Trove module from manifest.toml.
 type Manifest struct {
-	Name     string            `toml:"name"`
-	Version  string            `toml:"version"`
-	Kind     Kind              `toml:"kind"`
-	Provides []string          `toml:"provides"`
-	Consumes []string          `toml:"consumes"`
-	Schemas  map[string]string `toml:"schemas"`
-	HTTP     manifestHTTP      `toml:"http"`
-	MCP      manifestMCP       `toml:"mcp"`
-	Auth     manifestAuth      `toml:"auth"`
-	Listen   string            `toml:"listen"`
+	Name     string             `toml:"name"`
+	Version  string             `toml:"version"`
+	Kind     Kind               `toml:"kind"`
+	Provides []string           `toml:"provides"`
+	Consumes []string           `toml:"consumes"`
+	Schemas  map[string]string  `toml:"schemas"`
+	Types    []ManifestTypeDecl `toml:"types"`
+	HTTP     manifestHTTP       `toml:"http"`
+	MCP      manifestMCP        `toml:"mcp"`
+	Auth     manifestAuth       `toml:"auth"`
+	Listen   string             `toml:"listen"`
 }
 
 // EventRoutes reports whether the module participates in journal event routing.
@@ -148,6 +156,12 @@ func validateManifest(m Manifest) error {
 		}
 	}
 
+	for i, td := range m.Types {
+		if err := validateManifestTypeDecl(td); err != nil {
+			return fmt.Errorf("modules: manifest: types[%d]: %w", i, err)
+		}
+	}
+
 	for i, route := range m.HTTP.Routes {
 		if err := validateHTTPRoute(route); err != nil {
 			return fmt.Errorf("modules: manifest: http.routes[%d]: %w", i, err)
@@ -200,6 +214,19 @@ func validateHTTPRoute(route HTTPRoute) error {
 func validateAuthValidator(validator AuthValidatorDecl) error {
 	if strings.TrimSpace(validator.ID) == "" {
 		return fmt.Errorf("id is required")
+	}
+	return nil
+}
+
+func validateManifestTypeDecl(decl ManifestTypeDecl) error {
+	if strings.TrimSpace(decl.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if strings.TrimSpace(decl.Schema) == "" {
+		return fmt.Errorf("schema is required")
+	}
+	if decl.Version < 1 {
+		return fmt.Errorf("version must be >= 1")
 	}
 	return nil
 }

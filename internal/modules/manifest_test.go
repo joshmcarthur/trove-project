@@ -55,6 +55,23 @@ func TestParseManifestValid(t *testing.T) {
 				Consumes: []string{"note.*"},
 			},
 		},
+		{
+			name: "valid-source-types",
+			file: "valid-source-types.toml",
+			want: Manifest{
+				Name:     "test-source",
+				Version:  "1.0",
+				Kind:     KindSource,
+				Provides: []string{"trove://type/mqtt/message/received/*"},
+				Types: []ManifestTypeDecl{
+					{
+						Name:    "mqtt.message.received",
+						Version: 1,
+						Schema:  "types/mqtt.ttd.json",
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -88,6 +105,14 @@ func TestParseManifestValid(t *testing.T) {
 			for i := range tt.want.Consumes {
 				if got.Consumes[i] != tt.want.Consumes[i] {
 					t.Errorf("Consumes[%d] = %q, want %q", i, got.Consumes[i], tt.want.Consumes[i])
+				}
+			}
+			if len(got.Types) != len(tt.want.Types) {
+				t.Fatalf("Types len = %d, want %d", len(got.Types), len(tt.want.Types))
+			}
+			for i := range tt.want.Types {
+				if got.Types[i] != tt.want.Types[i] {
+					t.Errorf("Types[%d] = %#v, want %#v", i, got.Types[i], tt.want.Types[i])
 				}
 			}
 		})
