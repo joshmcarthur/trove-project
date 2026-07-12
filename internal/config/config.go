@@ -8,12 +8,20 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// TypeDecl declares a user-contributed type in trove.toml.
+type TypeDecl struct {
+	Name    string `toml:"name"`
+	Version int    `toml:"version"`
+	Schema  string `toml:"schema"`
+}
+
 // Config is the root Trove configuration loaded from TOML.
 type Config struct {
 	Journal JournalConfig `toml:"journal"`
 	Blobs   BlobsConfig   `toml:"blobs"`
 	Modules ModulesConfig `toml:"modules"`
 	HTTP    HTTPConfig    `toml:"http"`
+	Types   []TypeDecl    `toml:"types"`
 }
 
 // JournalConfig holds SQLite journal settings.
@@ -74,6 +82,7 @@ func Load(path string) (Config, error) {
 		Blobs   BlobsConfig      `toml:"blobs"`
 		Modules modulesConfigRaw `toml:"modules"`
 		HTTP    HTTPConfig       `toml:"http"`
+		Types   []TypeDecl       `toml:"types"`
 	}
 	md, err := toml.Decode(string(data), &decode)
 	if err != nil {
@@ -82,6 +91,7 @@ func Load(path string) (Config, error) {
 	cfg.Journal = decode.Journal
 	cfg.Blobs = decode.Blobs
 	cfg.HTTP = decode.HTTP
+	cfg.Types = decode.Types
 	modulesRaw = decode.Modules
 
 	settings, err := decodeModuleSettings(md, modulesRaw.Settings)
@@ -140,6 +150,9 @@ func applyDefaults(cfg *Config) {
 	if cfg.Modules.Settings == nil {
 		cfg.Modules.Settings = map[string]map[string]any{}
 	}
+	if cfg.Types == nil {
+		cfg.Types = []TypeDecl{}
+	}
 }
 
 func decodeModuleSettings(md toml.MetaData, raw map[string]toml.Primitive) (map[string]map[string]any, error) {
@@ -181,6 +194,13 @@ func expandPaths(cfg *Config) error {
 		cfg.Modules.Config[name], err = expandPath(path)
 		if err != nil {
 			return fmt.Errorf("config: modules.config[%q]: %w", name, err)
+		}
+	}
+
+	for i, td := range cfg.Types {
+		cfg.Types[i].Schema, err = expandPath(td.Schema)
+		if err != nil {
+			return fmt.Errorf("config: types[%d].schema: %w", i, err)
 		}
 	}
 
@@ -228,6 +248,18 @@ func validate(cfg *Config) error {
 	}
 	if cfg.Journal.RetentionDays < 0 {
 		return fmt.Errorf("config: journal.retention_days must be >= 0")
+	}
+
+	for i, td := range cfg.Types {
+		if strings.TrimSpace(td.Name) == "" {
+			return fmt.Errorf("config: types[%d].name is required", i)
+		}
+		if strings.TrimSpace(td.Schema) == "" {
+			return fmt.Errorf("config: types[%d].schema is required", i)
+		}
+		if td.Version < 1 {
+			return fmt.Errorf("config: types[%d].version must be >= 1", i)
+		}
 	}
 
 	return nil

@@ -126,6 +126,44 @@ func TestLoadModuleSettings(t *testing.T) {
 	}
 }
 
+func TestLoadTypesSection(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "journal.ttd.json")
+	if err := os.WriteFile(schemaPath, []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write schema: %v", err)
+	}
+
+	configPath := filepath.Join(dir, "trove.toml")
+	raw := `[[types]]
+name = "journal.entry"
+version = 1
+schema = "` + schemaPath + `"
+`
+	if err := os.WriteFile(configPath, []byte(raw), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.Types) != 1 {
+		t.Fatalf("len(cfg.Types) = %d, want 1", len(cfg.Types))
+	}
+
+	want := TypeDecl{
+		Name:    "journal.entry",
+		Version: 1,
+		Schema:  schemaPath,
+	}
+	if cfg.Types[0] != want {
+		t.Errorf("Types[0] = %#v, want %#v", cfg.Types[0], want)
+	}
+}
+
 func TestLoadErrors(t *testing.T) {
 	t.Parallel()
 
