@@ -1,0 +1,10 @@
+{
+  "$id": "trove://type/classify/pending/1",
+  "title": "Pending capture",
+  "definition": {
+    "optionalProperties": {
+      "body": { "type": "string" },
+      "caption": { "type": "string" }
+    }
+  }
+}

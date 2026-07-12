@@ -1,0 +1,8 @@
+{
+  "$id": "trove://type/test/typed/emit/1",
+  "definition": {
+    "properties": {
+      "message": { "type": "string" }
+    }
+  }
+}
