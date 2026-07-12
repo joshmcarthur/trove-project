@@ -40,7 +40,7 @@ archives:
   - id: raw
     formats:
       - binary
-    name_template: "trove-{{ .Os }}-{{ .Arch }}{{ if eq .Os \"windows\" }}.exe{{ end }}"
+    name_template: "trove-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: checksums.txt
@@ -70,6 +70,8 @@ nfpms:
 
 brews:
   - name: trove
+    ids:
+      - packaged
     repository:
       owner: joshmcarthur
       name: homebrew-trove
