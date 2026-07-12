@@ -36,9 +36,9 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	wakeCh, err := store.WatchAppends(ctx)
+	wakeCh, err := store.Watch(ctx)
 	if err != nil {
-		t.Fatalf("WatchAppends() error = %v", err)
+		t.Fatalf("Watch() error = %v", err)
 	}
 
 	done := make(chan struct{})

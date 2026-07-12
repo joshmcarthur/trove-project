@@ -497,15 +497,15 @@ func testEvent(id string, when time.Time, typ, source string) Event {
 	}
 }
 
-func TestWatchAppendsContextCancel(t *testing.T) {
+func TestWatchContextCancel(t *testing.T) {
 	t.Parallel()
 
 	store := openTestStore(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch, err := store.WatchAppends(ctx)
+	ch, err := store.Watch(ctx)
 	if err != nil {
-		t.Fatalf("WatchAppends() error = %v", err)
+		t.Fatalf("Watch() error = %v", err)
 	}
 
 	cancel()
@@ -664,7 +664,7 @@ func TestEventDispatchRoundTrip(t *testing.T) {
 	}
 }
 
-func TestWatchAppends(t *testing.T) {
+func TestWatch(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -673,9 +673,9 @@ func TestWatchAppends(t *testing.T) {
 	store := openTestStore(t)
 	t.Cleanup(func() { _ = store.Close() })
 
-	wakeCh, err := store.WatchAppends(ctx)
+	wakeCh, err := store.Watch(ctx)
 	if err != nil {
-		t.Fatalf("WatchAppends() error = %v", err)
+		t.Fatalf("Watch() error = %v", err)
 	}
 
 	if err := store.Append(ctx, Event{

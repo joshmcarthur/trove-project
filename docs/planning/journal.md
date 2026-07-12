@@ -23,7 +23,7 @@ type Journal interface {
     Append(ctx context.Context, e Event) error
     Query(ctx context.Context, f Filter) ([]Event, error)
     Get(ctx context.Context, id string) (Event, error)
-    WatchAppends(ctx context.Context) (<-chan struct{}, error)
+    Watch(ctx context.Context) (<-chan struct{}, error)
 }
 ```
 
@@ -34,7 +34,7 @@ type Journal interface {
 - SQLite driver: `modernc.org/sqlite` (pure Go, no CGO) vs `mattn/go-sqlite3` —
   prefer pure Go for Pi cross-compile unless FTS5/vec needs CGO
 - ULID generation at append time
-- `WatchAppends` signals coalesced wakeups after each append; consumers pull events
+- `Watch` signals coalesced wakeups after each append; consumers pull events
   via `Query` or `QueryAfter` (the router uses both with a durable cursor)
 - `router_state` and `event_dispatch` tables support cursor-based routing replay
 
@@ -44,9 +44,9 @@ type Journal interface {
 - [x] Query by type prefix, source, time range
 - [x] Query with `Filter.Text` performs FTS5 keyword search
 - [x] Get by id
-- [x] WatchAppends signals new appends for pull-based consumers
+- [x] `Watch` wakes pull-based consumers on new appends
 - [x] Optional `retention_days` prunes events older than the configured window on startup
-- [x] Router cursor (`router_state`) enables pull-based dispatch via `WatchAppends`
+- [x] Router cursor (`router_state`) enables pull-based dispatch via `Watch`
 
 ## Dependencies
 

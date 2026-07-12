@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-// WatchAppends returns a coalesced wakeup channel signaled after each Append.
+// Watch returns a coalesced wakeup channel signaled after each Append.
 // Payloads are not delivered; callers pull events from the journal separately.
-func (s *Store) WatchAppends(ctx context.Context) (<-chan struct{}, error) {
+func (s *Store) Watch(ctx context.Context) (<-chan struct{}, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("journal: watch appends: %w", err)
+		return nil, fmt.Errorf("journal: watch: %w", err)
 	}
 
 	ch := make(chan struct{}, 1)
@@ -19,13 +19,13 @@ func (s *Store) WatchAppends(ctx context.Context) (<-chan struct{}, error) {
 
 	go func() {
 		<-ctx.Done()
-		s.removeAppendWatcher(ch)
+		s.removeWatcher(ch)
 	}()
 
 	return ch, nil
 }
 
-func (s *Store) removeAppendWatcher(ch chan struct{}) {
+func (s *Store) removeWatcher(ch chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -38,7 +38,7 @@ func (s *Store) removeAppendWatcher(ch chan struct{}) {
 	}
 }
 
-func (s *Store) signalAppendWatchers() {
+func (s *Store) signalWatchers() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

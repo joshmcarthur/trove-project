@@ -24,15 +24,15 @@ type Journal interface {
     Append(ctx context.Context, e Event) error
     Query(ctx context.Context, f Filter) ([]Event, error)
     Get(ctx context.Context, id string) (Event, error)
-    WatchAppends(ctx context.Context) (<-chan struct{}, error)
+    Watch(ctx context.Context) (<-chan struct{}, error)
 }
 ```
 
 `Filter` supports type prefix, source, time range, and free-text match at
 minimum.
 
-New appends signal `WatchAppends` watchers; consumers pull data via `Query`.
-The event router combines `WatchAppends` with a durable cursor for guaranteed
+New appends signal `Watch` watchers; consumers pull data via `Query`.
+The event router combines `Watch` with a durable cursor for guaranteed
 dispatch to processors and sinks.
 
 ## Why SQLite

@@ -39,7 +39,7 @@ processors (for example `mcp-query`) use `[[http.routes]]` instead of `consumes`
 ## Event routing
 
 1. Source or processor emits an event → journal append
-2. Router pulls events after `last_dispatched_id` in ULID order (`WatchAppends` for wakeup)
+2. Router pulls events after `last_dispatched_id` in ULID order (`Watch` for wakeup)
 3. Router matches `consumes` patterns
 4. Core calls `Process` / `Handle` with `DispatchContext{root_id, seen}`
 5. Processor-derived events are validated against `provides` and appended

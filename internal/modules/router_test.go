@@ -230,7 +230,7 @@ func TestRouterStartupCatchUp(t *testing.T) {
 	}
 }
 
-func TestRouterWatchesAppends(t *testing.T) {
+func TestRouterWatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
