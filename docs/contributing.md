@@ -97,6 +97,21 @@ and [GoReleaser](https://goreleaser.com/). Merge the release-please PR when read
 to ship; CI tags the release and builds binaries, checksums, `.deb`/`.rpm`, and
 Docker images.
 
+**First-time setup on an existing repo:** `release-please-config.json` includes
+`bootstrap-sha` so release-please ignores pre-conventional commit history. Remove
+`bootstrap-sha` after the first release PR merges.
+
+**Repository settings required:**
+
+1. Settings → General → Pull Requests: squash merge + default to PR title
+2. Settings → Actions → General → Workflow permissions: enable **Allow GitHub
+   Actions to create and approve pull requests** (release-please opens Release PRs
+   with `GITHUB_TOKEN`; without this setting the workflow fails even when commit
+   history is valid)
+
+Non-conventional commits in old history are skipped (logged as warnings). They do
+not block release-please once `bootstrap-sha` is set.
+
 Repository secrets for full package-manager support:
 
 | Secret | Purpose |
