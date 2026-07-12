@@ -2,6 +2,11 @@
 
 GOIMPORTS := go run golang.org/x/tools/cmd/goimports
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+
 proto:
 	protoc -I api/proto \
 		--go_out=internal/modules/rpc --go_opt=paths=source_relative \
@@ -19,7 +24,7 @@ test:
 	go test -race -cover ./...
 
 build: build-http-gateway build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier build-type-catalog
-	go build -o bin/trove ./cmd/trove
+	go build -ldflags "$(LDFLAGS)" -o bin/trove ./cmd/trove
 
 build-http-gateway:
 	go build -o modules/http-gateway/module ./modules/http-gateway

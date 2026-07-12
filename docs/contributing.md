@@ -49,6 +49,64 @@ Per-module build targets (also run as part of `make build`):
 2. Check off acceptance criteria on that planning page.
 3. Update status in [roadmap.md](./roadmap.md).
 4. Run `make check` before opening a PR.
+5. Open the PR with a [Conventional Commits](https://www.conventionalcommits.org/) title (enforced by CI).
+
+## Commit messages
+
+Trove squash-merges PRs. **The PR title becomes the commit on `main`**, which
+release-please uses to decide version bumps and changelog entries.
+
+PR titles must follow Conventional Commits. CI validates every PR title.
+
+### Prefixes
+
+| Prefix | Release impact | Example |
+|--------|----------------|---------|
+| `feat:` | Minor version bump | `feat: add mqtt reconnect backoff` |
+| `fix:` | Patch version bump | `fix: handle SQLITE_BUSY in module router` |
+| `feat!:` / `fix!:` | Major version bump | `feat!: rename journal.path config key` |
+| `docs:` | No release | `docs: update installation guide` |
+| `chore:`, `ci:`, `test:`, `refactor:` | No release | `chore: bump golangci-lint` |
+
+Optional scope: `fix(ingest): correct Content-Type handling`.
+
+### Good vs bad titles
+
+Good:
+
+- `feat: add checksums to release artifacts`
+- `fix: journal migration for schema_ref column`
+- `docs: document brew install path`
+
+Bad (CI will fail):
+
+- `Add mqtt support`
+- `fix stuff`
+- `WIP`
+- `Feature: foo`
+
+### Repository settings
+
+Maintainers: enable **Allow squash merging** and **Default to pull request title
+for squash merge commits** under Settings → General → Pull Requests.
+
+### Release automation
+
+Stable releases use [release-please](https://github.com/googleapis/release-please)
+and [GoReleaser](https://goreleaser.com/). Merge the release-please PR when ready
+to ship; CI tags the release and builds binaries, checksums, `.deb`/`.rpm`, and
+Docker images.
+
+Repository secrets for full package-manager support:
+
+| Secret | Purpose |
+|--------|---------|
+| `GITHUB_TOKEN` | Provided by Actions — releases and ghcr.io |
+| `HOMEBREW_TAP_GITHUB_TOKEN` | Push Formula to `joshmcarthur/homebrew-trove` |
+
+Create the `homebrew-trove` GitHub repo with a `Formula/` directory before the
+first stable release. Without the tap token, GoReleaser still publishes GitHub
+Release assets; Homebrew formula push is skipped.
 
 ## Docs
 

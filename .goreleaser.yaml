@@ -1,0 +1,84 @@
+version: 2
+
+project_name: trove
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: trove
+    main: ./cmd/trove
+    binary: trove
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - id: packaged
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+
+  - id: raw
+    formats:
+      - binary
+    name_template: "trove-{{ .Os }}-{{ .Arch }}{{ if eq .Os \"windows\" }}.exe{{ end }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: joshmcarthur
+    name: trove-project
+  draft: false
+  prerelease: auto
+
+nfpms:
+  - id: trove
+    package_name: trove
+    vendor: Josh McArthur
+    homepage: https://github.com/joshmcarthur/trove
+    maintainer: Josh McArthur <https://github.com/joshmcarthur>
+    description: Personal event journal
+    license: GPL-3.0-or-later
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+
+brews:
+  - name: trove
+    repository:
+      owner: joshmcarthur
+      name: homebrew-trove
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/joshmcarthur/trove
+    description: Personal event journal
+    license: GPL-3.0-or-later
+    install: |
+      bin.install "trove"
+    test: |
+      system "#{bin}/trove", "-version"
