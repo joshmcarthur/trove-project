@@ -1,35 +1,43 @@
 ---
 title: "Welcome"
 nav_order: 0
+description: Capture broadly, store simply, converse to retrieve — your personal event journal.
 ---
 
-# Welcome to Trove
+<div class="trove-hero">
 
-Trove is a small, self-contained personal data store: a single binary that
-captures typed events from the sources in your life — Meshtastic, Home Assistant,
-MQTT, iOS Shortcuts, webhooks, and more — into one durable, queryable journal,
-with a conversational MCP interface as the primary way to get information back
-out.
+<p class="trove-tagline">Capture broadly, store simply, converse to retrieve.</p>
 
-> Capture broadly, store simply, converse to retrieve.
+<p class="trove-lead">
+Trove is a small, self-contained personal data store: one binary that captures
+typed events from the sources in your life into a durable journal, with a
+conversational MCP interface as the primary way to get information back out.
+</p>
 
-Trove v0 is implemented in Go. You can run `trove`, capture events via HTTP
-ingest, MQTT, Telegram, and iOS Shortcuts, and query the journal through MCP.
-See the [roadmap](./roadmap.md) for status.
+<div class="trove-cta">
+  <a href="./getting-started/try-in-a-day/">Try Trove in a day</a>
+  <span class="trove-cta-hint">Install, capture six typed events, query them via MCP — about two hours.</span>
+</div>
 
-## What's next
+</div>
 
-Milestones 1, 2, 2b, and 3 (journal, module runtime, HTTP ingest, MQTT source,
-blob store, config, MCP query) are **Supported**. Current focus: the two-week live test with
-[iOS Shortcuts](./getting-started/ios-shortcuts.md).
+## What it feels like when it works
+
+You jot a quick note from your phone, bookmark a link, or POST JSON from a script.
+Later you ask Cursor "what did I save about example.com this week?" and Trove
+answers from your journal — no bespoke app per source, no SQL.
+
+Trove v0 runs as a single Go binary with HTTP ingest, iOS Shortcuts, MQTT,
+Telegram, and MCP query. See the [roadmap](./roadmap.md) for current status.
 
 ## Documentation
 
-- [Roadmap](./roadmap.md) — status matrix and build order
-- [Getting started](./getting-started/installation.md) — install and build
-- [Concepts](./concepts.md) — architecture reference
-- [Planning](./planning/index.md) — per-feature implementation briefs
-- [Specification](./spec.md) — full canonical spec
+| Section | Start here |
+|---------|------------|
+| Getting started | [Try in a day](./getting-started/try-in-a-day.md) |
+| Architecture | [Concepts](./concepts.md) |
+| Status & build order | [Roadmap](./roadmap.md) |
+| Full specification | [Specification](./spec.md) |
 
 ## Development
 

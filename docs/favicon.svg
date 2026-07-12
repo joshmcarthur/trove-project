@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Trove">
+  <rect width="32" height="32" rx="6" fill="#2b7cb8"/>
+  <path d="M8 10h16v2H8zm0 5h12v2H8zm0 5h14v2H8z" fill="#fff" opacity="0.95"/>
+  <circle cx="24" cy="22" r="4" fill="#e8f4fc"/>
+</svg>

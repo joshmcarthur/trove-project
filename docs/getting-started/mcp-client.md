@@ -1,7 +1,7 @@
 ---
 title: MCP client setup
 parent: Getting started
-nav_order: 5
+nav_order: 6
 ---
 
 # MCP client setup

@@ -63,9 +63,38 @@ Derived events and side-effect handlers — deliberately minimal in v0.
 
 ## How it fits together
 
+```mermaid
+flowchart TB
+  subgraph sources [Source modules]
+    httpIngest[HTTP ingest]
+    mqtt[MQTT source]
+    telegram[Telegram source]
+  end
+
+  subgraph core [Trove core]
+    journal[(SQLite journal)]
+    blobs[(Blob store)]
+    catalog[Type catalog]
+  end
+
+  subgraph query [Retrieval]
+    mcp[MCP query tools]
+    client[Cursor / MCP client]
+  end
+
+  httpIngest --> journal
+  mqtt --> journal
+  telegram --> journal
+  journal --> blobs
+  catalog --> journal
+  journal --> mcp
+  mcp --> client
+```
+
 1. **Source modules** capture facts and call `Emit(event)` into the core.
 2. The **journal** persists events append-only in SQLite.
 3. Large payloads go to the **blob store**; events hold a `blob_ref`.
-4. **MCP query tools** search and summarize the journal for conversational use.
+4. The **type catalog** validates payloads against JTD contracts at emit time.
+5. **MCP query tools** search and summarize the journal for conversational use.
 
 For implementation order, see the [roadmap](./roadmap.md).

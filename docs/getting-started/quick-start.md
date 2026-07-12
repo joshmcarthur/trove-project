@@ -1,13 +1,13 @@
 ---
 title: Quick Start
 parent: Getting started
-nav_order: 2
+nav_order: 3
 ---
 
 # Quick Start
 
-Trove is in active development toward a two-week live validation. This page
-describes what works today and what comes next.
+Developer reference for what Trove implements today. **First time here?** Follow
+[Try in a day](./try-in-a-day.md) for a guided afternoon experiment instead.
 
 ## What works today
 
