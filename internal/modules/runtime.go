@@ -81,7 +81,7 @@ func StartSource(
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: trovemodule.Handshake,
 		Plugins: hostPluginSet(
-			j, policy, manifest.Name, blobs, caps, mcpTools, toolModules, mcpRegistry,
+			j, policy, manifest.Name, blobs, caps, mcpTools, toolModules, mcpRegistry, catalog,
 		),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
