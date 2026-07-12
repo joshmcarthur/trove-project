@@ -36,7 +36,25 @@ func (c *Catalog) Register(e Entry) (warning string, err error) {
 	return warning, nil
 }
 
-// Lookup returns the catalog entry for uri.
+// RegisterPermissive adds a type with an empty JTD schema that accepts any payload.
+func (c *Catalog) RegisterPermissive(uri string) error {
+	td := TypeDefinition{
+		ID:         uri,
+		Definition: []byte(`{}`),
+	}
+	ct, err := Compile(td)
+	if err != nil {
+		return err
+	}
+	_, err = c.Register(Entry{
+		URI:       uri,
+		SchemaRef: "blob:" + uri,
+		Compiled:  ct,
+		Source:    "test",
+	})
+	return err
+}
+
 func (c *Catalog) Lookup(uri string) (Entry, bool) {
 	e, ok := c.entries[uri]
 	return e, ok

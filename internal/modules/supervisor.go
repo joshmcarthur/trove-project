@@ -8,6 +8,7 @@ import (
 
 	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/types"
 )
 
 const (
@@ -27,6 +28,7 @@ func RunModules(
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	settings *SettingsStore,
+	catalog *types.Catalog,
 ) {
 	var wg sync.WaitGroup
 	for _, mod := range mods {
@@ -41,7 +43,7 @@ func RunModules(
 		wg.Add(1)
 		go func(mod Module) {
 			defer wg.Done()
-			superviseModule(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settings)
+			superviseModule(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settings, catalog)
 		}(mod)
 	}
 	wg.Wait()
@@ -66,6 +68,7 @@ func superviseModule(
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	settings *SettingsStore,
+	catalog *types.Catalog,
 ) {
 	backoff := initialBackoff
 	name := mod.Manifest.Name
@@ -75,7 +78,7 @@ func superviseModule(
 			return
 		}
 
-		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settings)
+		handle, err := StartSource(ctx, j, mod, blobs, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settings, catalog)
 		if handle != nil {
 			select {
 			case <-ctx.Done():
@@ -118,18 +121,19 @@ func RunSources(
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	settings *SettingsStore,
+	catalog *types.Catalog,
 ) {
-	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules, settings)
+	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules, settings, catalog)
 }
 
 // RunProcessors supervises event-routing processors until ctx is cancelled.
-func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore) {
-	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings)
+func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore, catalog *types.Catalog) {
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings, catalog)
 }
 
 // RunSinks supervises event-routing sinks until ctx is cancelled.
-func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore) {
-	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings)
+func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore, catalog *types.Catalog) {
+	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings, catalog)
 }
 
 func sleepOrDone(ctx context.Context, d time.Duration) bool {

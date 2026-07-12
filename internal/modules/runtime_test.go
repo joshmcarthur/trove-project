@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/types"
 )
 
 func TestStartSourceInvokesHealthcheck(t *testing.T) {
@@ -39,7 +40,7 @@ func TestStartSourceInvokesHealthcheck(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		handle, err := StartSource(ctx, store, mod, nil, nil, NewMCPRegistry(), nil, nil, map[string]string{}, nil)
+		handle, err := StartSource(ctx, store, mod, nil, nil, NewMCPRegistry(), nil, nil, map[string]string{}, nil, types.NewCatalog())
 		if err != nil && ctx.Err() == nil {
 			t.Errorf("StartSource() error = %v", err)
 		}
@@ -95,7 +96,10 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 		},
 	}
 
-	handle, err := StartSource(context.Background(), store, mod, nil, nil, NewMCPRegistry(), nil, nil, map[string]string{}, nil)
+	catalog := types.NewCatalog()
+	registerPermissiveCatalogType(t, catalog, "test.emit.once")
+
+	handle, err := StartSource(context.Background(), store, mod, nil, nil, NewMCPRegistry(), nil, nil, map[string]string{}, nil, catalog)
 	if err != nil {
 		t.Fatalf("StartSource() error = %v", err)
 	}

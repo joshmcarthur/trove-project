@@ -65,7 +65,7 @@ type moduleClient struct {
 	mcpClient       troverpc.MCPModuleClient
 	broker          *plugin.GRPCBroker
 	journal         journal.Journal
-	policy          IngestPolicy
+	policy          EmitPolicy
 	blobs           blob.Store
 	mcpTools        []MCPToolEntry
 	toolModules     map[string]string
@@ -173,7 +173,7 @@ func (c *moduleClient) Handle(ctx context.Context, event journal.Event, dispatch
 type moduleGRPCPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 	journal     journal.Journal
-	policy      IngestPolicy
+	policy      EmitPolicy
 	moduleName  string
 	blobs       blob.Store
 	mcpTools    []MCPToolEntry
@@ -207,7 +207,7 @@ func (p *moduleGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 
 func hostPluginSet(
 	j journal.Journal,
-	policy IngestPolicy,
+	policy EmitPolicy,
 	moduleName string,
 	blobs blob.Store,
 	caps moduleCapabilities,

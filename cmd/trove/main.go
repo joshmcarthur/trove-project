@@ -17,6 +17,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
 	"github.com/joshmcarthur/trove/internal/modules/bundled"
+	"github.com/joshmcarthur/trove/internal/types"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
@@ -156,7 +157,7 @@ func main() {
 
 	modulesDone := make(chan struct{})
 	go func() {
-		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore)
+		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore, types.NewCatalog())
 		close(modulesDone)
 	}()
 
