@@ -110,32 +110,6 @@ func superviseModule(
 	}
 }
 
-// RunSources supervises source, HTTP, and MCP modules until ctx is cancelled.
-func RunSources(
-	ctx context.Context,
-	j journal.Journal,
-	mods []Module,
-	blobs blob.Store,
-	httpRegistry *HTTPRegistry,
-	mcpRegistry *MCPRegistry,
-	mcpTools []MCPToolEntry,
-	toolModules map[string]string,
-	settings *SettingsStore,
-	catalog *types.Catalog,
-) {
-	RunModules(ctx, j, mods, blobs, httpRegistry, mcpRegistry, nil, mcpTools, toolModules, settings, catalog)
-}
-
-// RunProcessors supervises event-routing processors until ctx is cancelled.
-func RunProcessors(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore, catalog *types.Catalog) {
-	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings, catalog)
-}
-
-// RunSinks supervises event-routing sinks until ctx is cancelled.
-func RunSinks(ctx context.Context, j journal.Journal, mods []Module, blobs blob.Store, registry *EventRegistry, settings *SettingsStore, catalog *types.Catalog) {
-	RunModules(ctx, j, mods, blobs, nil, nil, registry, nil, nil, settings, catalog)
-}
-
 func sleepOrDone(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()

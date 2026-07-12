@@ -421,15 +421,6 @@ func CollectCLICommands(mods []Module) ([]CLICommandEntry, error) {
 	return commands, nil
 }
 
-// CLICommandModuleIndex maps CLI command names to providing module names.
-func CLICommandModuleIndex(entries []CLICommandEntry) map[string]string {
-	index := make(map[string]string, len(entries))
-	for _, entry := range entries {
-		index[entry.Command.Name] = entry.Module
-	}
-	return index
-}
-
 // CollectAuthValidatorRefs gathers declared auth validator refs from discovered modules.
 func CollectAuthValidatorRefs(mods []Module) (map[string]struct{}, error) {
 	refs := make(map[string]struct{})

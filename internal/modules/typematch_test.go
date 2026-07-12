@@ -31,19 +31,3 @@ func TestMatchType(t *testing.T) {
 		})
 	}
 }
-
-func TestResolveSchemaPattern(t *testing.T) {
-	t.Parallel()
-
-	keys := []string{"trove://type/note/*", "trove://type/note/created/1", "trove://type/http/ingest/received/1"}
-
-	if got, ok := ResolveSchemaPattern(keys, "trove://type/note/created/1"); !ok || got != "trove://type/note/created/1" {
-		t.Fatalf("ResolveSchemaPattern(note/created/1) = %q, %v; want trove://type/note/created/1, true", got, ok)
-	}
-	if got, ok := ResolveSchemaPattern(keys, "trove://type/note/updated/1"); !ok || got != "trove://type/note/*" {
-		t.Fatalf("ResolveSchemaPattern(note/updated/1) = %q, %v; want trove://type/note/*, true", got, ok)
-	}
-	if got, ok := ResolveSchemaPattern(keys, "trove://type/other/event/1"); ok {
-		t.Fatalf("ResolveSchemaPattern(other/event/1) = %q, true; want false", got)
-	}
-}

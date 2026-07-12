@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/joshmcarthur/trove/internal/types"
@@ -13,15 +14,23 @@ func TestCanonicalBytesStable(t *testing.T) {
 	  "$id": "trove://type/note/created/1",
 	  "definition": { "properties": { "title": { "type": "string" } } }
 	}`)
-	ha, err := types.CanonicalHash(a)
+	tdA, err := types.ParseTypeDefinition(a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	hb, err := types.CanonicalHash(b)
+	tdB, err := types.ParseTypeDefinition(b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ha != hb {
-		t.Fatalf("hash mismatch: %s vs %s", ha, hb)
+	canA, err := types.CanonicalBytes(tdA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canB, err := types.CanonicalBytes(tdB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(canA, canB) {
+		t.Fatalf("canonical bytes mismatch: %s vs %s", canA, canB)
 	}
 }
