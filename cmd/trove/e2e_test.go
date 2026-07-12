@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -25,7 +26,6 @@ func TestE2EIngestAndMCPQuery(t *testing.T) {
 
 	repoRoot := findRepoRoot(t)
 	bin := buildTroveBinary(t, repoRoot)
-	modulesRoot := buildE2EModules(t, repoRoot)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -45,11 +45,11 @@ path = %q
 path = %q
 
 [modules]
-paths = [%q]
+paths = []
 
 [http]
 listen = %q
-`, journalPath, blobsPath, modulesRoot, addr)
+`, journalPath, blobsPath, addr)
 	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -73,18 +73,7 @@ listen = %q
 
 	unique := fmt.Sprintf("e2e-marker-%d", time.Now().UnixNano())
 	payload := fmt.Sprintf(`{"type":"http.ingest.received","text":%q}`, unique)
-	resp, err := http.Post(
-		"http://"+addr+"/ingest/e2e",
-		"application/json",
-		strings.NewReader(payload),
-	)
-	if err != nil {
-		t.Fatalf("POST ingest: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("POST ingest status = %d, want 204", resp.StatusCode)
-	}
+	postIngestUntilOK(t, "http://"+addr+"/ingest/e2e", payload, 15*time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -130,22 +119,31 @@ listen = %q
 
 func waitForIngest(t *testing.T, addr string, timeout time.Duration) {
 	t.Helper()
+	postIngestUntilOK(t, "http://"+addr+"/ingest/e2e", `{"text":"probe"}`, timeout)
+}
+
+func postIngestUntilOK(t *testing.T, url, payload string, timeout time.Duration) {
+	t.Helper()
 	deadline := time.Now().Add(timeout)
+	var lastStatus int
+	var lastBody string
 	for time.Now().Before(deadline) {
-		resp, err := http.Post(
-			"http://"+addr+"/ingest/e2e",
-			"application/json",
-			strings.NewReader(`{"text":"probe"}`),
-		)
+		resp, err := http.Post(url, "application/json", strings.NewReader(payload))
 		if err == nil {
+			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
+			lastStatus = resp.StatusCode
+			lastBody = strings.TrimSpace(string(body))
 			if resp.StatusCode == http.StatusNoContent {
 				return
 			}
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	t.Fatalf("ingest endpoint not ready within %s", timeout)
+	if lastBody != "" {
+		t.Fatalf("POST %s status = %d, want 204; body = %q", url, lastStatus, lastBody)
+	}
+	t.Fatalf("POST %s status = %d, want 204", url, lastStatus)
 }
 
 func connectMCPWithRetry(t *testing.T, ctx context.Context, addr string, timeout time.Duration) *mcp.ClientSession {
@@ -194,38 +192,6 @@ func buildTroveBinary(t *testing.T, repoRoot string) string {
 		t.Fatalf("build trove: %v\n%s", err, out)
 	}
 	return bin
-}
-
-func buildE2EModules(t *testing.T, repoRoot string) string {
-	t.Helper()
-	root := filepath.Join(t.TempDir(), "modules")
-	for _, mod := range []string{"http-ingest", "mcp-query"} {
-		dst := filepath.Join(root, mod)
-		if err := os.MkdirAll(dst, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", mod, err)
-		}
-		manifest, err := os.ReadFile(filepath.Join(repoRoot, "modules", mod, "manifest.toml"))
-		if err != nil {
-			t.Fatalf("read manifest %s: %v", mod, err)
-		}
-		if err := os.WriteFile(filepath.Join(dst, "manifest.toml"), manifest, 0o644); err != nil {
-			t.Fatalf("write manifest %s: %v", mod, err)
-		}
-		binary := filepath.Join(dst, "module")
-		src := "./modules/http-ingest/cmd"
-		if mod == "mcp-query" {
-			src = "./modules/mcp-query/cmd"
-		}
-		cmd := exec.Command("go", "build", "-o", binary, src)
-		cmd.Dir = repoRoot
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("build %s: %v\n%s", mod, err, out)
-		}
-		if err := os.Chmod(binary, 0o755); err != nil {
-			t.Fatalf("chmod %s: %v", mod, err)
-		}
-	}
-	return root
 }
 
 func waitForTCP(t *testing.T, addr string, timeout time.Duration) {
