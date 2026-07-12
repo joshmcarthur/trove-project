@@ -15,11 +15,11 @@ func TestMatchType(t *testing.T) {
 	}{
 		{name: "exact match", patterns: []string{"a"}, event: "a", want: true},
 		{name: "exact mismatch", patterns: []string{"a"}, event: "b", want: false},
-		{name: "note wildcard", patterns: []string{"note.*"}, event: "note.created", want: true},
-		{name: "note wildcard miss", patterns: []string{"note.*"}, event: "note", want: false},
-		{name: "mqtt wildcard", patterns: []string{"mqtt.*.received"}, event: "mqtt.sensor.temp.received", want: true},
-		{name: "mqtt wildcard miss", patterns: []string{"mqtt.*.received"}, event: "mqtt.received", want: false},
-		{name: "multiple patterns", patterns: []string{"http.ingest.received", "note.*"}, event: "note.updated", want: true},
+		{name: "note wildcard", patterns: []string{"trove://type/note/*"}, event: "trove://type/note/created/1", want: true},
+		{name: "note wildcard miss", patterns: []string{"trove://type/note/*"}, event: "trove://type/notes/created/1", want: false},
+		{name: "mqtt exact", patterns: []string{"trove://type/mqtt/message/received/1"}, event: "trove://type/mqtt/message/received/1", want: true},
+		{name: "mqtt exact miss", patterns: []string{"trove://type/mqtt/message/received/1"}, event: "trove://type/mqtt/foo/1", want: false},
+		{name: "multiple patterns", patterns: []string{"trove://type/http/ingest/received/1", "trove://type/note/*"}, event: "trove://type/note/updated/1", want: true},
 	}
 
 	for _, tt := range tests {
@@ -35,15 +35,15 @@ func TestMatchType(t *testing.T) {
 func TestResolveSchemaPattern(t *testing.T) {
 	t.Parallel()
 
-	keys := []string{"note.*", "note.created", "http.ingest.received"}
+	keys := []string{"trove://type/note/*", "trove://type/note/created/1", "trove://type/http/ingest/received/1"}
 
-	if got, ok := ResolveSchemaPattern(keys, "note.created"); !ok || got != "note.created" {
-		t.Fatalf("ResolveSchemaPattern(note.created) = %q, %v; want note.created, true", got, ok)
+	if got, ok := ResolveSchemaPattern(keys, "trove://type/note/created/1"); !ok || got != "trove://type/note/created/1" {
+		t.Fatalf("ResolveSchemaPattern(note/created/1) = %q, %v; want trove://type/note/created/1, true", got, ok)
 	}
-	if got, ok := ResolveSchemaPattern(keys, "note.updated"); !ok || got != "note.*" {
-		t.Fatalf("ResolveSchemaPattern(note.updated) = %q, %v; want note.*, true", got, ok)
+	if got, ok := ResolveSchemaPattern(keys, "trove://type/note/updated/1"); !ok || got != "trove://type/note/*" {
+		t.Fatalf("ResolveSchemaPattern(note/updated/1) = %q, %v; want trove://type/note/*, true", got, ok)
 	}
-	if got, ok := ResolveSchemaPattern(keys, "other.event"); ok {
-		t.Fatalf("ResolveSchemaPattern(other.event) = %q, true; want false", got)
+	if got, ok := ResolveSchemaPattern(keys, "trove://type/other/event/1"); ok {
+		t.Fatalf("ResolveSchemaPattern(other/event/1) = %q, true; want false", got)
 	}
 }

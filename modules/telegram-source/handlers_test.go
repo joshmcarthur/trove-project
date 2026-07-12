@@ -10,6 +10,8 @@ import (
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
+const noteQuickType = "trove://type/note/quick/1"
+
 type stubCore struct {
 	journal *stubJournal
 }
@@ -85,12 +87,12 @@ func testConfig() config {
 	return config{
 		AllowedChatIDs: []int64{100},
 		Types: []typeOption{
-			{Label: "Quick note", TargetType: "note.quick"},
+			{Label: "Quick note", TargetType: noteQuickType},
 		},
 		Commands: []commandConfig{{
 			Command:     "note",
 			Description: "Quick note",
-			TargetType:  "note.quick",
+			TargetType:  noteQuickType,
 			FastPath:    true,
 		}},
 	}
@@ -127,7 +129,7 @@ func TestFinishClassifyEmitsTypedEvent(t *testing.T) {
 	sess := &session{
 		Mode:           modeClassify,
 		PendingEventID: result.EventID,
-		TargetType:     "note.quick",
+		TargetType:     noteQuickType,
 		Collected:      map[string]string{"text": "hello"},
 	}
 	svc.finishClassify(context.Background(), nil, chatID, sess)
@@ -135,8 +137,8 @@ func TestFinishClassifyEmitsTypedEvent(t *testing.T) {
 	if _, ok := svc.sessions.get(chatID); ok {
 		t.Fatal("session not cleared after classify")
 	}
-	if len(j.byType["note.quick"]) != 1 {
-		t.Fatalf("typed events = %#v", j.byType["note.quick"])
+	if len(j.byType[noteQuickType]) != 1 {
+		t.Fatalf("typed events = %#v", j.byType[noteQuickType])
 	}
 	if len(j.byType[classify.AssignedType]) != 1 {
 		t.Fatalf("assigned events = %#v", j.byType[classify.AssignedType])
@@ -153,7 +155,7 @@ func TestFinishFastPathEmitsDirectly(t *testing.T) {
 
 	sess := &session{
 		Mode:       modeFastPath,
-		TargetType: "note.quick",
+		TargetType: noteQuickType,
 		Collected:  map[string]string{"text": "fast"},
 		Draft: &captureDraft{
 			Time:        "2026-07-10T10:00:00Z",
@@ -165,11 +167,11 @@ func TestFinishFastPathEmitsDirectly(t *testing.T) {
 	if len(j.byType[classify.PendingType]) != 0 {
 		t.Fatal("fast path should not create pending event")
 	}
-	if len(j.byType["note.quick"]) != 1 {
-		t.Fatalf("typed events = %#v", j.byType["note.quick"])
+	if len(j.byType[noteQuickType]) != 1 {
+		t.Fatalf("typed events = %#v", j.byType[noteQuickType])
 	}
 	var payload map[string]any
-	if err := json.Unmarshal(j.byType["note.quick"][0].Payload, &payload); err != nil {
+	if err := json.Unmarshal(j.byType[noteQuickType][0].Payload, &payload); err != nil {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 	if payload["text"] != "fast" {

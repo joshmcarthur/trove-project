@@ -79,7 +79,7 @@ func TestClassifyHappyPath(t *testing.T) {
 
 	got, err := classify.Classify(context.Background(), j, classify.ClassifyRequest{
 		SourceEventID: pendingID,
-		TargetType:    "shortcuts.note.created",
+		TargetType:    "trove://type/note/created/1",
 	})
 	if err != nil {
 		t.Fatalf("Classify() error = %v", err)
@@ -89,7 +89,7 @@ func TestClassifyHappyPath(t *testing.T) {
 	}
 
 	target := j.events[got.TargetEventID]
-	if target.Type != "shortcuts.note.created" {
+	if target.Type != "trove://type/note/created/1" {
 		t.Fatalf("target type = %q", target.Type)
 	}
 	var payload map[string]any
@@ -125,7 +125,7 @@ func TestClassifyRejectsDoubleClassify(t *testing.T) {
 
 	_, err := classify.Classify(context.Background(), j, classify.ClassifyRequest{
 		SourceEventID: pendingID,
-		TargetType:    "shortcuts.note.created",
+		TargetType:    "trove://type/note/created/1",
 	})
 	if !errors.Is(err, classify.ErrAlreadyClassified) {
 		t.Fatalf("Classify() error = %v, want %v", err, classify.ErrAlreadyClassified)

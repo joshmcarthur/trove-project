@@ -136,8 +136,8 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 	}
 
 	events := emit.waitForEvents(t, 1, 5*time.Second)
-	if events[0].Type != "mqtt.home.sensor.temp.received" {
-		t.Errorf("Type = %q, want mqtt.home.sensor.temp.received", events[0].Type)
+	if events[0].Type != "trove://type/mqtt/message/received/1" {
+		t.Errorf("Type = %q, want trove://type/mqtt/message/received/1", events[0].Type)
 	}
 	if events[0].Source != "home/sensor/temp" {
 		t.Errorf("Source = %q, want home/sensor/temp", events[0].Source)

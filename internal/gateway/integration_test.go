@@ -38,7 +38,7 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 			Name:     "http-ingest",
 			Version:  "1.0",
 			Kind:     modules.KindSource,
-			Provides: []string{"http.ingest.received", "note.*", "shortcut.*"},
+			Provides: []string{"trove://type/http/ingest/received/1", "trove://type/note/*", "trove://type/shortcut/*"},
 		},
 	}
 
@@ -63,9 +63,9 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 		t.Fatalf("gateway.New() error = %v", err)
 	}
 
-	catalog := types.NewCatalog()
-	if err := catalog.RegisterPermissive("http.ingest.received"); err != nil {
-		t.Fatalf("RegisterPermissive() error = %v", err)
+	catalog, _, err := types.BuildCatalog(context.Background(), blobStore, filepath.Join(moduleRoot(t), "types", "builtin"), nil, nil)
+	if err != nil {
+		t.Fatalf("BuildCatalog() error = %v", err)
 	}
 
 	done := make(chan struct{})
@@ -113,7 +113,7 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 		t.Fatalf("POST status = %d, want %d", resp.StatusCode, http.StatusNoContent)
 	}
 
-	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "http.ingest.received"})
+	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "trove://type/http/ingest/received/1"})
 	if err != nil {
 		t.Fatalf("Query() error = %v", err)
 	}
@@ -160,7 +160,7 @@ func buildHTTPIngestModule(t *testing.T) string {
 	manifest := `name = "http-ingest"
 version = "1.0"
 kind = "source"
-provides = ["http.ingest.received", "note.*", "shortcut.*"]
+provides = ["trove://type/http/ingest/received/1", "trove://type/note/*", "trove://type/shortcut/*"]
 
 [[http.routes]]
 method = "POST"

@@ -38,7 +38,7 @@ func TestGetEvent(t *testing.T) {
 	want := journal.Event{
 		ID:      id,
 		Time:    when,
-		Type:    "http.ingest.received",
+		Type:    "trove://type/http/ingest/received/1",
 		Source:  "shortcuts",
 		Payload: json.RawMessage(`{"text":"hello"}`),
 		BlobRef: &blobRef,
@@ -95,8 +95,8 @@ func TestSearchEvents(t *testing.T) {
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 
 	seed := []journal.Event{
-		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
-		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"room":"kitchen"}`)},
 	}
 	for _, e := range seed {
@@ -130,7 +130,7 @@ func TestSearchEvents(t *testing.T) {
 			name:  "type prefix filter",
 			query: "balmy",
 			params: SearchParams{
-				TypePrefix: "mqtt.",
+				TypePrefix: "trove://type/mqtt/",
 			},
 			wantIDs: []string{seed[0].ID},
 		},
@@ -202,9 +202,9 @@ func TestGetEventsByType(t *testing.T) {
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 
 	seed := []journal.Event{
-		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
-		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
-		{ID: "01JEVT00000000000000000003", Time: t3, Type: "mqtt.sensor.temp", Source: "sensor-b", Payload: json.RawMessage(`{"v":3}`)},
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+		{ID: "01JEVT00000000000000000003", Time: t3, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-b", Payload: json.RawMessage(`{"v":3}`)},
 	}
 	for _, e := range seed {
 		if err := store.Append(ctx, e); err != nil {
@@ -221,12 +221,12 @@ func TestGetEventsByType(t *testing.T) {
 	}{
 		{
 			name:      "exact type excludes other types",
-			eventType: "mqtt.sensor.temp",
+			eventType: "trove://type/mqtt/sensor/temp/1",
 			wantIDs:   []string{seed[0].ID, seed[2].ID},
 		},
 		{
 			name:      "time window excludes outside events",
-			eventType: "mqtt.sensor.temp",
+			eventType: "trove://type/mqtt/sensor/temp/1",
 			timeFrom:  &t1,
 			timeTo:    &t2,
 			wantIDs:   []string{seed[0].ID},
@@ -279,7 +279,7 @@ func TestGetEventsByTypeInvalidRange(t *testing.T) {
 	timeFrom := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 	timeTo := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
 
-	_, err := svc.GetEventsByType(ctx, "mqtt.sensor.temp", &timeFrom, &timeTo)
+	_, err := svc.GetEventsByType(ctx, "trove://type/mqtt/sensor/temp/1", &timeFrom, &timeTo)
 	if !errors.Is(err, ErrInvalidTimeRange) {
 		t.Fatalf("GetEventsByType() error = %v, want %v", err, ErrInvalidTimeRange)
 	}
@@ -296,9 +296,9 @@ func TestSummarizeRange(t *testing.T) {
 	timeTo := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 
 	seed := []journal.Event{
-		{ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC), Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
-		{ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC), Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
-		{ID: "01JEVT00000000000000000003", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), Type: "http.ingest.received", Source: "shortcuts", Payload: json.RawMessage(`{"v":3}`)},
+		{ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC), Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC), Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+		{ID: "01JEVT00000000000000000003", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), Type: "trove://type/http/ingest/received/1", Source: "shortcuts", Payload: json.RawMessage(`{"v":3}`)},
 	}
 	for _, e := range seed {
 		if err := store.Append(ctx, e); err != nil {
@@ -313,11 +313,11 @@ func TestSummarizeRange(t *testing.T) {
 	if got.Total != 3 {
 		t.Errorf("Total = %d, want 3", got.Total)
 	}
-	if got.ByType["mqtt.sensor.temp"] != 2 {
-		t.Errorf("ByType[mqtt.sensor.temp] = %d, want 2", got.ByType["mqtt.sensor.temp"])
+	if got.ByType["trove://type/mqtt/sensor/temp/1"] != 2 {
+		t.Errorf("ByType[trove://type/mqtt/sensor/temp/1] = %d, want 2", got.ByType["trove://type/mqtt/sensor/temp/1"])
 	}
-	if got.ByType["http.ingest.received"] != 1 {
-		t.Errorf("ByType[http.ingest.received] = %d, want 1", got.ByType["http.ingest.received"])
+	if got.ByType["trove://type/http/ingest/received/1"] != 1 {
+		t.Errorf("ByType[trove://type/http/ingest/received/1] = %d, want 1", got.ByType["trove://type/http/ingest/received/1"])
 	}
 	if len(got.Notable) != 3 {
 		t.Fatalf("len(Notable) = %d, want 3", len(got.Notable))
@@ -361,11 +361,11 @@ func TestSummarizeRangeExcludesOutside(t *testing.T) {
 
 	inside := journal.Event{
 		ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC),
-		Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{}`),
+		Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{}`),
 	}
 	outside := journal.Event{
 		ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC),
-		Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{}`),
+		Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{}`),
 	}
 	for _, e := range []journal.Event{inside, outside} {
 		if err := store.Append(ctx, e); err != nil {
@@ -402,7 +402,7 @@ func TestSummarizeRangeNotableCap(t *testing.T) {
 		e := journal.Event{
 			ID:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			Time:    time.Date(2026, 7, 10, i+1, 0, 0, 0, time.UTC),
-			Type:    "mqtt.sensor.temp",
+			Type:    "trove://type/mqtt/sensor/temp/1",
 			Source:  "sensor-a",
 			Payload: json.RawMessage(`{}`),
 		}

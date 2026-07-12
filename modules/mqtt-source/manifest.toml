@@ -1,7 +1,12 @@
 name     = "mqtt-source"
 version  = "1.0"
 kind     = "source"
-provides = ["mqtt.message.received"]
+provides = ["trove://type/mqtt/message/received/1"]
+
+[[types]]
+name = "mqtt.message.received"
+version = 1
+schema = "../../types/builtin/mqtt.message.received.ttd.json"
 
 broker    = "tcp://localhost:1883"
 client_id = "trove-mqtt-source"

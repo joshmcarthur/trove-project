@@ -10,12 +10,12 @@ func TestPatternOverlaps(t *testing.T) {
 		consume string
 		want    bool
 	}{
-		{"note.created", "note.created", true},
-		{"note.created", "note.updated", false},
-		{"note.*", "note.created", true},
-		{"note.created", "note.*", true},
-		{"mqtt.*.received", "mqtt.foo.received", true},
-		{"note.*", "mqtt.*", true},
+		{"trove://type/note/created/1", "trove://type/note/created/1", true},
+		{"trove://type/note/created/1", "trove://type/note/updated/1", false},
+		{"trove://type/note/*", "trove://type/note/created/1", true},
+		{"trove://type/note/created/1", "trove://type/note/*", true},
+		{"trove://type/mqtt/message/received/1", "trove://type/mqtt/message/received/1", true},
+		{"trove://type/note/*", "trove://type/mqtt/*", true},
 	}
 	for _, tt := range tests {
 		if got := patternOverlaps(tt.provide, tt.consume); got != tt.want {

@@ -33,6 +33,7 @@ func TestBuildCatalogLoadsBuiltins(t *testing.T) {
 		"trove://type/classify/assigned/1",
 		"trove://type/note/created/1",
 		"trove://type/http/ingest/received/1",
+		"trove://type/mqtt/message/received/1",
 	} {
 		if _, ok := catalog.Lookup(uri); !ok {
 			t.Fatalf("Lookup(%q) ok = false, want true", uri)

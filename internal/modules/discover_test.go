@@ -29,7 +29,7 @@ func TestDiscoverValidSource(t *testing.T) {
 			Name:     "mqtt-source",
 			Version:  "1.0",
 			Kind:     KindSource,
-			Provides: []string{"mqtt.message.received"},
+			Provides: []string{"trove://type/mqtt/message/received/1"},
 		},
 	}
 	assertModule(t, got, want)

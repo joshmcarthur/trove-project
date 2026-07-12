@@ -114,7 +114,7 @@ func TestCaptureClassifierCallToolClassifyEvent(t *testing.T) {
 
 	args, _ := json.Marshal(map[string]string{
 		"source_event_id": pendingID,
-		"target_type":     "shortcuts.note.created",
+		"target_type":     "trove://type/note/created/1",
 	})
 	out, err := mod.CallTool(context.Background(), "classify_event", args)
 	if err != nil {

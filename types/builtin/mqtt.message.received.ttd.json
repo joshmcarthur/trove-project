@@ -1,0 +1,17 @@
+{
+  "$id": "trove://type/mqtt/message/received/1",
+  "title": "MQTT message received",
+  "definition": {
+    "properties": {
+      "metadata": {
+        "properties": {
+          "topic": { "type": "string" }
+        }
+      }
+    },
+    "optionalProperties": {
+      "message": {},
+      "raw": { "type": "string" }
+    }
+  }
+}

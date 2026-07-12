@@ -16,12 +16,12 @@ allowed_chat_ids = [12345]
 
 [[bot.types]]
 label = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 
 [[bot.commands]]
 command = "note"
 description = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 fast_path = true
 
   [[bot.commands.fields]]
@@ -40,7 +40,7 @@ fast_path = true
 	if cfg.BotToken != "test-token" {
 		t.Fatalf("BotToken = %q", cfg.BotToken)
 	}
-	if len(cfg.Types) != 1 || cfg.Types[0].TargetType != "note.quick" {
+	if len(cfg.Types) != 1 || cfg.Types[0].TargetType != "trove://type/note/quick/1" {
 		t.Fatalf("Types = %#v", cfg.Types)
 	}
 	if len(cfg.Commands) != 1 || cfg.Commands[0].Command != "note" {
@@ -61,7 +61,7 @@ allowed_chat_ids = []
 
 [[bot.types]]
 label = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 `
 	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o600); err != nil {
 		t.Fatalf("write manifest: %v", err)
@@ -92,7 +92,7 @@ allowed_chat_ids = [1]
 
 [[bot.types]]
 label = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 `
 	if err := os.WriteFile(filepath.Join(dir, "manifest.toml"), []byte(manifest), 0o600); err != nil {
 		t.Fatalf("write manifest: %v", err)
@@ -117,7 +117,7 @@ func TestFieldsForTarget(t *testing.T) {
 
 	cfg := config{
 		Commands: []commandConfig{{
-			TargetType: "note.bookmark",
+			TargetType: "trove://type/note/bookmark/1",
 			Fields: []fieldConfig{{
 				Name:     "url",
 				Prompt:   "URL?",
@@ -125,7 +125,7 @@ func TestFieldsForTarget(t *testing.T) {
 			}},
 		}},
 	}
-	fields := cfg.fieldsForTarget("note.bookmark")
+	fields := cfg.fieldsForTarget("trove://type/note/bookmark/1")
 	if len(fields) != 1 || fields[0].Name != "url" {
 		t.Fatalf("fieldsForTarget() = %#v", fields)
 	}

@@ -2,7 +2,9 @@ package modules
 
 import (
 	"path"
+	"strings"
 
+	"github.com/joshmcarthur/trove/internal/types"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
@@ -25,8 +27,15 @@ func ResolveSchemaPattern(schemaKeys []string, eventType string) (string, bool) 
 		if key == eventType {
 			continue
 		}
-		matched, err := path.Match(key, eventType)
-		if err != nil || !matched {
+		var matched bool
+		if strings.HasPrefix(key, "trove://type/") || strings.HasPrefix(eventType, "trove://type/") {
+			matched = types.MatchTypePattern(key, eventType)
+		} else {
+			var err error
+			matched, err = path.Match(key, eventType)
+			matched = err == nil && matched
+		}
+		if !matched {
 			continue
 		}
 		if len(key) > len(best) {

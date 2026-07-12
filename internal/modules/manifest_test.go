@@ -22,7 +22,7 @@ func TestParseManifestValid(t *testing.T) {
 				Name:     "mqtt-source",
 				Version:  "1.0",
 				Kind:     KindSource,
-				Provides: []string{"mqtt.message.received"},
+				Provides: []string{"trove://type/mqtt/message/received/1"},
 			},
 		},
 		{
@@ -32,8 +32,8 @@ func TestParseManifestValid(t *testing.T) {
 				Name:     "enricher",
 				Version:  "0.1.0",
 				Kind:     KindProcessor,
-				Consumes: []string{"http.ingest.received"},
-				Provides: []string{"http.ingest.enriched"},
+				Consumes: []string{"trove://type/http/ingest/received/1"},
+				Provides: []string{"trove://type/http/ingest/enriched/1"},
 			},
 		},
 		{
@@ -52,7 +52,7 @@ func TestParseManifestValid(t *testing.T) {
 				Name:     "webhook-sink",
 				Version:  "2.0",
 				Kind:     KindSink,
-				Consumes: []string{"note.*"},
+				Consumes: []string{"trove://type/note/*"},
 			},
 		},
 		{
@@ -211,7 +211,7 @@ func TestParseManifestHTTPRoutes(t *testing.T) {
 	data := []byte(`name = "http-ingest"
 version = "1.0"
 kind = "source"
-provides = ["http.ingest.received"]
+provides = ["trove://type/http/ingest/received/1"]
 
 [[http.routes]]
 method = "POST"

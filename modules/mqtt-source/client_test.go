@@ -7,28 +7,6 @@ import (
 	"testing"
 )
 
-func TestTopicToEventType(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		topic string
-		want  string
-	}{
-		{"home/sensor/temp", "mqtt.home.sensor.temp.received"},
-		{"devices/esphome/node1/state", "mqtt.devices.esphome.node1.state.received"},
-		{"single", "mqtt.single.received"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.topic, func(t *testing.T) {
-			t.Parallel()
-			if got := topicToEventType(tt.topic); got != tt.want {
-				t.Errorf("topicToEventType(%q) = %q, want %q", tt.topic, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestBuildPayload(t *testing.T) {
 	t.Parallel()
 
@@ -83,12 +61,14 @@ func TestBuildPayload(t *testing.T) {
 func TestBuildEvent(t *testing.T) {
 	t.Parallel()
 
+	const wantType = "trove://type/mqtt/message/received/1"
+
 	event, err := buildEvent("home/sensor/temp", []byte(`{"v":21.5}`))
 	if err != nil {
 		t.Fatalf("buildEvent() error = %v", err)
 	}
-	if event.Type != "mqtt.home.sensor.temp.received" {
-		t.Errorf("Type = %q, want mqtt.home.sensor.temp.received", event.Type)
+	if event.Type != wantType {
+		t.Errorf("Type = %q, want %s", event.Type, wantType)
 	}
 	if event.Source != "home/sensor/temp" {
 		t.Errorf("Source = %q, want home/sensor/temp", event.Source)
@@ -105,7 +85,7 @@ func TestLoadConfigFromDir(t *testing.T) {
 	manifest := `name = "mqtt-source"
 version = "1.0"
 kind = "source"
-provides = ["mqtt.message.received"]
+provides = ["trove://type/mqtt/message/received/1"]
 
 broker = "tcp://broker.example:1883"
 topics = ["home/#", "devices/+/state"]

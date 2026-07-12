@@ -1,4 +1,4 @@
 name     = "webhook-sink"
 version  = "2.0"
 kind     = "sink"
-consumes = ["note.*"]
+consumes = ["trove://type/note/*"]

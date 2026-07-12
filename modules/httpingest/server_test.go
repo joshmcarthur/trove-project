@@ -46,7 +46,7 @@ func (m *mockBlobPutter) Put(_ context.Context, data []byte) (string, error) {
 func defaultTestConfig() config {
 	return config{
 		MaxBodyBytes: defaultMaxBodyBytes,
-		Provides:     []string{"http.ingest.received", "note.*", "shortcut.*"},
+		Provides:     []string{"trove://type/http/ingest/received/1", "trove://type/note/*", "trove://type/shortcut/*"},
 	}
 }
 
@@ -245,13 +245,13 @@ func TestHandleIngest(t *testing.T) {
 		{
 			name:       "custom type and time",
 			source:     "shortcuts",
-			body:       `{"type":"note.created","time":"2026-07-10T12:00:00Z","title":"test"}`,
+			body:       `{"type":"trove://type/note/created/1","time":"2026-07-10T12:00:00Z","title":"test"}`,
 			wantStatus: http.StatusNoContent,
 			wantEmit:   true,
 			checkEvent: func(t *testing.T, event *troverpc.Event) {
 				t.Helper()
-				if event.Type != "note.created" {
-					t.Errorf("Type = %q, want note.created", event.Type)
+				if event.Type != "trove://type/note/created/1" {
+					t.Errorf("Type = %q, want trove://type/note/created/1", event.Type)
 				}
 				if event.Time != "2026-07-10T12:00:00Z" {
 					t.Errorf("Time = %q, want RFC3339 timestamp", event.Time)
@@ -322,14 +322,14 @@ func TestHandleIngest(t *testing.T) {
 		{
 			name:       "disallowed type",
 			source:     "shortcuts",
-			body:       `{"type":"mqtt.sensor.temp","title":"test"}`,
+			body:       `{"type":"trove://type/mqtt/sensor/temp/1","title":"test"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "emit invalid argument",
 			source:     "shortcuts",
 			body:       `{"title":"test"}`,
-			emitErr:    status.Error(codes.InvalidArgument, "payload does not match schema for type \"http.ingest.received\": missing title"),
+			emitErr:    status.Error(codes.InvalidArgument, "payload does not match schema for type \"trove://type/http/ingest/received/1\": missing title"),
 			wantStatus: http.StatusBadRequest,
 		},
 		{

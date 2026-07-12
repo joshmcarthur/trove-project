@@ -112,14 +112,14 @@ func TestValidateEmitPayloadFailure(t *testing.T) {
 func TestValidateEmitDottedPatterns(t *testing.T) {
 	t.Parallel()
 
-	const eventType = "http.ingest.received"
+	const eventType = testHTTPIngestReceivedURI
 	c := types.NewCatalog()
 	registerPermissiveType(t, c, eventType)
 
 	ref, err := c.ValidateEmit(journal.Event{
 		Type:    eventType,
 		Payload: json.RawMessage(`{"any":"value"}`),
-	}, []string{eventType})
+	}, []string{"trove://type/http/ingest/received/1"})
 	if err != nil {
 		t.Fatalf("ValidateEmit() error = %v", err)
 	}

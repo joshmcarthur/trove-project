@@ -1,5 +1,5 @@
 name     = "enricher"
 version  = "0.1.0"
 kind     = "processor"
-consumes = ["http.ingest.received"]
-provides = ["http.ingest.enriched"]
+consumes = ["trove://type/http/ingest/received/1"]
+provides = ["trove://type/http/ingest/enriched/1"]

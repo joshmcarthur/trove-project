@@ -1,7 +1,31 @@
 name     = "telegram-source"
 version  = "1.0"
 kind     = "source"
-provides = ["classify.pending", "classify.assigned", "note.*"]
+provides = [
+  "trove://type/classify/pending/1",
+  "trove://type/classify/assigned/1",
+  "trove://type/note/*",
+]
+
+[[types]]
+name = "classify.pending"
+version = 1
+schema = "../../types/builtin/classify.pending.ttd.json"
+
+[[types]]
+name = "classify.assigned"
+version = 1
+schema = "../../types/builtin/classify.assigned.ttd.json"
+
+[[types]]
+name = "note.quick"
+version = 1
+schema = "../../types/builtin/note.quick.ttd.json"
+
+[[types]]
+name = "note.bookmark"
+version = 1
+schema = "../../types/builtin/note.bookmark.ttd.json"
 
 # Set TELEGRAM_BOT_TOKEN in the environment or bot_token below.
 bot_token_env    = "TELEGRAM_BOT_TOKEN"
@@ -12,16 +36,16 @@ session_ttl_min  = 30
 
 [[bot.types]]
 label       = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 
 [[bot.types]]
 label       = "Bookmark"
-target_type = "note.bookmark"
+target_type = "trove://type/note/bookmark/1"
 
 [[bot.commands]]
 command     = "note"
 description = "Quick note (skip picker)"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 fast_path   = true
 
   [[bot.commands.fields]]
@@ -32,7 +56,7 @@ fast_path   = true
 [[bot.commands]]
 command     = "bookmark"
 description = "Bookmark (skip picker)"
-target_type = "note.bookmark"
+target_type = "trove://type/note/bookmark/1"
 fast_path   = true
 
   [[bot.commands.fields]]

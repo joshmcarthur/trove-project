@@ -1,4 +1,4 @@
 name     = "mqtt-source"
 version  = "1.0"
 kind     = "source"
-provides = ["mqtt.message.received"]
+provides = ["trove://type/mqtt/message/received/1"]

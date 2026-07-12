@@ -1,0 +1,10 @@
+{
+  "$id": "trove://type/note/quick/1",
+  "title": "Quick note",
+  "definition": {
+    "optionalProperties": {
+      "text": { "type": "string" },
+      "title": { "type": "string" }
+    }
+  }
+}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -13,10 +12,11 @@ import (
 )
 
 const (
-	mqttConnectTimeout = 10 * time.Second
-	mqttTokenTimeout   = 10 * time.Second
-	mqttRetryInterval  = 2 * time.Second
-	mqttMaxRetry       = 30 * time.Second
+	mqttConnectTimeout      = 10 * time.Second
+	mqttTokenTimeout        = 10 * time.Second
+	mqttRetryInterval       = 2 * time.Second
+	mqttMaxRetry            = 30 * time.Second
+	mqttMessageReceivedType = "trove://type/mqtt/message/received/1"
 )
 
 func runMQTT(ctx context.Context, emit trovemodule.Emitter, cfg config, state *subscriptionState) error {
@@ -103,15 +103,10 @@ func buildEvent(topic string, payload []byte) (*troverpc.Event, error) {
 	}
 
 	return &troverpc.Event{
-		Type:    topicToEventType(topic),
+		Type:    mqttMessageReceivedType,
 		Source:  topic,
 		Payload: body,
 	}, nil
-}
-
-func topicToEventType(topic string) string {
-	slug := strings.ReplaceAll(topic, "/", ".")
-	return "mqtt." + slug + ".received"
 }
 
 func buildPayload(topic string, payload []byte) ([]byte, error) {
