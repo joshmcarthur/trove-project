@@ -1,0 +1,9 @@
+name     = "typed-emit"
+version  = "0.1.0"
+kind     = "source"
+provides = ["trove://type/test/typed/emit/1"]
+
+[[types]]
+name    = "test.typed.emit"
+version = 1
+schema  = "types/test.typed.emit.ttd.json"

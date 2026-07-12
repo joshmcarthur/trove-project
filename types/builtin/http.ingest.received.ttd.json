@@ -1,0 +1,14 @@
+{
+  "$id": "trove://type/http/ingest/received/1",
+  "title": "HTTP ingest received",
+  "definition": {
+    "properties": {
+      "method": { "type": "string" },
+      "path": { "type": "string" }
+    },
+    "optionalProperties": {
+      "headers": { "type": "string" },
+      "body": { "type": "string" }
+    }
+  }
+}

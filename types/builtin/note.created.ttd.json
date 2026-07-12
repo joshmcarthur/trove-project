@@ -1,0 +1,9 @@
+{
+  "$id": "trove://type/note/created/1",
+  "title": "Note created",
+  "definition": {
+    "properties": {
+      "title": { "type": "string" }
+    }
+  }
+}

@@ -128,6 +128,34 @@ func main() {
 
 	modules.WarnModuleCycles(mods)
 
+	moduleTypes, err := modules.CollectModuleTypesInputs(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	userTypes := make([]types.TypeDecl, len(cfg.Types))
+	for i, td := range cfg.Types {
+		userTypes[i] = types.TypeDecl{
+			Name:    td.Name,
+			Version: td.Version,
+			Schema:  td.Schema,
+		}
+	}
+	catalog, catalogWarnings, err := types.BuildCatalog(
+		ctx,
+		blobStore,
+		types.DefaultBuiltinDir(),
+		moduleTypes,
+		userTypes,
+	)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	for _, w := range catalogWarnings {
+		log.Printf("trove: %s", w)
+	}
+
 	router := modules.NewRouter(store, eventRegistry)
 	routerDone := make(chan struct{})
 	go func() {
@@ -157,7 +185,7 @@ func main() {
 
 	modulesDone := make(chan struct{})
 	go func() {
-		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore, types.NewCatalog())
+		modules.RunModules(ctx, store, mods, blobStore, httpRegistry, mcpRegistry, eventRegistry, mcpTools, toolModules, settingsStore, catalog)
 		close(modulesDone)
 	}()
 
