@@ -916,3 +916,36 @@ func TestEventDispatchRoundTrip(t *testing.T) {
 		t.Fatal("LoadEventDispatch() after delete ok = true, want false")
 	}
 }
+
+func TestWatchAppends(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	store := openTestStore(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	wakeCh, err := store.WatchAppends(ctx)
+	if err != nil {
+		t.Fatalf("WatchAppends() error = %v", err)
+	}
+
+	if err := store.Append(ctx, Event{
+		Type: "test.watch", Source: "test", Payload: json.RawMessage(`{"n":1}`),
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	select {
+	case <-wakeCh:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for append wakeup")
+	}
+
+	select {
+	case <-wakeCh:
+		t.Fatal("received duplicate wakeup without another append")
+	case <-time.After(50 * time.Millisecond):
+	}
+}

@@ -32,8 +32,8 @@ type Journal interface {
 minimum.
 
 Persistence and routing are separate: every accepted append is durable in
-SQLite. The event router pulls undispatched events via a stored cursor, so
-processor/sink delivery does not depend on pub/sub channel capacity.
+SQLite. The event router pulls undispatched events via a stored cursor and
+wakes on `WatchAppends`; `Subscribe` is for best-effort live streaming only.
 
 ## Why SQLite
 

@@ -34,10 +34,11 @@ type Journal interface {
 - SQLite driver: `modernc.org/sqlite` (pure Go, no CGO) vs `mattn/go-sqlite3` —
   prefer pure Go for Pi cross-compile unless FTS5/vec needs CGO
 - ULID generation at append time
+- `WatchAppends` signals coalesced wakeups after each append (no payload); the
+  event router uses this plus a cursor pull — not `Subscribe`
 - `Subscribe` applies the same filters as `Query`, including `Filter.Text` (FTS)
-- `Subscribe` uses a bounded, non-blocking channel — slow subscribers may miss
-  live notifications; the event router does not rely on pub/sub delivery and
-  instead pulls undispatched events via a durable `last_dispatched_id` cursor
+- `Subscribe` delivers matching event payloads on a bounded, best-effort channel
+  for live streaming consumers; slow subscribers may miss events
 - `router_state` and `event_dispatch` tables support cursor-based routing replay
 
 ## Acceptance criteria
@@ -48,7 +49,7 @@ type Journal interface {
 - [x] Get by id
 - [x] Subscribe streams new events
 - [x] Optional `retention_days` prunes events older than the configured window on startup
-- [x] Router cursor (`router_state`) enables pull-based dispatch independent of pub/sub drops
+- [x] Router cursor (`router_state`) enables pull-based dispatch via `WatchAppends`
 
 ## Dependencies
 
