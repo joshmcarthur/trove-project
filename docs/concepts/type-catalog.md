@@ -27,6 +27,21 @@ There is **no central schema registry service** — see [non-goals](../non-goals
 The catalog is built locally at startup from builtins, module manifests, and user
 config.
 
+```mermaid
+flowchart LR
+  emit[Module Emit]
+  catalog[Type catalog]
+  jtd[JTD validator]
+  blobs[(TTD blob store)]
+  journal[(Journal)]
+
+  emit --> catalog
+  catalog --> jtd
+  jtd -->|valid| journal
+  catalog --> blobs
+  journal -->|schema_ref| blobs
+```
+
 ## `trove://` type URIs
 
 Event `type` values use the URI form:

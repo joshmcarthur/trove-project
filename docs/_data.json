@@ -7,7 +7,13 @@
     "lang": "en",
     "description": "=description"
   },
+  "description": "Capture broadly, store simply, converse to retrieve — a personal event journal with MCP query.",
   "top_links": [
+    {
+      "icon": "fas fa-play-circle",
+      "title": "Try in a day",
+      "url": "/getting-started/try-in-a-day/"
+    },
     {
       "icon": "fab fa-github",
       "title": "GitHub Repository",
@@ -15,6 +21,10 @@
     }
   ],
   "nav_links": [
+    {
+      "title": "Try in a day",
+      "url": "/getting-started/try-in-a-day/"
+    },
     {
       "title": "GitHub Repository",
       "url": "https://github.com/joshmcarthur/trove"

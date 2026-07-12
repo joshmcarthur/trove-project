@@ -10,7 +10,8 @@ Living plan for Trove development. Update this page when a feature lands.
 ## Current focus
 
 **Milestone 4 — two-week live test.** Milestones 1, 2, 2b, and 3 are complete.
-Run the two-week live test with [iOS Shortcuts](./getting-started/ios-shortcuts.md)
+New users should start with [Try in a day](./getting-started/try-in-a-day.md), then
+run the two-week live test with [iOS Shortcuts](./getting-started/ios-shortcuts.md)
 and the [live-test runbook](./getting-started/live-test.md) (spec §11.4).
 
 ## Milestone sequence

@@ -1,15 +1,14 @@
 ---
 title: Installation
 parent: Getting started
-nav_order: 1
+nav_order: 2
 ---
 
 # Installing Trove
 
 Trove ships as a single Go binary (and Docker image). With a valid config file,
-`trove` opens the journal, discovers source modules, and supervises them. HTTP
-ingest capture works today — see [Quick Start](./quick-start.md) and
-[iOS Shortcuts](./ios-shortcuts.md).
+`trove` opens the journal, discovers source modules, and supervises them. New here?
+Follow [Try in a day](./try-in-a-day.md) for a guided first run.
 
 ## From releases
 

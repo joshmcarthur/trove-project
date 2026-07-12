@@ -1,7 +1,7 @@
 ---
 title: Two-week live test
 parent: Getting started
-nav_order: 7
+nav_order: 8
 ---
 
 # Two-week live test
@@ -17,6 +17,10 @@ journal for two weeks and validate capture plus conversational retrieval.
 3. **Note gaps** — record what you asked for that Trove could not answer.
 
 ## Day 0 — setup checklist
+
+Complete [Try in a day](./try-in-a-day.md) first if you have not already — it
+covers install, config, first captures, and MCP query in one afternoon. Then use
+this checklist before starting the two-week run:
 
 - [ ] Build host and modules: `make build`
 - [ ] Create `trove.toml` with `[journal]`, `[blobs]`, `[http]`, `[modules].paths`

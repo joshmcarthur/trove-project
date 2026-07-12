@@ -9,6 +9,29 @@ nav_order: 6
 Modules are **separate processes**, discovered from `[modules].paths` in config
 and connected to the Trove core over a local (or networked) socket.
 
+```mermaid
+flowchart LR
+  subgraph host [trove host process]
+    core[Trove core]
+    gateway[HTTP gateway]
+    router[Event router]
+    core --> gateway
+    core --> router
+  end
+
+  subgraph subprocesses [go-plugin subprocesses]
+    httpIngest[http-ingest]
+    mcpQuery[mcp-query]
+    mqtt[mqtt-source]
+  end
+
+  gateway -->|"POST /ingest/*"| httpIngest
+  gateway -->|"POST /mcp"| mcpQuery
+  httpIngest -->|Emit| core
+  mqtt -->|Emit| core
+  router -->|Process| subprocesses
+```
+
 See [spec §8](../spec.md#8-module-architecture-dynamic-socket-based).
 
 ## Built-in modules

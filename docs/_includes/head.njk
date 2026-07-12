@@ -1,5 +1,76 @@
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
 :root {
   --primary-h: 205;
+  --trove-accent: hsl(var(--primary-h), 55%, 42%);
+  --trove-accent-soft: hsl(var(--primary-h), 45%, 94%);
+  --trove-warm-text: #2a3238;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --trove-warm-text: #d8dee4;
+    --trove-accent-soft: hsl(var(--primary-h), 25%, 18%);
+  }
+}
+
+body {
+  color: var(--trove-warm-text);
+}
+
+h1, h2, h3 {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+.trove-hero {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid hsl(var(--primary-h), 20%, 85%);
+}
+
+.trove-tagline {
+  font-size: 1.35rem;
+  font-style: italic;
+  color: var(--trove-accent);
+  margin: 0 0 1rem;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.trove-lead {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  max-width: 42em;
+}
+
+.trove-cta {
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--trove-accent-soft);
+  border-radius: 8px;
+  border-left: 4px solid var(--trove-accent);
+}
+
+.trove-cta a {
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-decoration: none;
+  color: var(--trove-accent);
+}
+
+.trove-cta a:hover {
+  text-decoration: underline;
+}
+
+.trove-cta-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+/* Mermaid diagrams: keep readable in both themes */
+.mermaid {
+  margin: 1.5rem 0;
 }
 </style>
