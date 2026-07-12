@@ -1,4 +1,4 @@
-.PHONY: fmt lint test build build-http-gateway build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier docs docs-serve check proto
+.PHONY: fmt lint test build build-http-gateway build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier build-type-catalog docs docs-serve check proto
 
 GOIMPORTS := go run golang.org/x/tools/cmd/goimports
 
@@ -18,7 +18,7 @@ lint:
 test:
 	go test -race -cover ./...
 
-build: build-http-gateway build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier
+build: build-http-gateway build-http-ingest build-mqtt-source build-telegram-source build-mcp-query build-capture-classifier build-type-catalog
 	go build -o bin/trove ./cmd/trove
 
 build-http-gateway:
@@ -44,6 +44,10 @@ build-mcp-query:
 build-capture-classifier:
 	go build -o modules/capture-classifier/module ./modules/capture-classifier
 	chmod +x modules/capture-classifier/module
+
+build-type-catalog:
+	go build -o modules/type-catalog/module ./modules/type-catalog/cmd
+	chmod +x modules/type-catalog/module
 
 docs:
 	cd docs && deno task build

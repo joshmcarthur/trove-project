@@ -154,7 +154,7 @@ func TestCLI(t *testing.T) {
 		}
 
 		stderr := errBuf.String()
-		if !strings.Contains(stderr, "starting modules:") || !strings.Contains(stderr, "http-ingest") || !strings.Contains(stderr, "mcp-query") {
+		if !strings.Contains(stderr, "starting modules:") || !strings.Contains(stderr, "http-ingest") || !strings.Contains(stderr, "mcp-query") || !strings.Contains(stderr, "type-catalog") {
 			t.Errorf("stderr = %q, want bundled modules started", stderr)
 		}
 		if !strings.Contains(stderr, "http gateway listening on :18080") {
@@ -162,6 +162,53 @@ func TestCLI(t *testing.T) {
 		}
 		if !strings.Contains(stderr, "shutting down") {
 			t.Errorf("stderr = %q, want substring %q", stderr, "shutting down")
+		}
+	})
+
+	t.Run("types list", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		journalPath := filepath.Join(dir, "trove.db")
+		configPath := writeConfig(t, journalPath)
+
+		cmd := exec.Command(bin, "-config", configPath, "types", "list")
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("run types list: %v\nstderr: %s", err, stderr.String())
+		}
+		out := stdout.String()
+		if !strings.Contains(out, "trove://type/note/created/1") {
+			t.Errorf("stdout = %q, want note.created type", out)
+		}
+	})
+
+	t.Run("types validate file", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		journalPath := filepath.Join(dir, "trove.db")
+		configPath := writeConfig(t, journalPath)
+		ttdPath := filepath.Join(dir, "test.ttd.json")
+		ttd := `{
+  "$id": "trove://type/example/test/1",
+  "definition": { "properties": { "name": { "type": "string" } } }
+}`
+		if err := os.WriteFile(ttdPath, []byte(ttd), 0o644); err != nil {
+			t.Fatalf("write ttd: %v", err)
+		}
+
+		cmd := exec.Command(bin, "-config", configPath, "types", "validate", "--file", ttdPath)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("run types validate: %v\nstderr: %s", err, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "trove://type/example/test/1") {
+			t.Errorf("stdout = %q, want validated uri", stdout.String())
 		}
 	})
 }

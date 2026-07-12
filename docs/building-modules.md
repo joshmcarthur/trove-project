@@ -21,8 +21,8 @@ Install under a configured search path:
     module               # executable
 ```
 
-For local development, `make build` compiles `bin/trove` (with `http-ingest` and
-`mcp-query` built in) and builds optional first-party modules to
+For local development, `make build` compiles `bin/trove` (with `http-ingest`,
+`mcp-query`, and `type-catalog` built in) and builds optional first-party modules to
 `modules/mqtt-source/`, `modules/telegram-source/`, and
 `modules/capture-classifier/`. Standalone copies of the HTTP and MCP modules are
 also emitted under `modules/http-ingest/` and `modules/mcp-query/` for module-only
@@ -73,6 +73,7 @@ consumes = ["note.created"]
 | `source` | **required** | forbidden |
 | `processor` (event-routing) | required when emitting derived events | **required** |
 | `processor` (HTTP-only) | forbidden | forbidden; use `[[http.routes]]` |
+| `processor` (CLI/MCP-only) | forbidden | forbidden; use `[[cli.commands]]` and/or `[[mcp.tools]]` |
 | `processor` (auth-only) | forbidden | forbidden; use `[[auth.validators]]` |
 | `sink` | forbidden | **required** |
 
@@ -106,6 +107,7 @@ Use `trovemodule.Serve` to register the module. Optional interfaces:
 - **HTTPHandler** — serve HTTP routes declared in the manifest
 - **AuthHandler** — validate gateway requests for `[[auth.validators]]` entries
 - **MCPToolHandler** — handle MCP tools declared in `[[mcp.tools]]`
+- **CLIHandler** — handle CLI commands declared in `[[cli.commands]]`
 - **EventProcessor** — `Process(event, dispatch)` for event-routing processors
 - **EventSink** — `Handle(event, dispatch)` for sinks
 - **HealthChecker** — report liveness to the parent

@@ -17,13 +17,13 @@ func TestDiscoverIncludesBundledModules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Discover(nil) error = %v", err)
 	}
-	if len(mods) != 2 {
-		t.Fatalf("Discover(nil) len = %d, want 2 bundled modules", len(mods))
+	if len(mods) != 3 {
+		t.Fatalf("Discover(nil) len = %d, want 3 bundled modules", len(mods))
 	}
 
-	names := []string{mods[0].Manifest.Name, mods[1].Manifest.Name}
+	names := []string{mods[0].Manifest.Name, mods[1].Manifest.Name, mods[2].Manifest.Name}
 	slices.Sort(names)
-	want := []string{"http-ingest", "mcp-query"}
+	want := []string{"http-ingest", "mcp-query", "type-catalog"}
 	if !slices.Equal(names, want) {
 		t.Errorf("module names = %v, want %v", names, want)
 	}

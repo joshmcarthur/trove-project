@@ -1,0 +1,23 @@
+name = "type-catalog"
+version = "1.0"
+kind = "processor"
+
+[[cli.commands]]
+name = "types"
+description = "List, export, and validate Trove type schemas"
+
+[[mcp.tools]]
+name = "list_types"
+description = "List registered trove:// type URIs in the catalog"
+
+[[mcp.tools]]
+name = "describe_type"
+description = "Describe a registered type by URI"
+
+[[mcp.tools]]
+name = "export_type"
+description = "Export canonical TTD JSON for a registered type"
+
+[[mcp.tools]]
+name = "validate_type_schema"
+description = "Validate a TTD JSON document (envelope + JTD)"
