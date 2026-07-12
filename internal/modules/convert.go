@@ -42,21 +42,23 @@ func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
 	}
 
 	return journal.Event{
-		ID:      e.Id,
-		Time:    eventTime,
-		Type:    e.Type,
-		Source:  e.Source,
-		Payload: json.RawMessage(e.Payload),
-		BlobRef: blobRef,
+		ID:        e.Id,
+		Time:      eventTime,
+		Type:      e.Type,
+		SchemaRef: e.SchemaRef,
+		Source:    e.Source,
+		Payload:   json.RawMessage(e.Payload),
+		BlobRef:   blobRef,
 	}, nil
 }
 
 func journalEventToRPC(e journal.Event) *troverpc.Event {
 	out := &troverpc.Event{
-		Id:      e.ID,
-		Type:    e.Type,
-		Source:  e.Source,
-		Payload: e.Payload,
+		Id:        e.ID,
+		Type:      e.Type,
+		SchemaRef: e.SchemaRef,
+		Source:    e.Source,
+		Payload:   e.Payload,
 	}
 	if !e.Time.IsZero() {
 		out.Time = e.Time.UTC().Format(time.RFC3339)
