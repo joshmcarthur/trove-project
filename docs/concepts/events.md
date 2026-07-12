@@ -18,8 +18,9 @@ See [spec §3](../spec.md#3-core-concepts) for the canonical definition.
 {
   "id": "01JXYZ...",
   "time": "2026-07-10T10:00:00+12:00",
-  "type": "meshtastic.message.received",
-  "source": "radio-node-1",
+  "type": "trove://type/mqtt/message/received/1",
+  "schema_ref": "sha256-abc123...",
+  "source": "home/sensors/temp",
   "payload": { "...": "..." },
   "blob_ref": null
 }
@@ -29,21 +30,22 @@ See [spec §3](../spec.md#3-core-concepts) for the canonical definition.
 |-------|------|-------|
 | `id` | ULID | Sortable, unique, generated at ingest |
 | `time` | RFC3339 | Event time, not ingest time |
-| `type` | string | Dotted namespace, e.g. `mqtt.tararuawx.temp` |
+| `type` | string | `trove://type/{path}/{version}` URI — see [type catalog](./type-catalog.md) |
+| `schema_ref` | string | Content hash of the TTD that validated `payload` at emit time |
 | `source` | string | Free-text origin (topic, device, app) |
-| `payload` | JSON | Arbitrary structured data |
+| `payload` | JSON | Structured data; shape enforced by the type catalog (JTD) |
 | `blob_ref` | string \| null | Optional attachment reference |
 
 ## Type naming
 
-Use namespaced strings: `<source-family>.<subject>.<verb>`. There is **no central
-schema registry service** — modules declare allowed types in `provides` and
-subscriptions in `consumes` (exact `trove://type/...` URIs or glob patterns such
-as `trove://type/note/*`). Optional `[[types]]` entries in module manifests point
-at Trove Type Definition (TTD) files; the core loads them into a local type
-catalog and validates payloads on `Emit`, stamping `schema_ref` on validated
-events. If a shape changes, add a new type version rather than mutating events
-in place.
+Event `type` values are **`trove://` URIs** registered in the [type catalog](./type-catalog.md),
+for example `trove://type/note/created/1`. Modules declare which types they may emit
+in `provides` and subscriptions in `consumes` (exact URIs or `trove://type/.../*`
+wildcard patterns for routing). Each concrete type must have a Trove Type Definition
+(TTD) with an RFC 8927 JTD `definition`; validated emits stamp `schema_ref` on the
+journal row. There is no central schema registry **service** — the catalog is built
+locally at startup. If a payload shape changes, bump the URI version segment
+(`/2`, `/3`, …) rather than mutating events in place.
 
 ## Immutability
 
@@ -68,13 +70,13 @@ metadata rather than mutating the original:
 ```
 
 The [capture-classifier](../planning/deferred-capture.md) module emits
-`classify.pending` for quick capture, then `classify.assigned` plus a typed target
-event when classified later.
+`trove://type/classify/pending/1` for quick capture, then
+`trove://type/classify/assigned/1` plus a typed target event when classified later.
 
 ## Implementation
 
-Events are persisted by the [journal](./journal.md). Type allowlists and TTD-backed
-payload validation are enforced at the module `Emit` boundary — see
-[building modules](../building-modules.md). See
+Events are persisted by the [journal](./journal.md). The [type catalog](./type-catalog.md)
+validates payloads and stamps `schema_ref` at every emit boundary (module `Emit`,
+HTTP ingest, classify) — see [building modules](../building-modules.md). See
 [planning/journal.md](../planning/journal.md) for the SQLite schema and
 `Journal` interface.

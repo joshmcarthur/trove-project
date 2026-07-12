@@ -55,7 +55,8 @@ mutated in place.
 {
   "id": "01JXYZ...",
   "time": "2026-07-10T10:00:00+12:00",
-  "type": "meshtastic.message.received",
+  "type": "trove://type/mqtt/message/received/1",
+  "schema_ref": "sha256-abc123...",
   "source": "radio-node-1",
   "payload": { "...": "..." },
   "blob_ref": null
@@ -68,20 +69,21 @@ Fields:
 |------------|-------------------|----------------------------------------------------|
 | `id`       | ULID              | sortable, unique, generated at ingest              |
 | `time`     | RFC3339 timestamp | event time, not ingest time (source may supply it)|
-| `type`     | string            | dotted namespace, e.g. `mqtt.tararuawx.temp`       |
+| `type`     | string            | `trove://type/{path}/{version}` URI                |
+| `schema_ref` | string          | content hash of the TTD that validated `payload`   |
 | `source`   | string            | free-text origin identifier (topic, device, app)   |
-| `payload`  | JSON              | arbitrary structured data, module-defined shape    |
+| `payload`  | JSON              | structured data; shape enforced by JTD in catalog  |
 | `blob_ref` | string \| null    | optional reference to an attachment (see §6)       |
 
-There is **no central schema registry**. `type` is a namespaced string convention
-(`<source-family>.<subject>.<verb>`), and `payload` is JSON defined by the source
-module. Source modules declare which types they may emit in `manifest.toml`
-(`provides`, including wildcard patterns such as `note.*`). The core enforces
-that allowlist at the `Emit` RPC boundary. Modules may optionally attach JSON
-Schema files per type pattern; when declared, payloads are validated before
-append. The journal itself only validates the event envelope (type, source, valid
-JSON). If a payload shape changes, use naming discipline (`.v2` suffixes) rather
-than in-place mutation.
+There is **no central schema registry service**. Event `type` values are `trove://`
+URIs registered in a **local type catalog** built at startup from builtins, module
+`[[types]]` entries, and optional user `[[types]]` in `trove.toml`. Each type has
+a Trove Type Definition (TTD) file with an RFC 8927 JTD `definition`; validated
+emits stamp `schema_ref` (a blob content hash) on the journal row. Source modules
+declare which types they may emit in `manifest.toml` (`provides`, including
+wildcard patterns such as `trove://type/note/*`). The core enforces that allowlist
+and catalog validation at the `Emit` RPC boundary. If a payload shape changes,
+bump the URI version segment (`/2`, `/3`, …) rather than in-place mutation.
 
 ---
 
@@ -260,16 +262,20 @@ module/
 name     = "mqtt-source"
 version  = "1.0"
 kind     = "source"        # source | processor | sink
-provides = ["mqtt.*.received"]   # exact types or glob patterns; required for sources
+provides = ["trove://type/mqtt/message/received/1"]
 
-[schemas]
-"mqtt.*.received" = "schemas/message.json"   # optional JSON Schema per pattern
+[[types]]
+name    = "mqtt.message.received"
+version = 1
+schema  = "types/mqtt.message.received.ttd.json"
 ```
 
-Source modules may only `Emit` types matching a `provides` pattern. Wildcards use
-Go `path.Match` rules (`note.*` matches `note.created`). Bare `*` is rejected.
-Optional `[schemas]` entries validate payloads when present; undeclared types are
-allowlisted but not schema-checked. The journal validates the envelope only.
+Source modules may only `Emit` types matching a `provides` pattern. For
+`trove://type/...` URIs, wildcards use a trailing `/*` segment
+(`trove://type/note/*` matches `trove://type/note/created/1`). Bare `*` is
+rejected. Each concrete emitted type must be registered in the type catalog via
+`[[types]]` (module, builtin, or user config); payloads are validated with RFC
+8927 JTD before append and `schema_ref` is stamped on the event.
 
 ### Transport
 
@@ -430,9 +436,9 @@ noted here so they don't get silently re-added:
   problem. Remote modules can stream events to the one central journal
   over Tailscale (§8), but there's still only one journal, not several
   that need reconciling.
-- **Central schema registry / formal schema evolution.** Per-module `provides`
-  allowlists and optional colocated JSON Schema files are in scope; a shared
-  registry service is not.
+- **Central schema registry / formal schema evolution.** A shared registry
+  **service** or cross-module schema negotiation is out of scope. A local type
+  catalog (`trove://` URIs, TTD + JTD, `schema_ref` on events) is in scope.
 - **A WASM guest runtime or module manifest discovery beyond the simple
   filesystem-path convention in §8.** Dynamic loading is in scope;
   sandboxed guest execution is not.
