@@ -13,7 +13,8 @@ See [spec §4](../spec.md#4-journal).
 ## Model
 
 - One SQLite database file (path from config).
-- `events` table with ULID primary key, indexed by time, type, and source.
+- `events` table with ULID primary key, `schema_ref` (TTD content hash), indexed
+  by time, type, and source.
 - Optional FTS5 for keyword search; optional `sqlite-vec` later for semantic
   search.
 

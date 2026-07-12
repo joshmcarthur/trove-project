@@ -1,0 +1,13 @@
+{
+  "$id": "trove://type/shortcuts/share/saved/1",
+  "title": "Shortcuts share saved",
+  "definition": {
+    "optionalProperties": {
+      "title": { "type": "string" },
+      "url": { "type": "string" },
+      "text": { "type": "string" },
+      "content_type": { "type": "string" },
+      "blob_ref": { "type": "string" }
+    }
+  }
+}

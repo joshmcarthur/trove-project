@@ -21,21 +21,27 @@ nav_order: 10
 
 ## Commands
 
-`make build` compiles `bin/trove` with built-in `http-ingest` and `mcp-query`
-modules, plus optional first-party module binaries under `modules/<name>/module`.
-Built-in modules need no `[modules].paths` entry. For MQTT, Telegram, and other
-external modules, point `[modules].paths` at the parent `modules/` directory (or
-an install tree with the same layout).
+`make build` compiles `bin/trove` with built-in `http-ingest`, `mcp-query`, and
+`type-catalog` modules, plus optional first-party module binaries under
+`modules/<name>/module`. Built-in modules need no `[modules].paths` entry. For
+MQTT, Telegram, http-gateway, and other external modules, point `[modules].paths`
+at the parent `modules/` directory (or an install tree with the same layout).
 
 | Command | Purpose |
 |---------|---------|
 | `make fmt` | `go fmt` + goimports |
 | `make lint` | golangci-lint |
 | `make test` | `go test -race -cover ./...` |
-| `make build` | `bin/trove` (with built-in http-ingest + mcp-query) and external module binaries |
+| `make build` | `bin/trove` (built-ins) and external module binaries |
 | `make check` | fmt + lint + test |
+| `make proto` | regenerate `api/proto` → `internal/modules/rpc` |
 | `make docs` | build Lume site |
 | `make docs-serve` | serve docs locally |
+
+Per-module build targets (also run as part of `make build`):
+`build-http-gateway`, `build-http-ingest`, `build-mqtt-source`,
+`build-telegram-source`, `build-mcp-query`, `build-capture-classifier`,
+`build-type-catalog`.
 
 ## Workflow
 

@@ -93,12 +93,13 @@ The journal is the single source of truth: an append-only table in SQLite.
 
 ```sql
 CREATE TABLE events (
-  id        TEXT PRIMARY KEY,
-  time      TEXT NOT NULL,
-  type      TEXT NOT NULL,
-  source    TEXT NOT NULL,
-  payload   TEXT NOT NULL,   -- JSON
-  blob_ref  TEXT
+  id         TEXT PRIMARY KEY,
+  time       TEXT NOT NULL,
+  type       TEXT NOT NULL,
+  schema_ref TEXT NOT NULL,
+  source     TEXT NOT NULL,
+  payload    TEXT NOT NULL,   -- JSON
+  blob_ref   TEXT
 );
 CREATE INDEX idx_events_time ON events(time);
 CREATE INDEX idx_events_type ON events(type);
@@ -119,7 +120,10 @@ type Journal interface {
 `Filter` supports type prefix, source, time range, and free-text match
 (via SQLite FTS5) at minimum. `Watch` signals coalesced wakeups after
 each append; consumers pull events via `Query` (the router uses a durable
-cursor for guaranteed dispatch).
+cursor via internal `QueryAfter` for guaranteed dispatch).
+
+**Retention:** optional `[journal].retention_days` prunes events older than
+N days at startup.
 
 **Semantic search** (optional, add once basic search proves insufficient):
 `sqlite-vec` as a virtual table alongside `events`, populated by an
@@ -241,14 +245,19 @@ socket, speaking a fixed RPC protocol.
 
 ### Discovery
 
-Module binaries live in predefined locations, checked in order at
-startup (mirrors standard Linux module-path conventions):
+Module binaries are discovered from `[modules].paths` in `trove.toml`. Common
+install locations (conventional, not hardcoded defaults):
 
 ```
 /usr/lib/trove/modules/
 /usr/local/lib/trove/modules/
 ~/.local/lib/trove/modules/
 ```
+
+**Built-in modules** (`http-ingest`, `mcp-query`, `type-catalog`) ship inside
+the `trove` binary. The core registers them when no on-disk module with the
+same `name` exists under a configured path. Built-ins still run as go-plugin
+subprocesses (core reexecs `trove` with `TROVE_BUNDLED_MODULE` set).
 
 Each module is a directory containing a manifest and an executable:
 
@@ -315,8 +324,10 @@ All kinds : core calls Healthcheck() periodically
 
 ### Supervision
 
-- The core watches the module directories (or reacts to `SIGHUP`) and can
-  start, stop, or restart individual modules without a full core restart.
+- The core discovers modules from configured paths at startup and supervises
+  subprocess lifecycle (restart with backoff on crash).
+- **SIGHUP reload** is not implemented in v0 — a full core restart is required
+  to pick up manifest or binary changes.
 - A crashing module must not take down the core — supervise with restart
   and backoff, log failures, keep serving from the journal regardless.
 
@@ -346,7 +357,7 @@ MCP.
 ```
 search_events(query string, type_prefix?, source?, time_range?) -> []Event
 get_events_by_type(type string, time_range) -> []Event
-get_event(id string) -> Event  // resolves blob_ref if present
+get_event(id string) -> Event  // returns event metadata including blob_ref; does not inline blob bytes
 summarize_range(time_range) -> Summary  // pre-aggregated: counts by type, notable events
 ```
 
@@ -469,15 +480,17 @@ incomplete — these need a decision but aren't blocking §11's build order:
   sentence-transformer via ONNX) vs. calling out to OpenRouter/Qwen like
   OpenClaw does. Affects whether Trove has any external network
   dependency at all.
-- **Auth model for the HTTP ingest and MCP endpoints** — Tailscale-only
-  (matching your existing pattern for OpenClaw) is the obvious default
-  but wasn't explicitly confirmed.
-- **Retention / pruning policy**, if any — journal is append-only by
-  design, but disk isn't infinite; not discussed whether old raw sensor
-  events ever get rolled up or archived.
 - **Whether `summarize_range` pre-aggregates at write time or query
   time** — the AI-non-determinism concern in §7 applies here too if
   summaries get cached/stored rather than generated fresh per query.
+
+**Resolved** (see [open-items.md](./open-items.md)):
+
+- **Auth model for HTTP ingest and MCP** — gateway auth validators
+  (`module.<name>.<id>`), optional `[http.auth].validator`.
+- **Retention / pruning policy** — optional `[journal].retention_days`.
+- **HTTP gateway route registration** — single `[http].listen`, manifest
+  `[[http.routes]]`, MCP on same port.
 
 ---
 
@@ -497,8 +510,9 @@ incomplete — these need a decision but aren't blocking §11's build order:
   iterated on independently of the core; this version corrects back to
   dynamic loading while keeping the manifest/discovery-path shape from
   the very first draft.
-- Dropped formal schema registry (protobuf/CBOR descriptors) in favor of
-  namespaced `type` strings and plain JSON payloads.
+- Dropped a central schema registry **service** (protobuf/CBOR descriptors) in
+  favor of a **local type catalog**: `trove://` type URIs, TTD files with RFC
+  8927 JTD payload contracts, and `schema_ref` on validated journal events.
 - Made the MCP-over-RPC query interface a first-class, load-bearing part
   of the spec (§9) rather than an afterthought — this is the piece most
   directly informed by understanding *why* prior art (Perkeep, MyLifeBits)

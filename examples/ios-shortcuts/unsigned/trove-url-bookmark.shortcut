@@ -6,7 +6,7 @@
 	<array>
 		<dict>
 			<key>UUID</key>
-			<string>718A7694-DAFD-4811-A747-FF5740DC9254</string>
+			<string>154852AE-F0CD-401F-B624-A542513ED359</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.url</string>
 			<key>WFWorkflowActionParameters</key>
@@ -29,40 +29,112 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>79305404-3E08-4859-B242-AE168479252E</string>
+			<string>B57B7FAD-F0A2-42A0-9F62-8F9FF1BCAB92</string>
 			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.detect.link</string>
+			<string>is.workflow.actions.dictionary</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
-				<key>WFInput</key>
+				<key>WFItems</key>
 				<dict>
-					<key>OutputName</key>
-					<string>Shortcut Input</string>
-					<key>Type</key>
-					<string>ShortcutInput</string>
+					<key>Value</key>
+					<dict>
+						<key>WFDictionaryFieldValueItems</key>
+						<array>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict/>
+										<key>string</key>
+										<string>type</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict/>
+										<key>string</key>
+										<string>trove://type/shortcuts/url/saved/1</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict/>
+										<key>string</key>
+										<string>url</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>OutputName</key>
+									<string>Shortcut Input</string>
+									<key>Type</key>
+									<string>ShortcutInput</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict/>
+										<key>string</key>
+										<string>title</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict/>
+										<key>string</key>
+										<string></string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFDictionaryFieldValue</string>
 				</dict>
 			</dict>
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>CBAAC9C8-64DD-4FFE-A7BE-F76AECA04179</string>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.gettext</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>WFTextActionText</key>
-				<string>{"type":"shortcuts.url.saved","url":"￼","title":""}</string>
-			</dict>
-		</dict>
-		<dict>
-			<key>UUID</key>
-			<string>D5098E73-1617-4A52-BED1-ABD086B1CEB7</string>
+			<string>C07285E0-8C44-4048-81C8-CAAFBE4D071C</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.downloadurl</string>
 			<key>WFWorkflowActionParameters</key>
 			<dict>
 				<key>WFHTTPBodyType</key>
-				<string>File</string>
+				<string>JSON</string>
 				<key>WFHTTPHeaders</key>
 				<dict>
 					<key>Value</key>
@@ -104,7 +176,7 @@
 				</dict>
 				<key>WFHTTPMethod</key>
 				<string>POST</string>
-				<key>WFRequestVariable</key>
+				<key>WFJSONValues</key>
 				<dict>
 					<key>Value</key>
 					<dict>
@@ -113,9 +185,9 @@
 							<key>{0, 1}</key>
 							<dict>
 								<key>OutputName</key>
-								<string>Text</string>
+								<string>Dictionary</string>
 								<key>OutputUUID</key>
-								<string>CBAAC9C8-64DD-4FFE-A7BE-F76AECA04179</string>
+								<string>B57B7FAD-F0A2-42A0-9F62-8F9FF1BCAB92</string>
 								<key>Type</key>
 								<string>ActionOutput</string>
 							</dict>
@@ -137,7 +209,7 @@
 								<key>OutputName</key>
 								<string>URL</string>
 								<key>OutputUUID</key>
-								<string>718A7694-DAFD-4811-A747-FF5740DC9254</string>
+								<string>154852AE-F0CD-401F-B624-A542513ED359</string>
 								<key>Type</key>
 								<string>ActionOutput</string>
 							</dict>
@@ -170,11 +242,11 @@
 			<key>Category</key>
 			<string>Parameter</string>
 			<key>DefaultValue</key>
-			<string>https://trove.local</string>
+			<string>https://trove.local/ingest/shortcuts</string>
 			<key>ParameterKey</key>
-			<string>WFURL</string>
+			<string>WFURLActionURL</string>
 			<key>Text</key>
-			<string>Trove host (base URL, no trailing slash)</string>
+			<string>Trove ingest URL (e.g. https://trove.local/ingest/shortcuts)</string>
 		</dict>
 	</array>
 	<key>WFWorkflowInputContentItemClasses</key>

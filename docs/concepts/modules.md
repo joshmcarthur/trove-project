@@ -1,12 +1,12 @@
 ---
 title: Modules
 parent: Concepts
-nav_order: 5
+nav_order: 6
 ---
 
 # Modules
 
-Modules are **separate processes**, discovered from predefined filesystem paths
+Modules are **separate processes**, discovered from `[modules].paths` in config
 and connected to the Trove core over a local (or networked) socket.
 
 See [spec §8](../spec.md#8-module-architecture-dynamic-socket-based).
@@ -32,7 +32,8 @@ binaries built by `make build`.
 
 ## Discovery paths
 
-Checked at startup, in order:
+Modules are discovered from `[modules].paths` in `trove.toml`. Common install
+locations:
 
 ```
 /usr/lib/trove/modules/
@@ -52,7 +53,7 @@ module/
 name     = "mqtt-source"
 version  = "1.0"
 kind     = "source"        # source | processor | sink
-provides = ["mqtt.message.received"]
+provides = ["trove://type/mqtt/message/received/1"]
 ```
 
 ## Declaring subscriptions and emissions
@@ -64,8 +65,8 @@ Modules declare journal event types in the manifest:
 | `provides` | Event types the module may emit (sources and event-routing processors) |
 | `consumes` | Event types the module subscribes to (event-routing processors and sinks) |
 
-Both fields accept exact type strings or glob patterns (`note.*`, `mqtt.*.received`).
-Bare `*` is not allowed.
+Both fields accept exact `trove://type/...` URIs or glob patterns
+(`trove://type/note/*`, `trove://type/mqtt/*/received/*`). Bare `*` is not allowed.
 
 Event-routing processors and sinks must declare `consumes`. Sources must declare
 `provides`. HTTP-only processors (for example `mcp-query`) declare

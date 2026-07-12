@@ -53,8 +53,8 @@ Event-routing processor example:
 name     = "embedder"
 version  = "0.1.0"
 kind     = "processor"
-consumes = ["note.*"]
-provides = ["note.embedding.generated"]
+consumes = ["trove://type/note/*"]
+provides = ["trove://type/note/embedding/generated/1"]
 ```
 
 Sink example:
@@ -63,7 +63,7 @@ Sink example:
 name     = "webhook-sink"
 version  = "2.0"
 kind     = "sink"
-consumes = ["note.created"]
+consumes = ["trove://type/note/created/1"]
 ```
 
 `kind` is `source`, `processor`, or `sink`.
@@ -143,6 +143,7 @@ Modules load overlays through `trovemodule.LoadModuleConfig` (merges manifest +
 
 | Module | Location | Planning page |
 |--------|----------|---------------|
+| HTTP gateway | `modules/http-gateway/` | [http-gateway](./planning/http-gateway.md) |
 | HTTP ingest | `modules/http-ingest/` | [http-ingest](./planning/http-ingest.md) |
 | Capture classifier | `modules/capture-classifier/` | [deferred-capture](./planning/deferred-capture.md) |
 | MCP query | `modules/mcp-query/` | [mcp-query](./planning/mcp-query.md) |
@@ -158,12 +159,11 @@ listen address). The `:source` path segment becomes the event `source` field;
 optional `type`, `time`, and `blob_ref` keys in the JSON body override event
 metadata. Default request body limit is 10 MiB (`max_body_bytes` in manifest).
 Allowed client `type` values are controlled by `provides` in the module manifest
-(for example `note.*` for Shortcuts). Disallowed types and schema validation
-failures return **400 Bad Request** with an error message.
+(for example `trove://type/shortcuts/*` for Shortcuts). Disallowed types and
+payload validation failures return **400 Bad Request** with an error message.
 
-For large attachments, do not inline bytes in JSON. Once the blob store is
-implemented, upload content separately and reference it with `blob_ref` on the
-ingest payload.
+For large attachments, do not inline bytes in JSON. Upload content via
+`PUT /blobs` and reference it with `blob_ref` on the ingest payload.
 
 See [iOS Shortcuts](../getting-started/ios-shortcuts.md) for importable capture
 Shortcuts that POST to this endpoint.

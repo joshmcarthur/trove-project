@@ -1,5 +1,5 @@
 {
-  "type": "shortcuts.share.saved",
+  "type": "trove://type/shortcuts/share/saved/1",
   "title": "Example page title",
   "url": "https://example.com/article",
   "text": "Shared text or notes",

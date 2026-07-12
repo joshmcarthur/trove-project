@@ -14,32 +14,47 @@ listed package, update the [roadmap](./roadmap.md).
 |------|---------|
 | [Journal (SQLite)](./journal.md) | `internal/journal` |
 | [Module runtime](./module-runtime.md) | `internal/modules` |
-| [HTTP ingest](./http-ingest.md) | external module |
+| [HTTP ingest](./http-ingest.md) | `modules/http-ingest` (built-in) |
 | [Config loader](./config.md) | `internal/config` |
+| [Type catalog](./type-catalog.md) | `internal/types` |
 
-## Milestone 2 — MQTT (complete) + blob storage
+## Milestone 2 — MQTT + blob storage
 
 | Page | Package |
 |------|---------|
 | [MQTT source](./mqtt-source.md) | `modules/mqtt-source` |
 | [Blob store](./blobs.md) | `internal/blob` |
 
-## Milestone 3 — MCP query (complete)
+## Milestone 3 — MCP query + gateway (complete)
 
 | Page | Package |
 |------|---------|
-| [MCP query server](./mcp-query.md) | `internal/query` |
+| [HTTP gateway](./http-gateway.md) | `internal/gateway` + modules |
+| [MCP query server](./mcp-query.md) | `internal/query` + `modules/mcp-query` |
 | [MCP tool registration](./mcp-tools.md) | `internal/modules` |
+| [Network auth](./auth.md) | `internal/gateway` + `modules/http-gateway` |
 | [Deferred capture](./deferred-capture.md) | `modules/capture-classifier` |
 | [Telegram source](./telegram-source.md) | `modules/telegram-source` |
-| [HTTP gateway](./http-gateway.md) | `internal/gateway` + modules |
 | [Processors and sinks](./processors-sinks.md) | `internal/modules` + modules |
+| [CLI command registration](./cli-commands.md) | `internal/modules` + `cmd/trove` |
+| [Type introspection](./type-introspection.md) | `modules/type-catalog` |
+
+## Milestone 4 — Two-week live test (current)
+
+Operational runbook — not a planning page:
+
+- [Two-week live test](../getting-started/live-test.md)
+- [iOS Shortcuts](../getting-started/ios-shortcuts.md)
 
 ## Open decisions
 
 | Page | Notes |
 |------|-------|
-| [Network auth](./auth.md) | HTTP ingest, MCP, remote modules |
+| [Config loader](./config.md) | Default config file location (XDG vs `/etc/trove`) |
+| [MCP query server](./mcp-query.md) | `summarize_range` write-time vs query-time aggregation |
+| [Blob store](./blobs.md) | Backend priority after filesystem |
+| [Embeddings](./embeddings.md) | Embedding model (local ONNX vs API) |
+| [Remote modules](./remote-modules.md) | Remote/edge RPC protocol shape |
 
 ## Later
 

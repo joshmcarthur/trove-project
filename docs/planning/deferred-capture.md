@@ -7,7 +7,7 @@ nav_order: 12
 # Deferred capture
 
 **Status:** Supported\
-**Milestone:** 4 — Two-week live test\
+**Milestone:** 3 — MCP query\
 **Spec:** [Events §3](../spec.md#3-core-concepts), [Sources §6](../spec.md#6-sources)\
 **Package:** `modules/capture-classifier`, `pkg/classify`
 
@@ -37,9 +37,9 @@ list_unclassified_captures()
 
 | Type | Purpose |
 |------|---------|
-| `classify.pending` | Quick capture awaiting classification |
-| `classify.assigned` | Link record: `{source_event_id, target_event_id, target_type}` |
-| Target types (e.g. `shortcuts.note.created`) | Properly typed classified event with `_trove.derived_from` |
+| `trove://type/classify/pending/1` | Quick capture awaiting classification |
+| `trove://type/classify/assigned/1` | Link record: `{source_event_id, target_event_id, target_type}` |
+| Target types (e.g. `trove://type/shortcuts/note/created/1`) | Properly typed classified event with `_trove.derived_from` |
 
 ## Implementation notes
 

@@ -57,6 +57,5 @@ MCP tools map 1:1 onto these methods.
 
 ## Open questions
 
-- Auth for MCP endpoint — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - `summarize_range` write-time vs query-time aggregation — [open-items.md](../open-items.md)
-- HTTP gateway migration — [http-gateway.md](./http-gateway.md) (Supported)
+- Gateway auth for MCP — resolved via `[http.auth].validator`; see [auth.md](./auth.md)

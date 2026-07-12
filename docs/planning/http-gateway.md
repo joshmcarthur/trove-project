@@ -7,18 +7,16 @@ nav_order: 10
 # HTTP gateway
 
 **Status:** Supported\
-**Milestone:** After two-week live test\
+**Milestone:** 3 — MCP query\
 **Spec:** [Module architecture §8](../spec.md#8-module-architecture-dynamic-socket-based), [Query §9](../spec.md#9-query-interface-mcp-over-rpc), [Configuration §10](../spec.md#10-configuration)\
 **Package:** `internal/gateway` (new), `internal/modules`, `internal/query`, `modules/http-ingest`
 
 ## Goal
 
 Unify Trove's HTTP surfaces behind a **single core listener** with **declarative
-route registration**. Today capture (`POST /ingest`, `PUT /blobs`) and query
-(MCP streamable HTTP) are implemented as separate servers on different ports and
-config files. This milestone makes them the same kind of thing: modules (or
-built-ins) that register routes on a shared gateway, with core owning durable
-services (journal, blobs) via symmetric RPC.
+route registration**. Capture (`POST /ingest`, `PUT /blobs`) and query (MCP
+streamable HTTP) register routes on a shared gateway; core owns durable services
+(journal, blobs) via symmetric RPC.
 
 Primary outcomes:
 
@@ -28,21 +26,17 @@ Primary outcomes:
 3. MCP and HTTP ingest follow the same extension pattern.
 4. Gateway-level auth middleware (see [auth](./auth.md)) applies once.
 
-## Problem statement (current state)
+## Background (before gateway)
 
-| Surface | Process | Config | Routes |
+Prior to this milestone, HTTP ingest and MCP ran on separate ports with per-module
+`listen` settings and `[mcp].listen` in core config. Blob uploads used
+`TROVE_BLOBS_PATH` env in the http-ingest subprocess. That split is **removed** —
+all routes now dispatch through `[http].listen`.
+
+| Surface (legacy) | Process | Config | Routes |
 |---------|---------|--------|--------|
-| HTTP ingest + blobs | `http-ingest` subprocess | `modules/http-ingest/manifest.toml` `listen` | Hardcoded in `server.go` |
+| HTTP ingest + blobs | `http-ingest` subprocess | per-module `listen` | Hardcoded in `server.go` |
 | MCP query | `trove` core built-in | `trove.toml` `[mcp].listen` | Hardcoded in `internal/query/mcp.go` |
-
-Pain points:
-
-- Two ports and two listen settings for phone capture + MCP.
-- `http-ingest` opens its own `http.Server`; core cannot compose routes.
-- Blob path passed via `TROVE_BLOBS_PATH` env — core validates config but module
-  owns the store handle (split authority).
-- Adding a new HTTP capability (web dashboard, webhook sink) has no uniform path.
-- Auth must be duplicated or proxied if surfaces stay split.
 
 ## Target architecture
 
@@ -114,7 +108,7 @@ New `[[http.routes]]` table in module `manifest.toml`:
 name     = "http-ingest"
 version  = "1.0"
 kind     = "source"
-provides = ["http.ingest.received", "note.*", "shortcut.*"]
+provides = ["trove://type/http/ingest/received/1", "trove://type/note/*", "trove://type/shortcut/*"]
 
 [[http.routes]]
 method = "POST"
@@ -297,7 +291,6 @@ Rejected requests never reach module `HandleHTTP`.
 ## Dependencies
 
 - **Blocks:** unified client URL, gateway-level auth, clean blob authority
-- **Blocked by:** two-week live test (validate capture + MCP before refactor)
 - **Related:** [auth](./auth.md), [blobs](./blobs.md), [http-ingest](./http-ingest.md), [mcp-query](./mcp-query.md), [module-runtime](./module-runtime.md)
 
 ## Non-goals (this milestone)
@@ -325,7 +318,7 @@ Track decisions in [open-items.md](../open-items.md) when resolved.
 
 ## See also
 
-- [HTTP ingest](./http-ingest.md) — current ingest + blob routes (to migrate)
-- [MCP query server](./mcp-query.md) — current MCP server (to migrate)
-- [Network auth](./auth.md) — natural fit at gateway layer
+- [HTTP ingest](./http-ingest.md) — ingest + blob routes on the gateway
+- [MCP query server](./mcp-query.md) — MCP route on the gateway
+- [Network auth](./auth.md) — gateway auth validators
 - [Module runtime](./module-runtime.md) — go-plugin supervision model

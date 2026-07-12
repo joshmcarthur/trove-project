@@ -1,0 +1,10 @@
+{
+  "$id": "trove://type/shortcuts/url/saved/1",
+  "title": "Shortcuts URL saved",
+  "definition": {
+    "optionalProperties": {
+      "url": { "type": "string" },
+      "title": { "type": "string" }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
-  "type": "shortcuts.location.checked",
-  "latitude": -36.8485,
-  "longitude": 174.7633,
-  "label": "Auckland CBD"
+  "type": "trove://type/shortcuts/location/checked/1",
+  "latitude": 37.7749,
+  "longitude": -122.4194,
+  "label": "Home"
 }

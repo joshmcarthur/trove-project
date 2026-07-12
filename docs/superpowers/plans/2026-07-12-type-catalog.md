@@ -1,5 +1,10 @@
 # Type Catalog Implementation Plan
 
+> **Status: Completed (2026-07-12).** This was the implementation plan for the
+> type catalog milestone. For current documentation see
+> [type-catalog planning](../planning/type-catalog.md) and
+> [type catalog concept](../concepts/type-catalog.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace per-module optional JSON Schema with a global type catalog: `trove://` type URIs, RFC 8927 JTD payload contracts, blob-stored schema bytes, and `schema_ref` on every validated journal event.

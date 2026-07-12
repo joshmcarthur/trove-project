@@ -1,7 +1,7 @@
 ---
 title: Two-week live test
 parent: Getting started
-nav_order: 6
+nav_order: 7
 ---
 
 # Two-week live test
@@ -31,15 +31,27 @@ journal for two weeks and validate capture plus conversational retrieval.
 
 ### Security note
 
-v0 has **no authentication** on ingest, blobs, or MCP. Run on **localhost** or a
-**trusted tailnet** (Tailscale) only. Do not expose `:8080` to the public internet
-until [network auth](../planning/auth.md) is implemented.
+By default Trove has **no authentication** on ingest, blobs, or MCP. For the
+live test, bind to **localhost** or a **trusted tailnet** (Tailscale). Optional
+gateway auth is **Supported** — enable when exposing beyond a trusted network:
+
+```toml
+[http.auth]
+validator = "module.http-gateway.bearer"
+
+[modules.settings.http-gateway]
+token_env = "TROVE_HTTP_TOKEN"
+```
+
+See [network auth](../planning/auth.md). Do not expose `:8080` to the public
+internet without auth or a reverse proxy with TLS.
 
 ### Example config
 
 ```toml
 [journal]
 path = "./trove.db"
+# retention_days = 90  # optional; prunes events older than N days
 
 [blobs]
 path = "./blobs"
@@ -98,9 +110,9 @@ Keep a simple notes file (outside Trove) with:
 
 | Limitation | Workaround |
 |------------|------------|
-| No auth | Localhost or tailnet only |
+| No auth by default | Localhost or tailnet; or enable `[http.auth].validator` — see [auth](../planning/auth.md) |
 | MQTT reconnect | Restart `trove` if broker was down at startup |
-| No retention policy | Monitor disk usage manually |
+| Retention not enabled by default | Set `[journal].retention_days` to prune old events — see [journal planning](../planning/journal.md) |
 | `get_event` does not inline blob bytes | Note `blob_ref`; fetch blob separately if needed |
 
 ## After the live test

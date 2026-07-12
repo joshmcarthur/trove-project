@@ -1,0 +1,11 @@
+{
+  "$id": "trove://type/shortcuts/location/checked/1",
+  "title": "Shortcuts location checked",
+  "definition": {
+    "optionalProperties": {
+      "latitude": { "type": "float64" },
+      "longitude": { "type": "float64" },
+      "label": { "type": "string" }
+    }
+  }
+}

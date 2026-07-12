@@ -13,13 +13,9 @@ From [spec §13](../spec.md#13-open-items-not-yet-decided):
 |------|---------|
 | RPC protocol for remote/edge modules | [remote-modules](./planning/remote-modules.md) |
 | Blob backend priority after filesystem | [blobs](./planning/blobs.md) |
-| Blob upload path | **Resolved:** `PUT /blobs` on http-ingest — see [blobs](./planning/blobs.md), [http-ingest](./planning/http-ingest.md) |
 | Embedding model (local ONNX vs API) | [embeddings](./planning/embeddings.md) |
-| Auth for HTTP ingest and MCP | **Resolved:** gateway validators — see [auth](./planning/auth.md) |
-| Retention / pruning policy | **Resolved:** `[journal].retention_days` — see [journal planning](./planning/journal.md) |
 | Default config file location (XDG vs `/etc/trove`) | [config](./planning/config.md) |
 | `summarize_range`: pre-aggregate at write vs query time | [mcp-query](./planning/mcp-query.md), [processors-sinks](./planning/processors-sinks.md) |
-| HTTP gateway: route registration, MCP migration, streaming RPC | [http-gateway](./planning/http-gateway.md) |
 
 ## Resolved
 
@@ -28,6 +24,9 @@ From [spec §13](../spec.md#13-open-items-not-yet-decided):
 | Manifest subscription model (`consumes`) | Modules declare `consumes` / `provides` with glob patterns; see [modules](../concepts/modules.md) | 2026-07-11 |
 | Auth for HTTP ingest and MCP | Gateway auth validators (`module.<name>.<id>`) | 2026-07-11 |
 | Circular event-routing prevention | `DispatchContext.seen` skips modules already in the chain; startup graph warning | 2026-07-11 |
+| Blob upload path | `PUT /blobs` on http-ingest via gateway | 2026-07-11 |
+| Retention / pruning policy | `[journal].retention_days` | 2026-07-11 |
+| HTTP gateway route registration | Single `[http].listen`, manifest `[[http.routes]]`, MCP on same port | 2026-07-11 |
 
 When you resolve an item, move the decision here with a date and link to the PR
 that implemented it.

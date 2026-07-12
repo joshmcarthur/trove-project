@@ -29,17 +29,17 @@ All kinds : core calls Healthcheck() periodically
 
 ## Implementation notes
 
-- Scan `[modules].paths` from config (standard Linux paths + home dir)
-- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`, `consumes`, optional `[schemas]`)
+- Scan `[modules].paths` from config
+- Parse `manifest.toml` (`name`, `version`, `kind`, `provides`, `consumes`, `[[types]]`)
   — landed in `internal/modules/manifest.go`
-- Enforce `provides` allowlist and optional JSON Schema at `Emit` — landed in
+- Enforce `provides` allowlist and type catalog validation at `Emit` — landed in
   `internal/modules/policy.go` and `internal/modules/services.go`
 - Event router with `DispatchContext.seen` loop prevention — `internal/modules/router.go`
 - Filesystem discovery scanner — landed in `internal/modules/discover.go`
 - Integrate go-plugin for subprocess lifecycle
 - Supervise with restart + backoff on crash
 - Start source, HTTP, and event-routing modules; HTTP-only processors skip the router
-- React to `SIGHUP` for reload (stretch)
+- **SIGHUP reload** is not implemented in v0
 
 ## Acceptance criteria
 
@@ -48,7 +48,7 @@ All kinds : core calls Healthcheck() periodically
 - [x] Module crash does not take down core
 - [x] Healthcheck RPC wired
 - [x] Source modules reject Emit for undeclared types
-- [x] Optional JSON Schema validation when declared in manifest
+- [x] Optional type catalog validation when type is registered
 
 ## Dependencies
 

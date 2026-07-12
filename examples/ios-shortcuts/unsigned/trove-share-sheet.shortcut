@@ -6,7 +6,7 @@
 	<array>
 		<dict>
 			<key>UUID</key>
-			<string>4F0BC310-EC5B-442F-8996-8A9DB79BE19F</string>
+			<string>C74FCB8D-7901-46AB-948C-FD1A2C76DBE9</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.url</string>
 			<key>WFWorkflowActionParameters</key>
@@ -29,7 +29,7 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>70855EAD-E73C-44AE-9DEE-978460832C58</string>
+			<string>D782431F-D1B6-46E2-A5D3-E312F3BD10CD</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.dictionary</string>
 			<key>WFWorkflowActionParameters</key>
@@ -62,7 +62,7 @@
 										<key>attachmentsByRange</key>
 										<dict/>
 										<key>string</key>
-										<string>shortcuts.share.saved</string>
+										<string>trove://type/shortcuts/share/saved/1</string>
 									</dict>
 									<key>WFSerializationType</key>
 									<string>WFTextTokenString</string>
@@ -100,7 +100,7 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>51D9E372-352C-49F8-83BD-35E1C12CC88F</string>
+			<string>2ADC232B-56F2-4C6D-B085-1F3424962E69</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.downloadurl</string>
 			<key>WFWorkflowActionParameters</key>
@@ -159,7 +159,7 @@
 								<key>OutputName</key>
 								<string>Dictionary</string>
 								<key>OutputUUID</key>
-								<string>70855EAD-E73C-44AE-9DEE-978460832C58</string>
+								<string>D782431F-D1B6-46E2-A5D3-E312F3BD10CD</string>
 								<key>Type</key>
 								<string>ActionOutput</string>
 							</dict>
@@ -181,7 +181,7 @@
 								<key>OutputName</key>
 								<string>URL</string>
 								<key>OutputUUID</key>
-								<string>4F0BC310-EC5B-442F-8996-8A9DB79BE19F</string>
+								<string>C74FCB8D-7901-46AB-948C-FD1A2C76DBE9</string>
 								<key>Type</key>
 								<string>ActionOutput</string>
 							</dict>
@@ -214,11 +214,11 @@
 			<key>Category</key>
 			<string>Parameter</string>
 			<key>DefaultValue</key>
-			<string>https://trove.local</string>
+			<string>https://trove.local/ingest/shortcuts</string>
 			<key>ParameterKey</key>
-			<string>WFURL</string>
+			<string>WFURLActionURL</string>
 			<key>Text</key>
-			<string>Trove host (base URL, no trailing slash)</string>
+			<string>Trove ingest URL (e.g. https://trove.local/ingest/shortcuts)</string>
 		</dict>
 	</array>
 	<key>WFWorkflowInputContentItemClasses</key>

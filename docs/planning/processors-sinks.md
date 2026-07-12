@@ -7,7 +7,7 @@ nav_order: 11
 # Processors and sinks
 
 **Status:** Supported\
-**Milestone:** After two-week live test\
+**Milestone:** 3 — MCP query\
 **Spec:** [Processors and sinks §7](../spec.md#7-processors-and-sinks)\
 **Package:** `internal/modules`, external modules
 
@@ -29,8 +29,8 @@ Event-routing modules declare subscriptions and emissions:
 
 ```toml
 kind     = "processor"
-consumes = ["note.*"]
-provides = ["note.embedding.generated"]
+consumes = ["trove://type/note/*"]
+provides = ["trove://type/note/embedding/generated/1"]
 ```
 
 See [modules concept](../concepts/modules.md) for per-kind rules. HTTP-only
