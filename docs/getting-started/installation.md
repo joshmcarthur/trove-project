@@ -68,6 +68,7 @@ sudo install -m 755 trove-linux-amd64 /usr/local/bin/trove
 curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove-darwin-arm64"
 curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/checksums.txt"
 shasum -a 256 -c checksums.txt --ignore-missing
+xattr -d com.apple.quarantine trove-darwin-arm64
 chmod +x trove-darwin-arm64
 sudo install -m 755 trove-darwin-arm64 /usr/local/bin/trove
 ```
@@ -93,10 +94,38 @@ chmod +x trove-linux-amd64
 curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/trove-darwin-arm64
 curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/checksums.txt
 shasum -a 256 -c checksums.txt --ignore-missing
+xattr -d com.apple.quarantine trove-darwin-arm64
 chmod +x trove-darwin-arm64
 ```
 
 Windows: download `trove-windows-amd64.exe` from the release page.
+
+### macOS Gatekeeper
+
+Release binaries are not Apple-signed yet. After downloading, macOS tags the file
+with a quarantine flag and Gatekeeper may block it with a message like *"Apple
+could not verify … is free of malware"*.
+
+Remove the quarantine flag before running or installing:
+
+```bash
+xattr -d com.apple.quarantine trove-darwin-arm64
+```
+
+If you already installed to `/usr/local/bin/trove`, clear it there too:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/trove
+```
+
+`xattr` exits with an error when the attribute is missing — that is fine.
+
+Alternatives if Gatekeeper still blocks:
+
+- **System Settings → Privacy & Security** — after a blocked run, an **Open Anyway**
+  button may appear for Trove.
+- **Build from source** on your Mac (see below) — locally built binaries are not
+  quarantined.
 
 Verify:
 
