@@ -12,6 +12,7 @@ message Event {
   string source = 4;
   bytes payload = 5; // JSON
   string blob_ref = 6;
+  string schema_ref = 7;
 }
 
 message EmitResponse {}
