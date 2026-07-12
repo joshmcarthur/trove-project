@@ -16,6 +16,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/gateway"
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/modules"
+	"github.com/joshmcarthur/trove/internal/types"
 )
 
 func TestHTTPIngestViaGateway(t *testing.T) {
@@ -62,9 +63,14 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 		t.Fatalf("gateway.New() error = %v", err)
 	}
 
+	catalog := types.NewCatalog()
+	if err := catalog.RegisterPermissive("http.ingest.received"); err != nil {
+		t.Fatalf("RegisterPermissive() error = %v", err)
+	}
+
 	done := make(chan struct{})
 	go func() {
-		handle, err := modules.StartSource(ctx, store, mod, blobStore, registry, modules.NewMCPRegistry(), nil, nil, map[string]string{}, nil)
+		handle, err := modules.StartSource(ctx, store, mod, blobStore, registry, modules.NewMCPRegistry(), nil, nil, map[string]string{}, nil, catalog)
 		if err != nil && ctx.Err() == nil {
 			t.Errorf("StartSource() error = %v", err)
 		}

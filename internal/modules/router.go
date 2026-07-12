@@ -149,7 +149,7 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 
 		childSeen := withSeen(dctx.Seen, binding.name)
 		for _, out := range derived {
-			if err := binding.policy.ValidateEvent(out); err != nil {
+			if err := binding.policy.ValidateEvent(&out); err != nil {
 				return fmt.Errorf("processor %q derived event: %w", binding.name, err)
 			}
 			childCtx := DispatchContext{

@@ -30,7 +30,7 @@ type EventRegistry struct {
 type eventProcessorBinding struct {
 	name     string
 	consumes []string
-	policy   IngestPolicy
+	policy   EmitPolicy
 	client   EventProcessorClient
 }
 
@@ -49,7 +49,7 @@ func NewEventRegistry() *EventRegistry {
 }
 
 // RegisterProcessor adds a processor module to the registry.
-func (r *EventRegistry) RegisterProcessor(name string, consumes []string, policy IngestPolicy, client EventProcessorClient) {
+func (r *EventRegistry) RegisterProcessor(name string, consumes []string, policy EmitPolicy, client EventProcessorClient) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.processors[name] = eventProcessorBinding{

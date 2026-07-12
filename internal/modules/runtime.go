@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/joshmcarthur/trove/internal/blob"
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/types"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
@@ -33,6 +34,7 @@ func StartSource(
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	settings *SettingsStore,
+	catalog *types.Catalog,
 ) (*SourceHandle, error) {
 	manifest, err := loadModuleManifest(mod)
 	if err != nil {
@@ -57,7 +59,7 @@ func StartSource(
 		return nil, fmt.Errorf("modules: start %q: not a supported module type", mod.Manifest.Name)
 	}
 
-	policy, err := LoadIngestPolicy(manifest, mod.Dir, mod.Bundled)
+	policy, err := LoadIngestPolicy(manifest, catalog, mod.Bundled)
 	if err != nil {
 		return nil, fmt.Errorf("modules: start %q: %w", mod.Manifest.Name, err)
 	}

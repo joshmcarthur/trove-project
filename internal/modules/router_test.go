@@ -9,6 +9,7 @@ import (
 
 	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
+	"github.com/joshmcarthur/trove/internal/types"
 )
 
 type stubProcessor struct {
@@ -23,15 +24,19 @@ func (s stubProcessor) Healthcheck(ctx context.Context) (*troverpc.HealthcheckRe
 	return &troverpc.HealthcheckResponse{Ok: true}, nil
 }
 
-func testPolicy(t *testing.T, name string, provides []string) IngestPolicy {
+func testPolicy(t *testing.T, name string, provides []string) EmitPolicy {
 	t.Helper()
+	catalog := types.NewCatalog()
+	for _, pattern := range provides {
+		registerPermissiveCatalogType(t, catalog, pattern)
+	}
 	policy, err := LoadIngestPolicy(Manifest{
 		Name:     name,
 		Version:  "1.0",
 		Kind:     KindProcessor,
 		Provides: provides,
 		Consumes: []string{"unused"},
-	}, t.TempDir(), false)
+	}, catalog, false)
 	if err != nil {
 		t.Fatalf("LoadIngestPolicy() error = %v", err)
 	}
@@ -221,12 +226,18 @@ func TestRouterStartupCatchUp(t *testing.T) {
 	if len(events) != 5 {
 		t.Fatalf("Query() len = %d, want 5", len(events))
 	}
+	var maxID string
+	for _, e := range events {
+		if maxID == "" || e.ID > maxID {
+			maxID = e.ID
+		}
+	}
 	watermark, err := store.LoadRouterWatermark(ctx)
 	if err != nil {
 		t.Fatalf("LoadRouterWatermark() error = %v", err)
 	}
-	if watermark != events[len(events)-1].ID {
-		t.Fatalf("watermark = %q, want %q", watermark, events[len(events)-1].ID)
+	if watermark != maxID {
+		t.Fatalf("watermark = %q, want %q", watermark, maxID)
 	}
 }
 

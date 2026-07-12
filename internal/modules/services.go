@@ -16,7 +16,7 @@ import (
 type coreServicesServer struct {
 	troverpc.UnimplementedCoreServicesServer
 	journal     journal.Journal
-	policy      IngestPolicy
+	policy      EmitPolicy
 	blobs       blob.Store
 	query       *query.Service
 	mcpTools    []MCPToolEntry
@@ -32,7 +32,7 @@ func (s *coreServicesServer) Emit(ctx context.Context, e *troverpc.Event) (*trov
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := s.policy.ValidateEvent(event); err != nil {
+	if err := s.policy.ValidateEvent(&event); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	if err := s.journal.Append(ctx, event); err != nil {

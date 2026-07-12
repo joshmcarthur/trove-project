@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/types"
 )
 
 func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
@@ -41,9 +42,12 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 		t.Fatalf("Watch() error = %v", err)
 	}
 
+	catalog := types.NewCatalog()
+	registerPermissiveCatalogType(t, catalog, "test.crash.restart")
+
 	done := make(chan struct{})
 	go func() {
-		RunSources(ctx, store, []Module{mod}, nil, NewHTTPRegistry(), NewMCPRegistry(), nil, map[string]string{}, nil)
+		RunSources(ctx, store, []Module{mod}, nil, NewHTTPRegistry(), NewMCPRegistry(), nil, map[string]string{}, nil, catalog)
 		close(done)
 	}()
 

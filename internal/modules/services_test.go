@@ -9,6 +9,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
+	"github.com/joshmcarthur/trove/internal/types"
 )
 
 func TestCoreServicesEmit(t *testing.T) {
@@ -25,13 +26,18 @@ func TestCoreServicesEmit(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = j.Close() })
 
+	catalog := types.NewCatalog()
+	registerPermissiveCatalogType(t, catalog, "test.event")
+
+	policy, err := NewEmitPolicy([]string{"test.event"}, catalog, "test")
+	if err != nil {
+		t.Fatalf("NewEmitPolicy() error = %v", err)
+	}
+
 	srv := &coreServicesServer{
 		journal: j,
-		policy: IngestPolicy{
-			patterns:   []string{"test.event"},
-			moduleName: "test",
-		},
-		blobs: store,
+		policy:  policy,
+		blobs:   store,
 	}
 	_, err = srv.Emit(context.Background(), &troverpc.Event{
 		Type:    "test.event",
