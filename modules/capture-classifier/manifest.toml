@@ -2,11 +2,26 @@ name     = "capture-classifier"
 version  = "1.0"
 kind     = "source"
 provides = [
-  "classify.*",
-  "note.*",
-  "shortcuts.*",
+  "trove://type/classify/*",
+  "trove://type/note/*",
+  "trove://type/shortcuts/*",
 ]
 max_body_bytes = 10485760
+
+[[types]]
+name = "classify.pending"
+version = 1
+schema = "../../types/builtin/classify.pending.ttd.json"
+
+[[types]]
+name = "classify.assigned"
+version = 1
+schema = "../../types/builtin/classify.assigned.ttd.json"
+
+[[types]]
+name = "note.created"
+version = 1
+schema = "../../types/builtin/note.created.ttd.json"
 
 [[http.routes]]
 method = "POST"
@@ -26,4 +41,4 @@ description = "Classify a pending capture into a typed event"
 
 [[mcp.tools]]
 name = "list_unclassified_captures"
-description = "List classify.pending events not yet classified"
+description = "List trove://type/classify/pending/1 events not yet classified"

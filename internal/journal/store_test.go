@@ -133,7 +133,7 @@ func TestAppendDefaults(t *testing.T) {
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
 	event := Event{
 		ID:      id,
-		Type:    "mqtt.test.event",
+		Type:    "trove://type/mqtt/test/event/1",
 		Source:  "sensor-1",
 		Payload: json.RawMessage(`{"value":42}`),
 	}
@@ -264,10 +264,10 @@ func TestQuery(t *testing.T) {
 	t4 := time.Date(2026, 7, 10, 11, 0, 0, 0, time.UTC)
 
 	seed := []Event{
-		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
-		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "sensor-b", Payload: json.RawMessage(`{"v":3}`)},
-		{ID: "01JEVT00000000000000000004", Time: t4, Type: "mqtt.sensor.temp", Source: "sensor-c", Payload: json.RawMessage(`{"v":4}`)},
+		{ID: "01JEVT00000000000000000004", Time: t4, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-c", Payload: json.RawMessage(`{"v":4}`)},
 	}
 	for _, e := range seed {
 		if err := store.Append(ctx, e); err != nil {
@@ -286,19 +286,19 @@ func TestQuery(t *testing.T) {
 			wantIDs: []string{seed[0].ID, seed[1].ID, seed[2].ID, seed[3].ID},
 		},
 		{
-			name:    "type prefix mqtt.",
-			filter:  Filter{TypePrefix: "mqtt."},
+			name:    "type prefix trove://type/mqtt/",
+			filter:  Filter{TypePrefix: "trove://type/mqtt/"},
 			wantIDs: []string{seed[0].ID, seed[1].ID, seed[3].ID},
 		},
 		{
 			name:    "exact type match",
-			filter:  Filter{Type: "mqtt.sensor.temp"},
+			filter:  Filter{Type: "trove://type/mqtt/sensor/temp/1"},
 			wantIDs: []string{seed[0].ID, seed[3].ID},
 		},
 		{
 			name: "exact type with time range",
 			filter: Filter{
-				Type:     "mqtt.sensor.temp",
+				Type:     "trove://type/mqtt/sensor/temp/1",
 				TimeFrom: &t1,
 				TimeTo:   &t2,
 			},
@@ -332,7 +332,7 @@ func TestQuery(t *testing.T) {
 		{
 			name: "combined filters",
 			filter: Filter{
-				TypePrefix: "mqtt.",
+				TypePrefix: "trove://type/mqtt/",
 				Source:     "sensor-a",
 				TimeFrom:   &t1,
 				TimeTo:     &t2,
@@ -379,8 +379,8 @@ func TestQueryText(t *testing.T) {
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 
 	seed := []Event{
-		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
-		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"room":"kitchen"}`)},
 	}
 	for _, e := range seed {
@@ -413,7 +413,7 @@ func TestQueryText(t *testing.T) {
 			name: "text with type prefix",
 			filter: Filter{
 				Text:       "balmy",
-				TypePrefix: "mqtt.",
+				TypePrefix: "trove://type/mqtt/",
 			},
 			wantIDs: []string{seed[0].ID},
 		},

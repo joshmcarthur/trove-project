@@ -1,8 +1,9 @@
 {
-  "$id": "trove://type/http/ingest/received/1",
-  "title": "HTTP ingest received",
+  "$id": "trove://type/note/bookmark/1",
+  "title": "Bookmark",
   "definition": {
     "optionalProperties": {
+      "url": { "type": "string" },
       "title": { "type": "string" },
       "text": { "type": "string" }
     }

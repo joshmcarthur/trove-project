@@ -1,13 +1,11 @@
 {
   "$id": "trove://type/classify/assigned/1",
-  "title": "Assigned capture",
+  "title": "Classification assignment",
   "definition": {
     "properties": {
-      "type": { "type": "string" },
-      "body": { "type": "string" }
-    },
-    "optionalProperties": {
-      "caption": { "type": "string" }
+      "source_event_id": { "type": "string" },
+      "target_event_id": { "type": "string" },
+      "target_type": { "type": "string" }
     }
   }
 }

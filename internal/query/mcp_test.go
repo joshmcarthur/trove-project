@@ -24,7 +24,7 @@ func TestMCPGetEvent(t *testing.T) {
 	want := journal.Event{
 		ID:      id,
 		Time:    when,
-		Type:    "http.ingest.received",
+		Type:    "trove://type/http/ingest/received/1",
 		Source:  "shortcuts",
 		Payload: json.RawMessage(`{"text":"hello"}`),
 	}
@@ -123,7 +123,7 @@ func TestMCPSearchEvents(t *testing.T) {
 	want := journal.Event{
 		ID:      id,
 		Time:    when,
-		Type:    "http.ingest.received",
+		Type:    "trove://type/http/ingest/received/1",
 		Source:  "shortcuts",
 		Payload: json.RawMessage(`{"text":"hello world"}`),
 	}
@@ -147,7 +147,7 @@ func TestMCPSearchEvents(t *testing.T) {
 		Name: "search_events",
 		Arguments: map[string]any{
 			"query":       "hello",
-			"type_prefix": "http.",
+			"type_prefix": "trove://type/http/",
 			"source":      "shortcuts",
 		},
 	})
@@ -217,8 +217,8 @@ func TestMCPGetEventsByType(t *testing.T) {
 	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
 
 	seed := []journal.Event{
-		{ID: "01JEVT00000000000000000001", Time: t1, Type: "mqtt.sensor.temp", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
-		{ID: "01JEVT00000000000000000002", Time: t2, Type: "mqtt.sensor.humidity", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
+		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
+		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
 	}
 	for _, e := range seed {
 		if err := store.Append(ctx, e); err != nil {
@@ -241,7 +241,7 @@ func TestMCPGetEventsByType(t *testing.T) {
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "get_events_by_type",
 		Arguments: map[string]any{
-			"type":      "mqtt.sensor.temp",
+			"type":      "trove://type/mqtt/sensor/temp/1",
 			"time_from": t1.Format(time.RFC3339),
 			"time_to":   t2.Format(time.RFC3339),
 		},
@@ -312,7 +312,7 @@ func TestMCPSummarizeRange(t *testing.T) {
 	want := journal.Event{
 		ID:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		Time:    when,
-		Type:    "http.ingest.received",
+		Type:    "trove://type/http/ingest/received/1",
 		Source:  "shortcuts",
 		Payload: json.RawMessage(`{"text":"hello"}`),
 	}
@@ -363,8 +363,8 @@ func TestMCPSummarizeRange(t *testing.T) {
 	if got.Total != 1 {
 		t.Errorf("Total = %d, want 1", got.Total)
 	}
-	if got.ByType["http.ingest.received"] != 1 {
-		t.Errorf("ByType[http.ingest.received] = %d, want 1", got.ByType["http.ingest.received"])
+	if got.ByType["trove://type/http/ingest/received/1"] != 1 {
+		t.Errorf("ByType[trove://type/http/ingest/received/1] = %d, want 1", got.ByType["trove://type/http/ingest/received/1"])
 	}
 	if len(got.Notable) != 1 || got.Notable[0].ID != want.ID {
 		t.Errorf("Notable = %#v, want event %q", got.Notable, want.ID)

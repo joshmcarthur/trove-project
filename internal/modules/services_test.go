@@ -108,14 +108,14 @@ func TestCoreServicesGetEvent(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Second)
 	if err := j.Append(context.Background(), journal.Event{
-		Type:    "note.created",
+		Type:    "trove://type/note/created/1",
 		Source:  "test",
 		Time:    now,
 		Payload: []byte(`{"title":"hello"}`),
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
-	events, err := j.Query(context.Background(), journal.Filter{TypePrefix: "note."})
+	events, err := j.Query(context.Background(), journal.Filter{TypePrefix: "trove://type/note/"})
 	if err != nil || len(events) != 1 {
 		t.Fatalf("Query() = %v, %d events", err, len(events))
 	}
@@ -144,7 +144,7 @@ func TestCoreServicesCallMCPTool(t *testing.T) {
 
 	resp, err := srv.CallMCPTool(context.Background(), &troverpc.MCPToolCallRequest{
 		Name:          "classify_event",
-		ArgumentsJson: []byte(`{"source_event_id":"01JTEST","target_type":"note.created"}`),
+		ArgumentsJson: []byte(`{"source_event_id":"01JTEST","target_type":"trove://type/note/created/1"}`),
 	})
 	if err != nil {
 		t.Fatalf("CallMCPTool() error = %v", err)

@@ -26,6 +26,7 @@ func TestE2EIngestAndMCPQuery(t *testing.T) {
 
 	repoRoot := findRepoRoot(t)
 	bin := buildTroveBinary(t, repoRoot)
+	modulesRoot := buildE2EModules(t, repoRoot)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -45,11 +46,11 @@ path = %q
 path = %q
 
 [modules]
-paths = []
+paths = [%q]
 
 [http]
 listen = %q
-`, journalPath, blobsPath, addr)
+`, journalPath, blobsPath, modulesRoot, addr)
 	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -72,7 +73,7 @@ listen = %q
 	waitForIngest(t, addr, 15*time.Second)
 
 	unique := fmt.Sprintf("e2e-marker-%d", time.Now().UnixNano())
-	payload := fmt.Sprintf(`{"type":"http.ingest.received","text":%q}`, unique)
+	payload := fmt.Sprintf(`{"type":"trove://type/http/ingest/received/1","text":%q}`, unique)
 	postIngestUntilOK(t, "http://"+addr+"/ingest/e2e", payload, 15*time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -194,6 +195,42 @@ func buildTroveBinary(t *testing.T, repoRoot string) string {
 	return bin
 }
 
+func buildE2EModules(t *testing.T, repoRoot string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "modules")
+	builtinDst := filepath.Join(filepath.Dir(root), "types", "builtin")
+	if err := copyDir(filepath.Join(repoRoot, "types", "builtin"), builtinDst); err != nil {
+		t.Fatalf("copy builtin types: %v", err)
+	}
+	for _, mod := range []string{"http-ingest", "mcp-query"} {
+		dst := filepath.Join(root, mod)
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", mod, err)
+		}
+		manifest, err := os.ReadFile(filepath.Join(repoRoot, "modules", mod, "manifest.toml"))
+		if err != nil {
+			t.Fatalf("read manifest %s: %v", mod, err)
+		}
+		if err := os.WriteFile(filepath.Join(dst, "manifest.toml"), manifest, 0o644); err != nil {
+			t.Fatalf("write manifest %s: %v", mod, err)
+		}
+		binary := filepath.Join(dst, "module")
+		src := "./modules/http-ingest/cmd"
+		if mod == "mcp-query" {
+			src = "./modules/mcp-query/cmd"
+		}
+		cmd := exec.Command("go", "build", "-o", binary, src)
+		cmd.Dir = repoRoot
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("build %s: %v\n%s", mod, err, out)
+		}
+		if err := os.Chmod(binary, 0o755); err != nil {
+			t.Fatalf("chmod %s: %v", mod, err)
+		}
+	}
+	return root
+}
+
 func waitForTCP(t *testing.T, addr string, timeout time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -206,4 +243,41 @@ func waitForTCP(t *testing.T, addr string, timeout time.Duration) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatalf("server at %s did not become ready within %s", addr, timeout)
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		return copyFile(path, target)
+	})
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close()
 }

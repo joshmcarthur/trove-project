@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const defaultEventType = "http.ingest.received"
+const defaultEventType = "trove://type/http/ingest/received/1"
 
 type putBlobResponse struct {
 	BlobRef string `json:"blob_ref"`

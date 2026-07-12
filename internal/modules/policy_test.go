@@ -190,7 +190,7 @@ func TestLoadIngestPolicyRequiresCatalog(t *testing.T) {
 		Name:     "test-source",
 		Version:  "1.0",
 		Kind:     KindSource,
-		Provides: []string{"note.created"},
+		Provides: []string{"trove://type/note/created/1"},
 	}, nil, false)
 	if err == nil || !strings.Contains(err.Error(), "catalog is required") {
 		t.Fatalf("LoadIngestPolicy() error = %v, want catalog required", err)

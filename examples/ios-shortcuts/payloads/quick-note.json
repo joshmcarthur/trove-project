@@ -1,5 +1,5 @@
 {
-  "type": "shortcuts.note.created",
-  "text": "Remember to call the plumber tomorrow.",
-  "tags": ["home", "todo"]
+  "type": "trove://type/note/created/1",
+  "title": "Quick note from Shortcuts",
+  "body": "Captured text"
 }

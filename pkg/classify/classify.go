@@ -15,9 +15,9 @@ import (
 
 const (
 	// PendingType is the event type for quick captures awaiting classification.
-	PendingType = "classify.pending"
+	PendingType = "trove://type/classify/pending/1"
 	// AssignedType records a completed classification.
-	AssignedType = "classify.assigned"
+	AssignedType = "trove://type/classify/assigned/1"
 )
 
 // ErrNotFound indicates the source event does not exist.

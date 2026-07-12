@@ -103,7 +103,7 @@ func TestHandleClassify(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]string{
 		"source_event_id": pendingID,
-		"target_type":     "shortcuts.note.created",
+		"target_type":     "trove://type/note/created/1",
 	})
 	resp, err := handleClassify(context.Background(), j, testConfig(), &troverpc.HTTPRequest{
 		Method:         "POST",

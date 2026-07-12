@@ -5,10 +5,10 @@ import "testing"
 func TestMatchType(t *testing.T) {
 	t.Parallel()
 
-	if !MatchType([]string{"note.*"}, "note.created") {
-		t.Fatal("MatchType(note.*, note.created) = false, want true")
+	if !MatchType([]string{"trove://type/note/*"}, "trove://type/note/created/1") {
+		t.Fatal("MatchType(trove://type/note/*, trove://type/note/created/1) = false, want true")
 	}
-	if MatchType([]string{"note.*"}, "mqtt.foo") {
-		t.Fatal("MatchType(note.*, mqtt.foo) = true, want false")
+	if MatchType([]string{"trove://type/note/*"}, "trove://type/mqtt/foo/1") {
+		t.Fatal("MatchType(trove://type/note/*, trove://type/mqtt/foo/1) = true, want false")
 	}
 }
