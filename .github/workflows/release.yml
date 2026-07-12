@@ -3,8 +3,8 @@ name: Release
 on:
   push:
     branches: [main]
-  release:
-    types: [created]
+    tags: ["v*"]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -12,7 +12,7 @@ env:
 
 jobs:
   update-latest:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -33,30 +33,34 @@ jobs:
 
       - name: Create 'latest' release
         run: |
-          gh release create latest --title "Latest Development Build" --notes "This is an automatically updated release containing the latest changes from the main branch." --prerelease
+          gh release create latest --title "Latest Development Build" --notes "Rolling prerelease from main. For stable releases, use a semver tag." --prerelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-binaries:
+  build-latest:
     needs: [update-latest]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.event_name == 'push' || github.event_name == 'release'
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
             suffix: trove-linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: trove-linux-arm64
           - goos: windows
             goarch: amd64
             suffix: trove-windows-amd64.exe
           - goos: darwin
+            goarch: amd64
+            suffix: trove-darwin-amd64
+          - goos: darwin
             goarch: arm64
             suffix: trove-darwin-arm64
-
-    runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v7
 
@@ -69,26 +73,112 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          VERSION: ${{ github.event_name == 'push' && 'latest' || github.ref_name }}
+          VERSION: latest
         run: |
-          go build -ldflags "-X main.version=${VERSION}" -o ${{ matrix.suffix }} ./cmd/trove
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          go build -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${SHORT_SHA} -X main.date=${DATE}" -o ${{ matrix.suffix }} ./cmd/trove
 
-      - name: Upload binary to release
+      - name: Upload binary to latest release
         uses: softprops/action-gh-release@v3
         with:
           files: ${{ matrix.suffix }}
-          tag_name: ${{ github.event_name == 'push' && 'latest' || github.ref }}
+          tag_name: latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-docker:
+  build-latest-checksums:
+    needs: [build-latest]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download latest release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download latest --dir dist
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum trove-* > checksums.txt
+          cat checksums.txt
+
+      - name: Upload checksums to latest release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/checksums.txt
+          tag_name: latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  goreleaser:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  build-docker-latest:
     needs: [update-latest]
-    if: github.event_name == 'push' || github.event_name == 'release'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    steps:
+      - uses: actions/checkout@v7
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push latest Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            VERSION=latest
+            COMMIT=${{ github.sha }}
+            DATE=${{ github.event.head_commit.timestamp || 'unknown' }}
+
+  build-docker-release:
+    needs: [goreleaser]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
@@ -108,11 +198,15 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
-      - name: Build and push Docker image
+      - name: Resolve build version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push release Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -120,3 +214,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ github.event.head_commit.timestamp || 'unknown' }}

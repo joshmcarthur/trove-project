@@ -42,7 +42,16 @@ to retrieve.
 | Go formatting & linting | `make fmt`, `make lint` (see Makefile) |
 | Tests | `make test` — table-driven, race detector enabled in CI |
 | Config format | TOML per [docs/getting-started/configuration.md](docs/getting-started/configuration.md) |
+| Commit messages / PR titles | [docs/contributing.md](docs/contributing.md) — Conventional Commits (`feat:`, `fix:`, …) |
 | License | GPLv3 |
+
+## Pull requests
+
+- Use **Conventional Commits** for PR titles: `feat: …`, `fix: …`, `docs: …`, etc.
+- Never use free-form titles like `Add mqtt support` or `WIP` — CI rejects them.
+- Breaking changes: `feat!:` or `fix!:` (e.g. `feat!: rename journal.path config key`).
+- The PR title becomes the squash-merge commit on `main`, which drives release-please versioning.
+- See [docs/contributing.md](docs/contributing.md) for the full prefix table.
 
 ## Go layout
 
@@ -60,6 +69,7 @@ internal/config/    — TOML config loader
 1. Mark acceptance criteria on the planning page.
 2. Update status in [docs/roadmap.md](docs/roadmap.md).
 3. Run `make check` before opening a PR.
+4. Use a Conventional Commit PR title (`feat:`, `fix:`, `docs:`, etc.).
 
 ## Cursor Cloud specific instructions
 

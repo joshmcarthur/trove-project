@@ -21,9 +21,7 @@ import (
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
-// version is set at build time via -ldflags "-X main.version=..."
-var version = "dev"
-
+// version is injected at build time via -ldflags; see version.go.
 func main() {
 	if name := strings.TrimSpace(os.Getenv(trovemodule.BundledModuleEnv)); name != "" {
 		bundled.Serve(name)
@@ -35,7 +33,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println(version)
+		fmt.Println(versionString())
 		os.Exit(0)
 	}
 

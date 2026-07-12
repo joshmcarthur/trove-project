@@ -11,28 +11,90 @@ Trove ships as a single Go binary (and Docker image). With a valid config file,
 ingest capture works today — see [Quick Start](./quick-start.md) and
 [iOS Shortcuts](./ios-shortcuts.md).
 
-## From releases
+## Release channels
 
-Download the latest build for your platform from
-[GitHub Releases](https://github.com/joshmcarthur/trove/releases).
+| Channel | Source | Use when |
+|---------|--------|----------|
+| **Stable** | Semver tags (`v0.1.0`) on [GitHub Releases](https://github.com/joshmcarthur/trove/releases) | Production installs, package managers |
+| **Rolling** | `latest` prerelease (rebuilt on every `main` push) | Trying the newest changes |
+
+Stable releases ship `.tar.gz` archives, `.deb`/`.rpm` packages, and `checksums.txt`.
+The rolling `latest` channel ships raw platform binaries.
+
+## Homebrew (macOS and Linux)
+
+After the `homebrew-trove` tap is configured:
+
+```bash
+brew install joshmcarthur/trove/trove
+trove -version
+```
+
+## Debian and Ubuntu
+
+Download the `.deb` for your architecture from the stable release page, then:
+
+```bash
+curl -LO https://github.com/joshmcarthur/trove/releases/download/v0.1.0/trove_0.1.0_linux_amd64.deb
+sudo dpkg -i trove_0.1.0_linux_amd64.deb
+trove -version
+```
+
+Replace `v0.1.0` and `amd64` with the version and architecture you need.
+
+## Fedora and RHEL
+
+```bash
+curl -LO https://github.com/joshmcarthur/trove/releases/download/v0.1.0/trove_0.1.0_linux_amd64.rpm
+sudo rpm -i trove_0.1.0_linux_amd64.rpm
+trove -version
+```
+
+## From releases (manual download)
+
+### Stable (recommended)
+
+```bash
+VERSION=v0.1.0
+
+# Linux amd64
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove_0.1.0_linux_amd64.tar.gz"
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/checksums.txt"
+sha256sum -c checksums.txt --ignore-missing
+tar -xzf trove_0.1.0_linux_amd64.tar.gz
+sudo install -m 755 trove /usr/local/bin/trove
+
+# macOS arm64
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove_0.1.0_darwin_arm64.tar.gz"
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/checksums.txt"
+shasum -a 256 -c checksums.txt --ignore-missing
+tar -xzf trove_0.1.0_darwin_arm64.tar.gz
+sudo install -m 755 trove /usr/local/bin/trove
+```
+
+### Rolling (`latest`)
 
 ```bash
 # Linux amd64
 curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/trove-linux-amd64
+curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/checksums.txt
+sha256sum -c checksums.txt --ignore-missing
 chmod +x trove-linux-amd64
 
 # macOS arm64
 curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/trove-darwin-arm64
+curl -LO https://github.com/joshmcarthur/trove/releases/latest/download/checksums.txt
+shasum -a 256 -c checksums.txt --ignore-missing
 chmod +x trove-darwin-arm64
-
-# Windows amd64
-# Download trove-windows-amd64.exe from the release page
 ```
+
+Windows: download `trove-windows-amd64.exe` from the release page.
 
 Verify:
 
 ```bash
-./trove-darwin-arm64 -version
+trove -version
+# 0.1.0 (abc1234, 2026-07-12)
 ```
 
 ## Build from source
@@ -46,12 +108,23 @@ make build
 ./bin/trove -version
 ```
 
+`make build` injects version metadata from `git describe` and the current commit.
+
 ## Docker
 
 ```bash
 docker pull ghcr.io/joshmcarthur/trove:latest
 docker run --rm ghcr.io/joshmcarthur/trove:latest -version
 ```
+
+Pin a stable release with a semver tag, e.g. `ghcr.io/joshmcarthur/trove:0.1.0`.
+
+## External modules
+
+Release binaries include built-in modules (`http-ingest`, `mcp-query`,
+`type-catalog`). Optional modules (`mqtt-source`, `telegram-source`,
+`http-gateway`, etc.) are not bundled — build them with `make build` and install
+under `[modules].paths`. See [Building modules](../building-modules.md).
 
 ## System requirements
 
