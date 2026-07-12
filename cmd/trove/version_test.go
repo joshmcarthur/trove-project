@@ -2,7 +2,7 @@ package main
 
 import "testing"
 
-func TestVersionString(t *testing.T) {
+func TestFormatVersion(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -32,17 +32,8 @@ func TestVersionString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			version = tt.version
-			commit = tt.commit
-			date = tt.date
-			t.Cleanup(func() {
-				version = "dev"
-				commit = "none"
-				date = ""
-			})
-
-			if got := versionString(); got != tt.want {
-				t.Errorf("versionString() = %q, want %q", got, tt.want)
+			if got := formatVersion(tt.version, tt.commit, tt.date); got != tt.want {
+				t.Errorf("formatVersion() = %q, want %q", got, tt.want)
 			}
 		})
 	}

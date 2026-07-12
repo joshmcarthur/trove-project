@@ -10,6 +10,10 @@ var (
 )
 
 func versionString() string {
+	return formatVersion(version, commit, date)
+}
+
+func formatVersion(version, commit, date string) string {
 	if commit == "none" && date == "" {
 		return version
 	}
