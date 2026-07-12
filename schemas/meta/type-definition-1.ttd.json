@@ -1,0 +1,11 @@
+{
+  "$id": "trove://type/note/created/1",
+  "title": "Note created",
+  "description": "A journal entry created from a note capture.",
+  "definition": {
+    "properties": {
+      "title": { "type": "string" }
+    }
+  },
+  "status": "active"
+}
