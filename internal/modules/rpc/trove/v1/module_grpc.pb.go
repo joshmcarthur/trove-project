@@ -8,6 +8,7 @@ package troverpc
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -19,14 +20,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CoreServices_Emit_FullMethodName            = "/trove.v1.CoreServices/Emit"
-	CoreServices_BlobPut_FullMethodName         = "/trove.v1.CoreServices/BlobPut"
-	CoreServices_GetEvent_FullMethodName        = "/trove.v1.CoreServices/GetEvent"
-	CoreServices_SearchEvents_FullMethodName    = "/trove.v1.CoreServices/SearchEvents"
-	CoreServices_GetEventsByType_FullMethodName = "/trove.v1.CoreServices/GetEventsByType"
-	CoreServices_SummarizeRange_FullMethodName  = "/trove.v1.CoreServices/SummarizeRange"
-	CoreServices_ListMCPTools_FullMethodName    = "/trove.v1.CoreServices/ListMCPTools"
-	CoreServices_CallMCPTool_FullMethodName     = "/trove.v1.CoreServices/CallMCPTool"
+	CoreServices_Emit_FullMethodName                   = "/trove.v1.CoreServices/Emit"
+	CoreServices_BlobPut_FullMethodName                = "/trove.v1.CoreServices/BlobPut"
+	CoreServices_GetEvent_FullMethodName               = "/trove.v1.CoreServices/GetEvent"
+	CoreServices_SearchEvents_FullMethodName           = "/trove.v1.CoreServices/SearchEvents"
+	CoreServices_GetEventsByType_FullMethodName        = "/trove.v1.CoreServices/GetEventsByType"
+	CoreServices_SummarizeRange_FullMethodName         = "/trove.v1.CoreServices/SummarizeRange"
+	CoreServices_ListMCPTools_FullMethodName           = "/trove.v1.CoreServices/ListMCPTools"
+	CoreServices_CallMCPTool_FullMethodName            = "/trove.v1.CoreServices/CallMCPTool"
+	CoreServices_ListTypes_FullMethodName              = "/trove.v1.CoreServices/ListTypes"
+	CoreServices_GetType_FullMethodName                = "/trove.v1.CoreServices/GetType"
+	CoreServices_ExportType_FullMethodName             = "/trove.v1.CoreServices/ExportType"
+	CoreServices_ValidateTypeDefinition_FullMethodName = "/trove.v1.CoreServices/ValidateTypeDefinition"
 )
 
 // CoreServicesClient is the client API for CoreServices service.
@@ -45,6 +50,10 @@ type CoreServicesClient interface {
 	SummarizeRange(ctx context.Context, in *SummarizeRangeRequest, opts ...grpc.CallOption) (*Summary, error)
 	ListMCPTools(ctx context.Context, in *ListMCPToolsRequest, opts ...grpc.CallOption) (*ListMCPToolsResponse, error)
 	CallMCPTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error)
+	ListTypes(ctx context.Context, in *ListTypesRequest, opts ...grpc.CallOption) (*ListTypesResponse, error)
+	GetType(ctx context.Context, in *GetTypeRequest, opts ...grpc.CallOption) (*GetTypeResponse, error)
+	ExportType(ctx context.Context, in *ExportTypeRequest, opts ...grpc.CallOption) (*ExportTypeResponse, error)
+	ValidateTypeDefinition(ctx context.Context, in *ValidateTypeDefinitionRequest, opts ...grpc.CallOption) (*ValidateTypeDefinitionResponse, error)
 }
 
 type coreServicesClient struct {
@@ -135,6 +144,46 @@ func (c *coreServicesClient) CallMCPTool(ctx context.Context, in *MCPToolCallReq
 	return out, nil
 }
 
+func (c *coreServicesClient) ListTypes(ctx context.Context, in *ListTypesRequest, opts ...grpc.CallOption) (*ListTypesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTypesResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ListTypes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) GetType(ctx context.Context, in *GetTypeRequest, opts ...grpc.CallOption) (*GetTypeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTypeResponse)
+	err := c.cc.Invoke(ctx, CoreServices_GetType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) ExportType(ctx context.Context, in *ExportTypeRequest, opts ...grpc.CallOption) (*ExportTypeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportTypeResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ExportType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) ValidateTypeDefinition(ctx context.Context, in *ValidateTypeDefinitionRequest, opts ...grpc.CallOption) (*ValidateTypeDefinitionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateTypeDefinitionResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ValidateTypeDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoreServicesServer is the server API for CoreServices service.
 // All implementations must embed UnimplementedCoreServicesServer
 // for forward compatibility.
@@ -151,6 +200,10 @@ type CoreServicesServer interface {
 	SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error)
 	ListMCPTools(context.Context, *ListMCPToolsRequest) (*ListMCPToolsResponse, error)
 	CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error)
+	ListTypes(context.Context, *ListTypesRequest) (*ListTypesResponse, error)
+	GetType(context.Context, *GetTypeRequest) (*GetTypeResponse, error)
+	ExportType(context.Context, *ExportTypeRequest) (*ExportTypeResponse, error)
+	ValidateTypeDefinition(context.Context, *ValidateTypeDefinitionRequest) (*ValidateTypeDefinitionResponse, error)
 	mustEmbedUnimplementedCoreServicesServer()
 }
 
@@ -184,6 +237,18 @@ func (UnimplementedCoreServicesServer) ListMCPTools(context.Context, *ListMCPToo
 }
 func (UnimplementedCoreServicesServer) CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CallMCPTool not implemented")
+}
+func (UnimplementedCoreServicesServer) ListTypes(context.Context, *ListTypesRequest) (*ListTypesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTypes not implemented")
+}
+func (UnimplementedCoreServicesServer) GetType(context.Context, *GetTypeRequest) (*GetTypeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetType not implemented")
+}
+func (UnimplementedCoreServicesServer) ExportType(context.Context, *ExportTypeRequest) (*ExportTypeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportType not implemented")
+}
+func (UnimplementedCoreServicesServer) ValidateTypeDefinition(context.Context, *ValidateTypeDefinitionRequest) (*ValidateTypeDefinitionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidateTypeDefinition not implemented")
 }
 func (UnimplementedCoreServicesServer) mustEmbedUnimplementedCoreServicesServer() {}
 func (UnimplementedCoreServicesServer) testEmbeddedByValue()                      {}
@@ -350,6 +415,78 @@ func _CoreServices_CallMCPTool_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoreServices_ListTypes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTypesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ListTypes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ListTypes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ListTypes(ctx, req.(*ListTypesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_GetType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).GetType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_GetType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).GetType(ctx, req.(*GetTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_ExportType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ExportType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ExportType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ExportType(ctx, req.(*ExportTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_ValidateTypeDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateTypeDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ValidateTypeDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ValidateTypeDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ValidateTypeDefinition(ctx, req.(*ValidateTypeDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoreServices_ServiceDesc is the grpc.ServiceDesc for CoreServices service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -388,6 +525,22 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CallMCPTool",
 			Handler:    _CoreServices_CallMCPTool_Handler,
+		},
+		{
+			MethodName: "ListTypes",
+			Handler:    _CoreServices_ListTypes_Handler,
+		},
+		{
+			MethodName: "GetType",
+			Handler:    _CoreServices_GetType_Handler,
+		},
+		{
+			MethodName: "ExportType",
+			Handler:    _CoreServices_ExportType_Handler,
+		},
+		{
+			MethodName: "ValidateTypeDefinition",
+			Handler:    _CoreServices_ValidateTypeDefinition_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -706,6 +859,112 @@ var MCPModule_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CallTool",
 			Handler:    _MCPModule_CallTool_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "trove/v1/module.proto",
+}
+
+const (
+	CLIModule_RunCommand_FullMethodName = "/trove.v1.CLIModule/RunCommand"
+)
+
+// CLIModuleClient is the client API for CLIModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// CLIModule is implemented by modules that provide CLI commands.
+type CLIModuleClient interface {
+	RunCommand(ctx context.Context, in *CLICommandRequest, opts ...grpc.CallOption) (*CLICommandResponse, error)
+}
+
+type cLIModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCLIModuleClient(cc grpc.ClientConnInterface) CLIModuleClient {
+	return &cLIModuleClient{cc}
+}
+
+func (c *cLIModuleClient) RunCommand(ctx context.Context, in *CLICommandRequest, opts ...grpc.CallOption) (*CLICommandResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CLICommandResponse)
+	err := c.cc.Invoke(ctx, CLIModule_RunCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CLIModuleServer is the server API for CLIModule service.
+// All implementations must embed UnimplementedCLIModuleServer
+// for forward compatibility.
+//
+// CLIModule is implemented by modules that provide CLI commands.
+type CLIModuleServer interface {
+	RunCommand(context.Context, *CLICommandRequest) (*CLICommandResponse, error)
+	mustEmbedUnimplementedCLIModuleServer()
+}
+
+// UnimplementedCLIModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedCLIModuleServer struct{}
+
+func (UnimplementedCLIModuleServer) RunCommand(context.Context, *CLICommandRequest) (*CLICommandResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunCommand not implemented")
+}
+func (UnimplementedCLIModuleServer) mustEmbedUnimplementedCLIModuleServer() {}
+func (UnimplementedCLIModuleServer) testEmbeddedByValue()                   {}
+
+// UnsafeCLIModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CLIModuleServer will
+// result in compilation errors.
+type UnsafeCLIModuleServer interface {
+	mustEmbedUnimplementedCLIModuleServer()
+}
+
+func RegisterCLIModuleServer(s grpc.ServiceRegistrar, srv CLIModuleServer) {
+	// If the following call panics, it indicates UnimplementedCLIModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&CLIModule_ServiceDesc, srv)
+}
+
+func _CLIModule_RunCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CLICommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CLIModuleServer).RunCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CLIModule_RunCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CLIModuleServer).RunCommand(ctx, req.(*CLICommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// CLIModule_ServiceDesc is the grpc.ServiceDesc for CLIModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CLIModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "trove.v1.CLIModule",
+	HandlerType: (*CLIModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RunCommand",
+			Handler:    _CLIModule_RunCommand_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

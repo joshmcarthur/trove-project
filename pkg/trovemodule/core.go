@@ -9,12 +9,13 @@ import (
 )
 
 // Core is the module's connection to the Trove parent process. Use it to append
-// events, store blobs, read the journal, and invoke module MCP tools.
+// events, store blobs, read the journal, invoke module MCP tools, and introspect types.
 type Core interface {
 	Emitter
 	BlobPutter
 	Querier
 	MCPToolCaller
+	TypeCatalogReader
 }
 
 // Module is the main entry contract for trovemodule.Serve. Implement Run to
@@ -123,6 +124,61 @@ func (c *coreConn) CallMCPTool(ctx context.Context, name string, arguments json.
 		return nil, &mcpToolError{msg: msg}
 	}
 	return resp.GetResultJson(), nil
+}
+
+func (c *coreConn) ListTypes(ctx context.Context, sourceFilter string) ([]TypeSummary, error) {
+	resp, err := c.client.ListTypes(ctx, &troverpc.ListTypesRequest{SourceFilter: sourceFilter})
+	if err != nil {
+		return nil, err
+	}
+	return protoTypeSummaries(resp.GetTypes()), nil
+}
+
+func (c *coreConn) GetType(ctx context.Context, uri string) (TypeSummary, json.RawMessage, error) {
+	resp, err := c.client.GetType(ctx, &troverpc.GetTypeRequest{Uri: uri})
+	if err != nil {
+		return TypeSummary{}, nil, err
+	}
+	return protoTypeSummary(resp.GetSummary()), json.RawMessage(resp.GetDefinitionJson()), nil
+}
+
+func (c *coreConn) ExportType(ctx context.Context, uri string) ([]byte, string, error) {
+	resp, err := c.client.ExportType(ctx, &troverpc.ExportTypeRequest{Uri: uri})
+	if err != nil {
+		return nil, "", err
+	}
+	return resp.GetTtdJson(), resp.GetSchemaRef(), nil
+}
+
+func (c *coreConn) ValidateTypeDefinition(ctx context.Context, ttdJSON []byte) (bool, string, string, error) {
+	resp, err := c.client.ValidateTypeDefinition(ctx, &troverpc.ValidateTypeDefinitionRequest{TtdJson: ttdJSON})
+	if err != nil {
+		return false, "", "", err
+	}
+	return resp.GetValid(), resp.GetUri(), resp.GetError(), nil
+}
+
+func protoTypeSummaries(in []*troverpc.TypeSummary) []TypeSummary {
+	out := make([]TypeSummary, 0, len(in))
+	for _, s := range in {
+		out = append(out, protoTypeSummary(s))
+	}
+	return out
+}
+
+func protoTypeSummary(s *troverpc.TypeSummary) TypeSummary {
+	if s == nil {
+		return TypeSummary{}
+	}
+	return TypeSummary{
+		URI:         s.GetUri(),
+		Title:       s.GetTitle(),
+		Description: s.GetDescription(),
+		Source:      s.GetSource(),
+		SourcePath:  s.GetSourcePath(),
+		SchemaRef:   s.GetSchemaRef(),
+		Status:      s.GetStatus(),
+	}
 }
 
 type mcpToolError struct {

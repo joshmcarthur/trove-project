@@ -47,6 +47,8 @@ Build order from spec §11:
 | Network auth (HTTP ingest + MCP) | Supported | §13 | [auth](./planning/auth.md) | `internal/gateway` + `modules/http-gateway` |
 | Journal retention / pruning | Supported | §13 | [journal](./planning/journal.md) | `internal/journal` |
 | Type catalog | Supported | §3, §8 | [type-catalog](./planning/type-catalog.md) | `internal/types` |
+| CLI command registration | Supported | §8 | [cli-commands](./planning/cli-commands.md) | `internal/modules` + `cmd/trove` |
+| Type introspection (CLI + MCP) | Supported | §3, §8 | [type-introspection](./planning/type-introspection.md) | `modules/type-catalog` |
 | HA WebSocket tap | Later | §6 | [ha-source](./planning/ha-source.md) | external module |
 | Remote modules (Tailscale) | Later | §8 | [remote-modules](./planning/remote-modules.md) | `internal/modules` |
 | Semantic search (sqlite-vec) | Later | §4 | [embeddings](./planning/embeddings.md) | `internal/journal` |

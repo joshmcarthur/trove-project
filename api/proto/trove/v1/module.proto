@@ -29,6 +29,10 @@ service CoreServices {
   rpc SummarizeRange(SummarizeRangeRequest) returns (Summary);
   rpc ListMCPTools(ListMCPToolsRequest) returns (ListMCPToolsResponse);
   rpc CallMCPTool(MCPToolCallRequest) returns (MCPToolCallResponse);
+  rpc ListTypes(ListTypesRequest) returns (ListTypesResponse);
+  rpc GetType(GetTypeRequest) returns (GetTypeResponse);
+  rpc ExportType(ExportTypeRequest) returns (ExportTypeResponse);
+  rpc ValidateTypeDefinition(ValidateTypeDefinitionRequest) returns (ValidateTypeDefinitionResponse);
 }
 
 message BlobPutRequest {
@@ -142,6 +146,68 @@ message MCPToolCallResponse {
 // MCPModule is implemented by modules that provide MCP tools.
 service MCPModule {
   rpc CallTool(MCPToolCallRequest) returns (MCPToolCallResponse);
+}
+
+message TypeSummary {
+  string uri = 1;
+  string title = 2;
+  string description = 3;
+  string source = 4;
+  string source_path = 5;
+  string schema_ref = 6;
+  string status = 7;
+}
+
+message ListTypesRequest {
+  string source_filter = 1;
+}
+
+message ListTypesResponse {
+  repeated TypeSummary types = 1;
+}
+
+message GetTypeRequest {
+  string uri = 1;
+}
+
+message GetTypeResponse {
+  TypeSummary summary = 1;
+  bytes definition_json = 2;
+}
+
+message ExportTypeRequest {
+  string uri = 1;
+}
+
+message ExportTypeResponse {
+  bytes ttd_json = 1;
+  string schema_ref = 2;
+}
+
+message ValidateTypeDefinitionRequest {
+  bytes ttd_json = 1;
+}
+
+message ValidateTypeDefinitionResponse {
+  bool valid = 1;
+  string uri = 2;
+  string error = 3;
+}
+
+message CLICommandRequest {
+  string command = 1;
+  repeated string args = 2;
+}
+
+message CLICommandResponse {
+  int32 exit_code = 1;
+  bytes stdout = 2;
+  bytes stderr = 3;
+}
+
+// CLIModule is implemented by modules that provide CLI commands.
+service CLIModule {
+  rpc RunCommand(CLICommandRequest) returns (CLICommandResponse);
 }
 
 message RunRequest {

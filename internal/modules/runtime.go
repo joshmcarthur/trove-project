@@ -44,6 +44,7 @@ func StartSource(
 	hasHTTP := len(manifest.HTTPRoutes()) > 0
 	hasAuth := len(manifest.AuthValidators()) > 0
 	hasMCPTools := len(manifest.MCPTools()) > 0
+	hasCLI := len(manifest.CLICommands()) > 0
 	needsSource := manifest.Kind == KindSource
 	hasProcessor := manifest.Kind == KindProcessor && manifest.EventRoutes()
 	hasSink := manifest.Kind == KindSink && manifest.EventRoutes()
@@ -53,6 +54,7 @@ func StartSource(
 	case hasHTTP:
 	case hasAuth:
 	case hasMCPTools:
+	case hasCLI:
 	case hasProcessor:
 	case hasSink:
 	default:
@@ -75,13 +77,14 @@ func StartSource(
 		hasProcessor: hasProcessor,
 		hasSink:      hasSink,
 		hasMCPTools:  hasMCPTools,
+		hasCLI:       hasCLI,
 		needsSource:  needsSource,
 	}
 
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: trovemodule.Handshake,
 		Plugins: hostPluginSet(
-			j, policy, manifest.Name, blobs, caps, mcpTools, toolModules, mcpRegistry,
+			j, policy, manifest.Name, blobs, caps, mcpTools, toolModules, mcpRegistry, catalog,
 		),
 		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},

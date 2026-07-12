@@ -9,6 +9,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
+	"github.com/joshmcarthur/trove/internal/types"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 	"google.golang.org/grpc"
 )
@@ -16,6 +17,7 @@ import (
 var errHTTPNotSupported = errors.New("modules: module does not support HTTP")
 var errMCPNotSupported = errors.New("modules: module does not support MCP tools")
 var errAuthNotSupported = errors.New("modules: module does not support auth")
+var errCLINotSupported = errors.New("modules: module does not support CLI commands")
 
 type moduleCapabilities struct {
 	hasHTTP      bool
@@ -23,6 +25,7 @@ type moduleCapabilities struct {
 	hasProcessor bool
 	hasSink      bool
 	hasMCPTools  bool
+	hasCLI       bool
 	needsSource  bool
 }
 
@@ -63,10 +66,12 @@ type moduleClient struct {
 	httpClient      troverpc.HTTPModuleClient
 	authClient      troverpc.AuthModuleClient
 	mcpClient       troverpc.MCPModuleClient
+	cliClient       troverpc.CLIModuleClient
 	broker          *plugin.GRPCBroker
 	journal         journal.Journal
 	policy          EmitPolicy
 	blobs           blob.Store
+	catalog         *types.Catalog
 	mcpTools        []MCPToolEntry
 	toolModules     map[string]string
 	mcpRegistry     *MCPRegistry
@@ -74,7 +79,7 @@ type moduleClient struct {
 }
 
 func (c *moduleClient) Run(ctx context.Context) error {
-	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools || c.caps.hasAuth
+	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools || c.caps.hasAuth || c.caps.hasCLI
 	if !needsPluginRun {
 		<-ctx.Done()
 		return ctx.Err()
@@ -91,6 +96,7 @@ func (c *moduleClient) Run(ctx context.Context) error {
 			journal:     c.journal,
 			policy:      c.policy,
 			blobs:       c.blobs,
+			catalog:     c.catalog,
 			query:       querySvc,
 			mcpTools:    c.mcpTools,
 			toolModules: c.toolModules,
@@ -137,6 +143,13 @@ func (c *moduleClient) CallTool(ctx context.Context, req *troverpc.MCPToolCallRe
 	return c.mcpClient.CallTool(ctx, req)
 }
 
+func (c *moduleClient) RunCommand(ctx context.Context, req *troverpc.CLICommandRequest) (*troverpc.CLICommandResponse, error) {
+	if !c.caps.hasCLI {
+		return nil, errCLINotSupported
+	}
+	return c.cliClient.RunCommand(ctx, req)
+}
+
 func (c *moduleClient) Process(ctx context.Context, event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
 	if !c.caps.hasProcessor {
 		return nil, errors.New("modules: module does not support Process")
@@ -176,6 +189,7 @@ type moduleGRPCPlugin struct {
 	policy      EmitPolicy
 	moduleName  string
 	blobs       blob.Store
+	catalog     *types.Catalog
 	mcpTools    []MCPToolEntry
 	toolModules map[string]string
 	mcpRegistry *MCPRegistry
@@ -190,10 +204,12 @@ func (p *moduleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBr
 		httpClient:      troverpc.NewHTTPModuleClient(c),
 		authClient:      troverpc.NewAuthModuleClient(c),
 		mcpClient:       troverpc.NewMCPModuleClient(c),
+		cliClient:       troverpc.NewCLIModuleClient(c),
 		broker:          broker,
 		journal:         p.journal,
 		policy:          p.policy,
 		blobs:           p.blobs,
+		catalog:         p.catalog,
 		mcpTools:        p.mcpTools,
 		toolModules:     p.toolModules,
 		mcpRegistry:     p.mcpRegistry,
@@ -214,6 +230,7 @@ func hostPluginSet(
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	mcpRegistry *MCPRegistry,
+	catalog *types.Catalog,
 ) map[string]plugin.Plugin {
 	return map[string]plugin.Plugin{
 		trovemodule.PluginName: &moduleGRPCPlugin{
@@ -221,6 +238,7 @@ func hostPluginSet(
 			policy:      policy,
 			moduleName:  moduleName,
 			blobs:       blobs,
+			catalog:     catalog,
 			mcpTools:    mcpTools,
 			toolModules: toolModules,
 			mcpRegistry: mcpRegistry,
