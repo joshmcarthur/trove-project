@@ -1,0 +1,7 @@
+name = "legacy"
+version = "1.0"
+kind = "source"
+provides = ["trove://type/example/event/1"]
+
+[schemas]
+"trove://type/example/event/1" = "schemas/event.json"

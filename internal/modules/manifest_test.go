@@ -187,6 +187,11 @@ func TestParseManifestInvalid(t *testing.T) {
 			file:    "invalid-consumes-star.toml",
 			wantErr: `pattern "*" is not allowed`,
 		},
+		{
+			name:    "legacy schemas",
+			file:    "invalid-legacy-schemas.toml",
+			wantErr: "[schemas] is removed",
+		},
 	}
 
 	for _, tt := range tests {
@@ -202,6 +207,26 @@ func TestParseManifestInvalid(t *testing.T) {
 				t.Errorf("ParseManifestFile() error = %q, want substring %q", err.Error(), tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestParseManifestRejectsLegacySchemas(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name = "legacy"
+version = "1.0"
+kind = "source"
+provides = ["trove://type/example/event/1"]
+
+[schemas]
+"trove://type/example/event/1" = "schemas/event.json"
+`)
+	_, err := ParseManifest(data)
+	if err == nil {
+		t.Fatal("ParseManifest() error = nil, want [schemas] rejection")
+	}
+	if !strings.Contains(err.Error(), "[schemas] is removed") {
+		t.Fatalf("ParseManifest() error = %q, want [schemas] removal message", err.Error())
 	}
 }
 

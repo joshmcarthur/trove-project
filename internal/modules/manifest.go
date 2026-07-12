@@ -64,7 +64,6 @@ type Manifest struct {
 	Kind     Kind               `toml:"kind"`
 	Provides []string           `toml:"provides"`
 	Consumes []string           `toml:"consumes"`
-	Schemas  map[string]string  `toml:"schemas"`
 	Types    []ManifestTypeDecl `toml:"types"`
 	HTTP     manifestHTTP       `toml:"http"`
 	MCP      manifestMCP        `toml:"mcp"`
@@ -95,8 +94,12 @@ func (m Manifest) AuthValidators() []AuthValidatorDecl {
 // ParseManifest parses and validates manifest TOML from data.
 func ParseManifest(data []byte) (Manifest, error) {
 	var m Manifest
-	if _, err := toml.Decode(string(data), &m); err != nil {
+	meta, err := toml.Decode(string(data), &m)
+	if err != nil {
 		return Manifest{}, fmt.Errorf("modules: manifest: parse: %w", err)
+	}
+	if meta.IsDefined("schemas") {
+		return Manifest{}, fmt.Errorf("modules: manifest: [schemas] is removed; use [[types]] with TTD files")
 	}
 	if err := validateManifest(m); err != nil {
 		return Manifest{}, err
@@ -149,11 +152,6 @@ func validateManifest(m Manifest) error {
 	}
 	if err := validateKindPatterns(m); err != nil {
 		return err
-	}
-	for pattern := range m.Schemas {
-		if err := validateProvidesPattern(pattern); err != nil {
-			return fmt.Errorf("modules: manifest: schemas key: %w", err)
-		}
 	}
 
 	for i, td := range m.Types {
@@ -273,10 +271,6 @@ func validateTypePattern(pattern string) error {
 		return fmt.Errorf("modules: manifest: invalid pattern %q: %w", pattern, err)
 	}
 	return nil
-}
-
-func validateProvidesPattern(pattern string) error {
-	return validateTypePattern(pattern)
 }
 
 // CollectHTTPRoutes gathers HTTP routes from discovered modules and rejects duplicates.
