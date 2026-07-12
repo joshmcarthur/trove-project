@@ -865,6 +865,112 @@ var MCPModule_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	CLIModule_RunCommand_FullMethodName = "/trove.v1.CLIModule/RunCommand"
+)
+
+// CLIModuleClient is the client API for CLIModule service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// CLIModule is implemented by modules that provide CLI commands.
+type CLIModuleClient interface {
+	RunCommand(ctx context.Context, in *CLICommandRequest, opts ...grpc.CallOption) (*CLICommandResponse, error)
+}
+
+type cLIModuleClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCLIModuleClient(cc grpc.ClientConnInterface) CLIModuleClient {
+	return &cLIModuleClient{cc}
+}
+
+func (c *cLIModuleClient) RunCommand(ctx context.Context, in *CLICommandRequest, opts ...grpc.CallOption) (*CLICommandResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CLICommandResponse)
+	err := c.cc.Invoke(ctx, CLIModule_RunCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CLIModuleServer is the server API for CLIModule service.
+// All implementations must embed UnimplementedCLIModuleServer
+// for forward compatibility.
+//
+// CLIModule is implemented by modules that provide CLI commands.
+type CLIModuleServer interface {
+	RunCommand(context.Context, *CLICommandRequest) (*CLICommandResponse, error)
+	mustEmbedUnimplementedCLIModuleServer()
+}
+
+// UnimplementedCLIModuleServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedCLIModuleServer struct{}
+
+func (UnimplementedCLIModuleServer) RunCommand(context.Context, *CLICommandRequest) (*CLICommandResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunCommand not implemented")
+}
+func (UnimplementedCLIModuleServer) mustEmbedUnimplementedCLIModuleServer() {}
+func (UnimplementedCLIModuleServer) testEmbeddedByValue()                   {}
+
+// UnsafeCLIModuleServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CLIModuleServer will
+// result in compilation errors.
+type UnsafeCLIModuleServer interface {
+	mustEmbedUnimplementedCLIModuleServer()
+}
+
+func RegisterCLIModuleServer(s grpc.ServiceRegistrar, srv CLIModuleServer) {
+	// If the following call panics, it indicates UnimplementedCLIModuleServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&CLIModule_ServiceDesc, srv)
+}
+
+func _CLIModule_RunCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CLICommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CLIModuleServer).RunCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CLIModule_RunCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CLIModuleServer).RunCommand(ctx, req.(*CLICommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// CLIModule_ServiceDesc is the grpc.ServiceDesc for CLIModule service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CLIModule_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "trove.v1.CLIModule",
+	HandlerType: (*CLIModuleServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RunCommand",
+			Handler:    _CLIModule_RunCommand_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "trove/v1/module.proto",
+}
+
+const (
 	SourceModule_Run_FullMethodName         = "/trove.v1.SourceModule/Run"
 	SourceModule_Healthcheck_FullMethodName = "/trove.v1.SourceModule/Healthcheck"
 )

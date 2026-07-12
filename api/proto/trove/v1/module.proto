@@ -194,6 +194,22 @@ message ValidateTypeDefinitionResponse {
   string error = 3;
 }
 
+message CLICommandRequest {
+  string command = 1;
+  repeated string args = 2;
+}
+
+message CLICommandResponse {
+  int32 exit_code = 1;
+  bytes stdout = 2;
+  bytes stderr = 3;
+}
+
+// CLIModule is implemented by modules that provide CLI commands.
+service CLIModule {
+  rpc RunCommand(CLICommandRequest) returns (CLICommandResponse);
+}
+
 message RunRequest {
   // Internal plugin wire format: parent-process handle for CoreServices.
   // Module authors use trovemodule.Core instead.

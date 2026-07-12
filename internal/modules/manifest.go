@@ -34,6 +34,10 @@ type manifestMCP struct {
 	Tools []MCPTool `toml:"tools"`
 }
 
+type manifestCLI struct {
+	Commands []CLICommand `toml:"commands"`
+}
+
 type manifestAuth struct {
 	Validators []AuthValidatorDecl `toml:"validators"`
 }
@@ -46,6 +50,12 @@ type AuthValidatorDecl struct {
 
 // MCPTool declares an MCP tool provided by a module.
 type MCPTool struct {
+	Name        string `toml:"name"`
+	Description string `toml:"description"`
+}
+
+// CLICommand declares a top-level CLI command provided by a module.
+type CLICommand struct {
 	Name        string `toml:"name"`
 	Description string `toml:"description"`
 }
@@ -67,6 +77,7 @@ type Manifest struct {
 	Types    []ManifestTypeDecl `toml:"types"`
 	HTTP     manifestHTTP       `toml:"http"`
 	MCP      manifestMCP        `toml:"mcp"`
+	CLI      manifestCLI        `toml:"cli"`
 	Auth     manifestAuth       `toml:"auth"`
 	Listen   string             `toml:"listen"`
 }
@@ -84,6 +95,11 @@ func (m Manifest) HTTPRoutes() []HTTPRoute {
 // MCPTools returns declared MCP tools from the manifest.
 func (m Manifest) MCPTools() []MCPTool {
 	return m.MCP.Tools
+}
+
+// CLICommands returns declared CLI commands from the manifest.
+func (m Manifest) CLICommands() []CLICommand {
+	return m.CLI.Commands
 }
 
 // AuthValidators returns declared auth validators from the manifest.
@@ -178,6 +194,12 @@ func validateManifest(m Manifest) error {
 		}
 	}
 
+	for i, command := range m.CLI.Commands {
+		if err := validateCLICommand(command); err != nil {
+			return fmt.Errorf("modules: manifest: cli.commands[%d]: %w", i, err)
+		}
+	}
+
 	return nil
 }
 
@@ -189,6 +211,28 @@ func validateMCPTool(tool MCPTool) error {
 		return fmt.Errorf("description is required")
 	}
 	return nil
+}
+
+func validateCLICommand(command CLICommand) error {
+	if strings.TrimSpace(command.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if strings.TrimSpace(command.Description) == "" {
+		return fmt.Errorf("description is required")
+	}
+	if isReservedCLICommand(command.Name) {
+		return fmt.Errorf("name %q is reserved", command.Name)
+	}
+	return nil
+}
+
+func isReservedCLICommand(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "version", "config", "help":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateHTTPRoute(route HTTPRoute) error {
@@ -234,6 +278,7 @@ func validateKindPatterns(m Manifest) error {
 	hasProvides := len(m.Provides) > 0
 	hasHTTP := len(m.HTTP.Routes) > 0
 	hasMCPTools := len(m.MCP.Tools) > 0
+	hasCLI := len(m.CLI.Commands) > 0
 	hasAuth := len(m.Auth.Validators) > 0
 
 	switch m.Kind {
@@ -252,12 +297,12 @@ func validateKindPatterns(m Manifest) error {
 		switch {
 		case hasConsumes:
 			// event-routing processor
-		case hasHTTP, hasMCPTools, hasAuth:
+		case hasHTTP, hasMCPTools, hasCLI, hasAuth:
 			if hasProvides {
-				return fmt.Errorf("modules: manifest: provides is not allowed for HTTP/MCP/auth-only processor modules")
+				return fmt.Errorf("modules: manifest: provides is not allowed for HTTP/MCP/CLI/auth-only processor modules")
 			}
 		default:
-			return fmt.Errorf("modules: manifest: processor %q must declare consumes, http.routes, auth.validators, and/or mcp.tools", m.Name)
+			return fmt.Errorf("modules: manifest: processor %q must declare consumes, http.routes, auth.validators, cli.commands, and/or mcp.tools", m.Name)
 		}
 	}
 	return nil
@@ -339,6 +384,48 @@ func MCPToolModuleIndex(entries []MCPToolEntry) map[string]string {
 	index := make(map[string]string, len(entries))
 	for _, entry := range entries {
 		index[entry.Tool.Name] = entry.Module
+	}
+	return index
+}
+
+// CLICommandEntry binds a manifest CLI command to its module.
+type CLICommandEntry struct {
+	Command CLICommand
+	Module  string
+}
+
+// CollectCLICommands gathers CLI commands from discovered modules and rejects duplicates.
+func CollectCLICommands(mods []Module) ([]CLICommandEntry, error) {
+	seen := make(map[string]struct{})
+	var commands []CLICommandEntry
+
+	for _, mod := range mods {
+		manifest, err := loadModuleManifest(mod)
+		if err != nil {
+			return nil, err
+		}
+		for _, command := range manifest.CLICommands() {
+			if isReservedCLICommand(command.Name) {
+				return nil, fmt.Errorf("modules: cli command %q is reserved", command.Name)
+			}
+			if _, exists := seen[command.Name]; exists {
+				return nil, fmt.Errorf("modules: duplicate cli command %q for module %q", command.Name, manifest.Name)
+			}
+			seen[command.Name] = struct{}{}
+			commands = append(commands, CLICommandEntry{
+				Command: command,
+				Module:  manifest.Name,
+			})
+		}
+	}
+	return commands, nil
+}
+
+// CLICommandModuleIndex maps CLI command names to providing module names.
+func CLICommandModuleIndex(entries []CLICommandEntry) map[string]string {
+	index := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		index[entry.Command.Name] = entry.Module
 	}
 	return index
 }

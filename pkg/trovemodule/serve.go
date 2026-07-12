@@ -10,8 +10,8 @@ import (
 )
 
 // Serve starts a Trove module plugin subprocess. mod must implement Module and
-// may also implement HTTPHandler, AuthHandler, MCPToolHandler, EventProcessor, EventSink,
-// and HealthChecker.
+// may also implement HTTPHandler, AuthHandler, MCPToolHandler, CLIHandler,
+// EventProcessor, EventSink, and HealthChecker.
 func Serve(mod Module) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
@@ -44,6 +44,9 @@ func (p *sourceGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 	}
 	if _, ok := p.mod.(MCPToolHandler); ok {
 		troverpc.RegisterMCPModuleServer(s, &mcpModuleServer{mod: p.mod})
+	}
+	if _, ok := p.mod.(CLIHandler); ok {
+		troverpc.RegisterCLIModuleServer(s, &cliModuleServer{mod: p.mod})
 	}
 	if _, ok := p.mod.(EventProcessor); ok {
 		troverpc.RegisterProcessorModuleServer(s, &processorModuleServer{mod: p.mod})
@@ -126,6 +129,19 @@ func (s *mcpModuleServer) CallTool(ctx context.Context, req *troverpc.MCPToolCal
 		}, nil
 	}
 	return &troverpc.MCPToolCallResponse{ResultJson: result}, nil
+}
+
+type cliModuleServer struct {
+	troverpc.UnimplementedCLIModuleServer
+	mod Module
+}
+
+func (s *cliModuleServer) RunCommand(ctx context.Context, req *troverpc.CLICommandRequest) (*troverpc.CLICommandResponse, error) {
+	h, ok := s.mod.(CLIHandler)
+	if !ok {
+		return nil, fmt.Errorf("trovemodule: module does not implement CLIHandler")
+	}
+	return RunCommandRPC(ctx, h, req)
 }
 
 type processorModuleServer struct {

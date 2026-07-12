@@ -13,7 +13,7 @@ See [spec §8](../spec.md#8-module-architecture-dynamic-socket-based).
 
 ## Built-in modules
 
-`http-ingest` and `mcp-query` ship **inside the `trove` binary**. The core
+`http-ingest`, `mcp-query`, and `type-catalog` ship **inside the `trove` binary**. The core
 discovers them automatically when no on-disk module with the same `name` exists
 in `[modules].paths`. Built-ins still run as go-plugin subprocesses (the core
 reexecs `trove` with `TROVE_BUNDLED_MODULE` set); only the packaging differs.
@@ -101,21 +101,24 @@ and transport once given a binary path.
 ## RPC surface
 
 ```
-CoreServices : module calls Emit, BlobPut, and query RPCs on the parent
+CoreServices : module calls Emit, BlobPut, query, and type-catalog RPCs on the parent
 SourceModule : parent calls Run to start a source subprocess
 ProcessorModule : parent calls Process(event, context) -> []event
 SinkModule     : parent calls Handle(event, context) -> ack
 HTTPModule     : gateway calls HandleHTTP for declared routes
+CLIModule      : host calls RunCommand for one-shot CLI dispatch
 All kinds      : Healthcheck periodically
 ```
 
-At runtime, **source**, **HTTP**, and **event-routing** modules are started.
+At runtime, **source**, **HTTP**, **CLI/MCP**, and **event-routing** modules are started.
 The core runs an event router that subscribes to the journal and dispatches to
 matching processors and sinks.
 
 ## Implementation
 
 - [Module runtime](../planning/module-runtime.md) — milestone 1
+- [CLI commands](../planning/cli-commands.md) — module CLI registration
+- [Type introspection](../planning/type-introspection.md) — catalog list/export/validate
 - [Processors and sinks](../planning/processors-sinks.md) — event routing
 - [Remote modules](../planning/remote-modules.md) — later
 - [Building modules](../building-modules.md) — author guide

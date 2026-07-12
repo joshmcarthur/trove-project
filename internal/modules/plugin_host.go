@@ -17,6 +17,7 @@ import (
 var errHTTPNotSupported = errors.New("modules: module does not support HTTP")
 var errMCPNotSupported = errors.New("modules: module does not support MCP tools")
 var errAuthNotSupported = errors.New("modules: module does not support auth")
+var errCLINotSupported = errors.New("modules: module does not support CLI commands")
 
 type moduleCapabilities struct {
 	hasHTTP      bool
@@ -24,6 +25,7 @@ type moduleCapabilities struct {
 	hasProcessor bool
 	hasSink      bool
 	hasMCPTools  bool
+	hasCLI       bool
 	needsSource  bool
 }
 
@@ -64,6 +66,7 @@ type moduleClient struct {
 	httpClient      troverpc.HTTPModuleClient
 	authClient      troverpc.AuthModuleClient
 	mcpClient       troverpc.MCPModuleClient
+	cliClient       troverpc.CLIModuleClient
 	broker          *plugin.GRPCBroker
 	journal         journal.Journal
 	policy          EmitPolicy
@@ -76,7 +79,7 @@ type moduleClient struct {
 }
 
 func (c *moduleClient) Run(ctx context.Context) error {
-	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools || c.caps.hasAuth
+	needsPluginRun := c.caps.needsSource || c.caps.hasHTTP || c.caps.hasMCPTools || c.caps.hasAuth || c.caps.hasCLI
 	if !needsPluginRun {
 		<-ctx.Done()
 		return ctx.Err()
@@ -140,6 +143,13 @@ func (c *moduleClient) CallTool(ctx context.Context, req *troverpc.MCPToolCallRe
 	return c.mcpClient.CallTool(ctx, req)
 }
 
+func (c *moduleClient) RunCommand(ctx context.Context, req *troverpc.CLICommandRequest) (*troverpc.CLICommandResponse, error) {
+	if !c.caps.hasCLI {
+		return nil, errCLINotSupported
+	}
+	return c.cliClient.RunCommand(ctx, req)
+}
+
 func (c *moduleClient) Process(ctx context.Context, event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
 	if !c.caps.hasProcessor {
 		return nil, errors.New("modules: module does not support Process")
@@ -194,6 +204,7 @@ func (p *moduleGRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBr
 		httpClient:      troverpc.NewHTTPModuleClient(c),
 		authClient:      troverpc.NewAuthModuleClient(c),
 		mcpClient:       troverpc.NewMCPModuleClient(c),
+		cliClient:       troverpc.NewCLIModuleClient(c),
 		broker:          broker,
 		journal:         p.journal,
 		policy:          p.policy,
