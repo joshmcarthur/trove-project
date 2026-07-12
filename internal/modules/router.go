@@ -42,7 +42,7 @@ func NewRouter(j journal.Journal, registry *EventRegistry) *Router {
 }
 
 // Run pulls events from the journal in ULID order and dispatches them until ctx
-// is cancelled. WatchAppends provides low-latency wakeups; a poll interval is
+// is cancelled. Watch provides low-latency wakeups; a poll interval is
 // the fallback when a coalesced signal is missed.
 func (r *Router) Run(ctx context.Context) error {
 	routeStore, ok := r.journal.(routingJournal)
@@ -50,9 +50,9 @@ func (r *Router) Run(ctx context.Context) error {
 		return fmt.Errorf("modules: router requires routing-capable journal store")
 	}
 
-	wakeCh, err := routeStore.WatchAppends(ctx)
+	wakeCh, err := routeStore.Watch(ctx)
 	if err != nil {
-		return fmt.Errorf("modules: router watch appends: %w", err)
+		return fmt.Errorf("modules: router watch: %w", err)
 	}
 
 	watermark, err := routeStore.LoadRouterWatermark(ctx)

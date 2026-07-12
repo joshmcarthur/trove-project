@@ -197,7 +197,7 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 		return fmt.Errorf("journal: append: commit: %w", err)
 	}
 
-	s.signalAppendWatchers()
+	s.signalWatchers()
 	return nil
 }
 
