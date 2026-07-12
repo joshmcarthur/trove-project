@@ -6,7 +6,7 @@ conversational MCP interface as the primary way to get information back out.
 
 > Capture broadly, store simply, converse to retrieve.
 
-- **Documentation:** [trove docs site](https://joshmcarthur.github.io/trove/) (or `make docs-serve` locally)
+- **Documentation:** [trove docs site](https://joshmcarthur.com/trove-project) (or `make docs-serve` locally)
 - **Specification:** [docs/spec.md](docs/spec.md)
 - **Agent guide:** [AGENTS.md](AGENTS.md)
 - **Roadmap:** [docs/roadmap.md](docs/roadmap.md)
