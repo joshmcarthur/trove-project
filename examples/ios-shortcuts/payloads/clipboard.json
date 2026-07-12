@@ -1,4 +1,4 @@
 {
-  "type": "shortcuts.clipboard.saved",
-  "text": "Copied text from clipboard"
+  "type": "trove://type/shortcuts/clipboard/saved/1",
+  "text": "Clipboard contents"
 }

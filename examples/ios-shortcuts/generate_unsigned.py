@@ -31,6 +31,11 @@ BASE_META = {
 
 DEFAULT_INGEST_URL = "https://trove.local/ingest/shortcuts"
 
+TYPE_SHARE_SAVED = "trove://type/shortcuts/share/saved/1"
+TYPE_NOTE_CREATED = "trove://type/shortcuts/note/created/1"
+TYPE_URL_SAVED = "trove://type/shortcuts/url/saved/1"
+TYPE_LOCATION_CHECKED = "trove://type/shortcuts/location/checked/1"
+
 
 def uid() -> str:
     return str(uuid.uuid4()).upper()
@@ -163,7 +168,7 @@ def share_sheet() -> None:
     url_a, url_id = url_action()
     dict_a, dict_id = dictionary_action(
         [
-            dict_item("type", "shortcuts.share.saved"),
+            dict_item("type", TYPE_SHARE_SAVED),
             dict_item("text", shortcut_input()),
         ]
     )
@@ -211,7 +216,7 @@ def quick_note() -> None:
     )
     dict_a, dict_id = dictionary_action(
         [
-            dict_item("type", "shortcuts.note.created"),
+            dict_item("type", TYPE_NOTE_CREATED),
             dict_item("text", output_ref(ask_id, "Provided Input")),
         ]
     )
@@ -242,7 +247,7 @@ def url_bookmark() -> None:
     url_a, url_id = url_action()
     dict_a, dict_id = dictionary_action(
         [
-            dict_item("type", "shortcuts.url.saved"),
+            dict_item("type", TYPE_URL_SAVED),
             dict_item("url", shortcut_input()),
             dict_item("title", ""),
         ]
@@ -286,7 +291,7 @@ def location_checkin() -> None:
     )
     dict_a, dict_id = dictionary_action(
         [
-            dict_item("type", "shortcuts.location.checked"),
+            dict_item("type", TYPE_LOCATION_CHECKED),
             dict_item("label", output_ref(ask_id, "Provided Input")),
             dict_item("latitude", output_ref(loc_id, "Current Location")),
         ]

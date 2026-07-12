@@ -19,6 +19,31 @@ name = "note.created"
 version = 1
 schema = "../../types/builtin/note.created.ttd.json"
 
+[[types]]
+name = "shortcuts.share.saved"
+version = 1
+schema = "../../types/builtin/shortcuts.share.saved.ttd.json"
+
+[[types]]
+name = "shortcuts.note.created"
+version = 1
+schema = "../../types/builtin/shortcuts.note.created.ttd.json"
+
+[[types]]
+name = "shortcuts.url.saved"
+version = 1
+schema = "../../types/builtin/shortcuts.url.saved.ttd.json"
+
+[[types]]
+name = "shortcuts.location.checked"
+version = 1
+schema = "../../types/builtin/shortcuts.location.checked.ttd.json"
+
+[[types]]
+name = "shortcuts.clipboard.saved"
+version = 1
+schema = "../../types/builtin/shortcuts.clipboard.saved.ttd.json"
+
 [[http.routes]]
 method = "POST"
 path   = "/ingest/{source}"

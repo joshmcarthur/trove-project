@@ -28,7 +28,7 @@ type Source interface {
 }
 ```
 
-Event shape: `type` from payload or default `http.ingest.received`; `source` from
+Event shape: `type` from payload or default `trove://type/http/ingest/received/1`; `source` from
 `:source` path segment.
 
 ## Implementation notes
@@ -41,8 +41,8 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
   event and store bytes via `PUT /blobs` ([blobs](./blobs.md)); blobs stored via core
   `BlobPut` RPC (no local blob store in module)
 - `provides` in manifest controls allowed client `type` values (wildcards such as
-  `note.*` supported); early HTTP 400 for disallowed types
-- Optional `[schemas]` validated at core `Emit`; failures return HTTP 400
+  `trove://type/note/*` supported); early HTTP 400 for disallowed types
+- Type catalog validation at core `Emit`; failures return HTTP 400
 
 ### Request / response
 
@@ -51,7 +51,7 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 | `POST /ingest/{source}` with valid JSON body | `204 No Content` |
 | Empty body, invalid JSON, bad metadata fields | `400 Bad Request` |
 | Type not in manifest `provides` | `400 Bad Request` |
-| Schema validation failure (when declared) | `400 Bad Request` |
+| Type catalog / payload validation failure | `400 Bad Request` |
 | Non-POST to `/ingest/{source}` | `405 Method Not Allowed` |
 | Other Emit failure | `500 Internal Server Error` |
 | `PUT /blobs` with body bytes | `201 Created` + `{ "blob_ref": "sha256-..." }` |
@@ -61,7 +61,7 @@ Event shape: `type` from payload or default `http.ingest.received`; `source` fro
 
 Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339),
 `blob_ref`. Remaining keys become `payload`. Default event type:
-`http.ingest.received`.
+`trove://type/http/ingest/received/1`.
 
 ## Acceptance criteria
 
@@ -83,6 +83,5 @@ Optional JSON object fields peeled into event metadata: `type`, `time` (RFC3339)
 
 ## Open questions
 
-- Auth model — [auth.md](./auth.md), [open-items.md](../open-items.md)
 - Blob upload: `PUT /blobs` — see [blobs](./blobs.md) (Supported)
-- HTTP gateway migration — [http-gateway.md](./http-gateway.md) (Planned)
+- `get_event` blob inlining — see [blobs](./blobs.md) (deferred)

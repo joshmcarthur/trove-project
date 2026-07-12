@@ -1,14 +1,15 @@
 ---
 title: Telegram
 parent: Getting started
-nav_order: 5
+nav_order: 6
 ---
 
 # Telegram capture
 
-Send text and media to a personal Telegram bot; Trove stores a `classify.pending`
-event and guides you to classify it in the same chat. See
-[planning/telegram-source](../planning/telegram-source.md) for the full design.
+Send text and media to a personal Telegram bot; Trove stores a
+`trove://type/classify/pending/1` event and guides you to classify it in the same
+chat. See [planning/telegram-source](../planning/telegram-source.md) for the full
+design.
 
 ## Prerequisites
 
@@ -41,11 +42,11 @@ allowed_chat_ids = [123456789]   # your Telegram user/chat ID
 
 [[bot.types]]
 label       = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 
 [[bot.types]]
 label       = "Bookmark"
-target_type = "note.bookmark"
+target_type = "trove://type/note/bookmark/1"
 ```
 
 Set the token in your environment (recommended):
@@ -86,7 +87,7 @@ Ensure `modules/` is in `[modules].paths` in `trove.toml`, then start Trove:
 3. The bot replies with `Captured 01J…` and type buttons.
 4. Tap **Quick note** (or another configured type).
 5. Answer any field prompts, or `/skip` optional fields.
-6. Confirm with `Logged as note.quick (01J…)`.
+6. Confirm with `Logged as trove://type/note/quick/1 (01J…)`.
 
 Query the journal via MCP `search_events` or the capture-classifier
 `GET /pending` endpoint.
@@ -97,7 +98,7 @@ Query the journal via MCP `search_events` or the capture-classifier
 |---------|-----|
 | `/note hello` | Log a quick note without the picker |
 | `/bookmark` | Start a bookmark with field prompts |
-| `/classify 01J… note.quick` | Classify a pending event by ID |
+| `/classify 01J… trove://type/note/quick/1` | Classify a pending event by ID |
 | `/cancel` | Abandon the in-chat session (pending event stays in journal) |
 
 ## Security

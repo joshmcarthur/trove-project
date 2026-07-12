@@ -7,7 +7,7 @@ nav_order: 13
 # Type catalog
 
 **Status:** Supported\
-**Milestone:** 4 — Two-week live test\
+**Milestone:** 3 — MCP query\
 **Spec:** [Core concepts §3](../spec.md#3-core-concepts), [Module architecture §8](../spec.md#8-module-architecture-dynamic-socket-based)\
 **Package:** `internal/types`, `internal/modules`, `internal/journal`
 

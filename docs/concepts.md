@@ -12,10 +12,17 @@ modules, and conversational retrieval via MCP.
 ## Events
 
 The fundamental unit of data — an immutable fact with a ULID, timestamp, typed
-namespace, source identifier, and JSON payload. Modules declare allowed types and
-optional JSON Schema in the manifest; no central registry.
+namespace, source identifier, and JSON payload. Types are `trove://` URIs
+registered in the local type catalog; payloads are validated against JTD contracts.
 
 [Events](./concepts/events.md)
+
+## Type catalog
+
+Local registry of event payload contracts — `trove://` URIs, TTD files, and
+`schema_ref` on validated journal events.
+
+[Type catalog](./concepts/type-catalog.md)
 
 ## Journal
 

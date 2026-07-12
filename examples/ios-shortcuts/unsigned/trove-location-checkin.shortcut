@@ -6,7 +6,7 @@
 	<array>
 		<dict>
 			<key>UUID</key>
-			<string>427AB221-CFAE-4FF6-BE72-7D208AA445C3</string>
+			<string>17ED68A9-4E43-4ED7-A69A-CEE1A7E70356</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.url</string>
 			<key>WFWorkflowActionParameters</key>
@@ -29,7 +29,7 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>AF2C2B15-E843-41C8-B894-0B9A1ED7E2A3</string>
+			<string>2F2EF576-9001-40F5-B9C4-B7F8413DC4DF</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.getcurrentlocation</string>
 			<key>WFWorkflowActionParameters</key>
@@ -37,7 +37,7 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>392BD7EC-EAC0-4FCD-AE7E-1C436D2BCC0A</string>
+			<string>6A568884-B2B0-4F9A-8050-0855BF01DA52</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.ask</string>
 			<key>WFWorkflowActionParameters</key>
@@ -50,7 +50,7 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>7BBA8DC3-71D2-4972-8894-4996BB1D8B28</string>
+			<string>80363001-9492-446A-A0C4-88B5A0961776</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.dictionary</string>
 			<key>WFWorkflowActionParameters</key>
@@ -83,7 +83,7 @@
 										<key>attachmentsByRange</key>
 										<dict/>
 										<key>string</key>
-										<string>shortcuts.location.checked</string>
+										<string>trove://type/shortcuts/location/checked/1</string>
 									</dict>
 									<key>WFSerializationType</key>
 									<string>WFTextTokenString</string>
@@ -115,7 +115,45 @@
 												<key>OutputName</key>
 												<string>Provided Input</string>
 												<key>OutputUUID</key>
-												<string>392BD7EC-EAC0-4FCD-AE7E-1C436D2BCC0A</string>
+												<string>6A568884-B2B0-4F9A-8050-0855BF01DA52</string>
+												<key>Type</key>
+												<string>ActionOutput</string>
+											</dict>
+										</dict>
+										<key>string</key>
+										<string>￼</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+							</dict>
+							<dict>
+								<key>WFItemType</key>
+								<integer>0</integer>
+								<key>WFKey</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict/>
+										<key>string</key>
+										<string>latitude</string>
+									</dict>
+									<key>WFSerializationType</key>
+									<string>WFTextTokenString</string>
+								</dict>
+								<key>WFValue</key>
+								<dict>
+									<key>Value</key>
+									<dict>
+										<key>attachmentsByRange</key>
+										<dict>
+											<key>{0, 1}</key>
+											<dict>
+												<key>OutputName</key>
+												<string>Current Location</string>
+												<key>OutputUUID</key>
+												<string>2F2EF576-9001-40F5-B9C4-B7F8413DC4DF</string>
 												<key>Type</key>
 												<string>ActionOutput</string>
 											</dict>
@@ -136,7 +174,7 @@
 		</dict>
 		<dict>
 			<key>UUID</key>
-			<string>F6C10416-77A1-4AF0-8E57-0F6092F2AEA9</string>
+			<string>DE9464B1-FF1E-4110-A946-8ACDA547690A</string>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.downloadurl</string>
 			<key>WFWorkflowActionParameters</key>
@@ -195,7 +233,7 @@
 								<key>OutputName</key>
 								<string>Dictionary</string>
 								<key>OutputUUID</key>
-								<string>7BBA8DC3-71D2-4972-8894-4996BB1D8B28</string>
+								<string>80363001-9492-446A-A0C4-88B5A0961776</string>
 								<key>Type</key>
 								<string>ActionOutput</string>
 							</dict>
@@ -217,7 +255,7 @@
 								<key>OutputName</key>
 								<string>URL</string>
 								<key>OutputUUID</key>
-								<string>427AB221-CFAE-4FF6-BE72-7D208AA445C3</string>
+								<string>17ED68A9-4E43-4ED7-A69A-CEE1A7E70356</string>
 								<key>Type</key>
 								<string>ActionOutput</string>
 							</dict>
@@ -250,11 +288,11 @@
 			<key>Category</key>
 			<string>Parameter</string>
 			<key>DefaultValue</key>
-			<string>https://trove.local</string>
+			<string>https://trove.local/ingest/shortcuts</string>
 			<key>ParameterKey</key>
-			<string>WFURL</string>
+			<string>WFURLActionURL</string>
 			<key>Text</key>
-			<string>Trove host (base URL, no trailing slash)</string>
+			<string>Trove ingest URL (e.g. https://trove.local/ingest/shortcuts)</string>
 		</dict>
 	</array>
 	<key>WFWorkflowMinimumClientVersion</key>

@@ -7,7 +7,7 @@ nav_order: 13
 # Telegram source
 
 **Status:** Supported\
-**Milestone:** 4 — Two-week live test\
+**Milestone:** 3 — MCP query\
 **Spec:** [Sources §6](../spec.md#6-sources), [Deferred capture §3](../spec.md#3-core-concepts)\
 **Package:** `modules/telegram-source`, `pkg/classify`
 
@@ -24,19 +24,19 @@ Source module — long-polling Telegram Bot API; uses `trovemodule.Core` for:
 
 - `Put(bytes)` — store media blobs
 - `Emit(event)` — fast-path typed events
-- `classify.CapturePendingWithResult` — deferred capture (`classify.pending`)
+- `classify.CapturePendingWithResult` — deferred capture (`trove://type/classify/pending/1`)
 - `classify.Classify` — classify by `source_event_id`
 
-`provides`: `classify.pending`, `classify.assigned`, `note.*`
+`provides`: `trove://type/classify/*`, `trove://type/note/*`
 
 ## Default flow
 
 1. User sends text, photo, document, or voice to the bot (DM or allowed chat).
-2. Module stores media via `core.Put`, emits `classify.pending` with
+2. Module stores media via `core.Put`, emits `trove://type/classify/pending/1` with
    `source = "telegram"`, returns event ID in chat.
 3. Inline keyboard (`[[bot.types]]`) offers target types.
 4. User picks a type; optional field prompts from matching `[[bot.commands]]`.
-5. `classify.Classify` emits typed event + `classify.assigned`; session cleared.
+5. `classify.Classify` emits typed event + `trove://type/classify/assigned/1`; session cleared.
 
 ## One pending per chat
 
@@ -53,8 +53,8 @@ Registered via `[[bot.commands]]` with `fast_path = true`:
 
 | Command | Behaviour |
 |---------|-----------|
-| `/note` | Emit `note.quick` directly (optional field prompts) |
-| `/bookmark` | Emit `note.bookmark` directly |
+| `/note` | Emit `trove://type/note/quick/1` directly (optional field prompts) |
+| `/bookmark` | Emit `trove://type/note/bookmark/1` directly |
 | `/classify <id> <type>` | Classify any pending event by ID |
 | `/cancel` | End current session |
 
@@ -68,7 +68,7 @@ Module-specific keys (core ignores them). Settings may also be supplied via
 name     = "telegram-source"
 version  = "1.0"
 kind     = "source"
-provides = ["classify.pending", "classify.assigned", "note.*"]
+provides = ["trove://type/classify/*", "trove://type/note/*"]
 
 bot_token_env    = "TELEGRAM_BOT_TOKEN"
 allowed_chat_ids = [123456789]
@@ -78,12 +78,12 @@ session_ttl_min  = 30
 
 [[bot.types]]
 label       = "Quick note"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 
 [[bot.commands]]
 command     = "note"
 description = "Quick note (skip picker)"
-target_type = "note.quick"
+target_type = "trove://type/note/quick/1"
 fast_path   = true
 ```
 
@@ -94,7 +94,7 @@ fast_path   = true
 
 ## Capture payload
 
-`classify.pending` payload (JSON):
+`trove://type/classify/pending/1` payload (JSON):
 
 ```json
 {
@@ -114,9 +114,9 @@ Top-level `time` and `blob_ref` are peeled into event metadata by `pkg/classify`
 ## Acceptance criteria
 
 - [x] Module starts under go-plugin supervision
-- [x] Text message to allowed chat creates one `classify.pending` event and shows ID
+- [x] Text message to allowed chat creates one `trove://type/classify/pending/1` event and shows ID
 - [x] Photo/document/voice stored via `core.Put` with `blob_ref` on pending event
-- [x] Inline type pick → `classify.Classify` → typed event + `classify.assigned`
+- [x] Inline type pick → `classify.Classify` → typed event + `trove://type/classify/assigned/1`
 - [x] Second capture while one open → blocked with active ID
 - [x] `/classify <id> <type>` works on pending event
 - [x] `/note` fast path emits typed event without pending

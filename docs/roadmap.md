@@ -35,9 +35,8 @@ Build order from spec §11:
 | Generic HTTP ingest | Supported | §6, §11.1 | [http-ingest](./planning/http-ingest.md) | module + `internal/modules` |
 | Module discovery (go-plugin) | Supported | §8 | [module-runtime](./planning/module-runtime.md) | `internal/modules` |
 | MQTT source | Supported | §6, §11.2 | [mqtt-source](./planning/mqtt-source.md) | `modules/mqtt-source` |
-| MCP query server | Supported | §9, §11.3 | [mcp-query](./planning/mcp-query.md) | `internal/query` + `modules/mcp-query` |
+| MCP query (server + module) | Supported | §9, §11.3 | [mcp-query](./planning/mcp-query.md) | `internal/query` + `modules/mcp-query` |
 | HTTP gateway | Supported | §8, §9 | [http-gateway](./planning/http-gateway.md) | `internal/gateway` |
-| MCP query module | Supported | §9 | [mcp-query](./planning/mcp-query.md) | `modules/mcp-query` |
 | TOML config | Supported | §10 | [config](./planning/config.md) | `internal/config` |
 | iOS Shortcuts capture recipes | Supported | §6 | [iOS Shortcuts](./getting-started/ios-shortcuts.md) | `examples/ios-shortcuts/` |
 | Blob store (filesystem) | Supported | §5 | [blobs](./planning/blobs.md) | `internal/blob` |

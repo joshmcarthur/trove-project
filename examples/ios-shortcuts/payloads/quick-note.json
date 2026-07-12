@@ -1,5 +1,4 @@
 {
-  "type": "trove://type/note/created/1",
-  "title": "Quick note from Shortcuts",
-  "body": "Captured text"
+  "type": "trove://type/shortcuts/note/created/1",
+  "text": "Example quick note text"
 }

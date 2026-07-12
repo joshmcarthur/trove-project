@@ -1,7 +1,7 @@
 ---
 title: Processors and sinks
 parent: Concepts
-nav_order: 7
+nav_order: 8
 ---
 
 # Processors and sinks
@@ -31,8 +31,8 @@ Event routing for processors and sinks is **Supported** — see
 
 First-party examples today:
 
-- **`capture-classifier`** — processor with HTTP routes and MCP tools for deferred
-  capture classification
+- **`capture-classifier`** — source module with HTTP routes and MCP tools for
+  deferred capture classification (not an event-routing processor)
 - **`mcp-query`** — HTTP-only processor that exposes the MCP endpoint on the
   gateway
 

@@ -1,0 +1,10 @@
+{
+  "$id": "trove://type/shortcuts/note/created/1",
+  "title": "Shortcuts note created",
+  "definition": {
+    "optionalProperties": {
+      "text": { "type": "string" },
+      "tags": { "elements": { "type": "string" } }
+    }
+  }
+}

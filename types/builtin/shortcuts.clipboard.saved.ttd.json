@@ -1,0 +1,9 @@
+{
+  "$id": "trove://type/shortcuts/clipboard/saved/1",
+  "title": "Shortcuts clipboard saved",
+  "definition": {
+    "optionalProperties": {
+      "text": { "type": "string" }
+    }
+  }
+}
