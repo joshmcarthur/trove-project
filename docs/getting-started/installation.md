@@ -18,7 +18,8 @@ ingest capture works today — see [Quick Start](./quick-start.md) and
 | **Stable** | Semver tags (`v0.1.0`) on [GitHub Releases](https://github.com/joshmcarthur/trove/releases) | Production installs, package managers |
 | **Rolling** | `latest` prerelease (rebuilt on every `main` push) | Trying the newest changes |
 
-Stable releases ship `.tar.gz` archives, `.deb`/`.rpm` packages, and `checksums.txt`.
+Stable releases ship raw precompiled binaries, `.tar.gz`/`.zip` archives,
+`.deb`/`.rpm` packages, and `checksums.txt`.
 The rolling `latest` channel ships raw platform binaries.
 
 ## Homebrew (macOS and Linux)
@@ -57,18 +58,26 @@ trove -version
 ```bash
 VERSION=v0.1.0
 
-# Linux amd64
-curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove_0.1.0_linux_amd64.tar.gz"
+# Linux amd64 — raw binary (no extract step)
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove-linux-amd64"
 curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/checksums.txt"
 sha256sum -c checksums.txt --ignore-missing
-tar -xzf trove_0.1.0_linux_amd64.tar.gz
-sudo install -m 755 trove /usr/local/bin/trove
+chmod +x trove-linux-amd64
+sudo install -m 755 trove-linux-amd64 /usr/local/bin/trove
 
-# macOS arm64
-curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove_0.1.0_darwin_arm64.tar.gz"
+# macOS arm64 — raw binary
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove-darwin-arm64"
 curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/checksums.txt"
 shasum -a 256 -c checksums.txt --ignore-missing
-tar -xzf trove_0.1.0_darwin_arm64.tar.gz
+chmod +x trove-darwin-arm64
+sudo install -m 755 trove-darwin-arm64 /usr/local/bin/trove
+```
+
+Archives are also available if you prefer a tarball (includes `LICENSE`):
+
+```bash
+curl -LO "https://github.com/joshmcarthur/trove/releases/download/${VERSION}/trove_0.1.0_linux_amd64.tar.gz"
+tar -xzf trove_0.1.0_linux_amd64.tar.gz
 sudo install -m 755 trove /usr/local/bin/trove
 ```
 

@@ -26,7 +26,7 @@ builds:
       - -X main.date={{ .Date }}
 
 archives:
-  - id: default
+  - id: packaged
     formats:
       - tar.gz
     format_overrides:
@@ -36,6 +36,11 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
+
+  - id: raw
+    formats:
+      - binary
+    name_template: "trove-{{ .Os }}-{{ .Arch }}{{ if eq .Os \"windows\" }}.exe{{ end }}"
 
 checksum:
   name_template: checksums.txt
