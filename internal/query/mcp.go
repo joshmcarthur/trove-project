@@ -3,9 +3,7 @@ package query
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -32,35 +30,6 @@ type MCPDeps struct {
 // MCPHandler returns the MCP streamable HTTP handler.
 func MCPHandler(deps MCPDeps) http.Handler {
 	return newMCPHandler(deps)
-}
-
-// Serve starts the MCP query server on listen until ctx is cancelled.
-func Serve(ctx context.Context, listen string, svc *Service) error {
-	if svc == nil {
-		return fmt.Errorf("query: service is required")
-	}
-
-	handler := MCPHandler(MCPDeps{Querier: svc})
-
-	httpServer := &http.Server{
-		Addr:    listen,
-		Handler: handler,
-	}
-
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancel()
-		_ = httpServer.Shutdown(shutdownCtx)
-	}()
-
-	log.Printf("trove: mcp listening on %s", listen)
-
-	err := httpServer.ListenAndServe()
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
-	return err
 }
 
 func newMCPHandler(deps MCPDeps) http.Handler {

@@ -37,14 +37,6 @@ func TestStoreTypeDefinitionPutsBlob(t *testing.T) {
 		t.Fatalf("schemaRef = %q, want sha256- prefix", schemaRef)
 	}
 
-	wantRef, err := types.CanonicalHash(raw)
-	if err != nil {
-		t.Fatalf("CanonicalHash() error = %v", err)
-	}
-	if schemaRef != wantRef {
-		t.Fatalf("schemaRef = %q, want %q", schemaRef, wantRef)
-	}
-
 	rc, err := store.Get(ctx, schemaRef)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)

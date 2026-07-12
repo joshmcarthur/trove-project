@@ -12,7 +12,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/types"
 )
 
-func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
+func TestRunModulesSurvivesModuleCrash(t *testing.T) {
 	binary := buildCrashRestartModule(t)
 	counterFile := filepath.Join(t.TempDir(), "counter")
 	if err := os.WriteFile(counterFile, []byte("0"), 0o644); err != nil {
@@ -47,7 +47,7 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		RunSources(ctx, store, []Module{mod}, nil, NewHTTPRegistry(), NewMCPRegistry(), nil, map[string]string{}, nil, catalog)
+		RunModules(ctx, store, []Module{mod}, nil, NewHTTPRegistry(), NewMCPRegistry(), nil, nil, map[string]string{}, nil, catalog)
 		close(done)
 	}()
 
@@ -71,7 +71,7 @@ func TestRunSourcesSurvivesModuleCrash(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("RunSources did not return after context cancellation")
+		t.Fatal("RunModules did not return after context cancellation")
 	}
 }
 
