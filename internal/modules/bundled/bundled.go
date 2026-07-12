@@ -7,6 +7,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/modules"
 	"github.com/joshmcarthur/trove/modules/httpingest"
 	"github.com/joshmcarthur/trove/modules/mcpquery"
+	"github.com/joshmcarthur/trove/modules/typecatalog"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
@@ -26,6 +27,11 @@ var registry = []entry{
 		name:     "mcp-query",
 		new:      mcpquery.New,
 		manifest: mcpquery.Manifest,
+	},
+	{
+		name:     "type-catalog",
+		new:      typecatalog.New,
+		manifest: typecatalog.Manifest,
 	},
 }
 

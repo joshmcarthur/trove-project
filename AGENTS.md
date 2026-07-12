@@ -74,7 +74,8 @@ Standard commands are in [docs/contributing.md](docs/contributing.md) /
 Non-obvious caveats:
 
 - `make build` produces `bin/trove` plus each first-party module binary at
-  `modules/<name>/module` (all gitignored). The host binary only discovers a
+  `modules/<name>/module` (all gitignored). Built-in modules: `http-ingest`,
+  `mcp-query`, and `type-catalog`. The host binary only discovers a
   module when its `module` binary sits next to its `manifest.toml`, so re-run
   `make build` after editing any module before running `trove`.
 - `trove` requires `-config <path>` (there is no default); `trove -version` is
