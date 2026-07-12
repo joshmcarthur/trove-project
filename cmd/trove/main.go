@@ -39,6 +39,7 @@ func main() {
 		os.Exit(0)
 	}
 
+	args := flag.Args()
 	if *configPath == "" {
 		fmt.Fprintln(os.Stderr, "trove: -config is required")
 		os.Exit(1)
@@ -50,6 +51,97 @@ func main() {
 		os.Exit(1)
 	}
 
+	mods, err := modules.Discover(cfg.Modules.Paths)
+	if err != nil {
+		log.Printf("trove: module discovery: %v", err)
+	}
+
+	if len(args) > 0 {
+		if exitCode := tryRunCLICommand(cfg, mods, args); exitCode >= 0 {
+			os.Exit(exitCode)
+		}
+	}
+
+	runDaemon(cfg, mods)
+}
+
+func tryRunCLICommand(cfg config.Config, mods []modules.Module, args []string) int {
+	cliCommands, err := modules.CollectCLICommands(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+
+	registry := modules.NewCLIRegistry(mods)
+	mod, ok := registry.ModuleForCommand(cliCommands, args[0])
+	if !ok {
+		return -1
+	}
+
+	blobStore, err := blob.OpenFilesystem(cfg.Blobs.Path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+
+	moduleTypes, err := modules.CollectModuleTypesInputs(mods)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	userTypes := make([]types.TypeDecl, len(cfg.Types))
+	for i, td := range cfg.Types {
+		userTypes[i] = types.TypeDecl{
+			Name:    td.Name,
+			Version: td.Version,
+			Schema:  td.Schema,
+		}
+	}
+	catalog, catalogWarnings, err := types.BuildCatalog(
+		context.Background(),
+		blobStore,
+		types.DefaultBuiltinDir(),
+		moduleTypes,
+		userTypes,
+	)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	for _, w := range catalogWarnings {
+		log.Printf("trove: %s", w)
+	}
+
+	settingsStore, err := modules.NewSettingsStore(cfg.Modules)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer settingsStore.Close()
+
+	stdout, stderr, exitCode, err := modules.RunCLICommand(
+		context.Background(),
+		mod,
+		catalog,
+		blobStore,
+		args[0],
+		args[1:],
+		settingsStore,
+	)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if len(stdout) > 0 {
+		os.Stdout.Write(stdout)
+	}
+	if len(stderr) > 0 {
+		os.Stderr.Write(stderr)
+	}
+	return exitCode
+}
+
+func runDaemon(cfg config.Config, mods []modules.Module) {
 	store, err := journal.Open(cfg.Journal.Path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -70,11 +162,6 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
-	}
-
-	mods, err := modules.Discover(cfg.Modules.Paths)
-	if err != nil {
-		log.Printf("trove: module discovery: %v", err)
 	}
 
 	moduleNames := supervisedModuleNames(mods)
@@ -205,6 +292,7 @@ func supervisedModuleNames(mods []modules.Module) []string {
 			len(manifest.HTTPRoutes()) > 0 ||
 			len(manifest.AuthValidators()) > 0 ||
 			len(manifest.MCPTools()) > 0 ||
+			len(manifest.CLICommands()) > 0 ||
 			manifest.EventRoutes() {
 			names = append(names, manifest.Name)
 		}

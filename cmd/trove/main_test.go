@@ -47,13 +47,17 @@ func runTrove(t *testing.T, bin string, args ...string) (stderr string, exitCode
 func writeConfig(t *testing.T, journalPath string) string {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "trove.toml")
+	dir := filepath.Dir(journalPath)
+	path := filepath.Join(dir, "trove.toml")
 	content := fmt.Sprintf(`[journal]
 path = %q
 
+[blobs]
+path = %q
+
 [http]
-listen = ":8080"
-`, journalPath)
+listen = ":18080"
+`, journalPath, filepath.Join(dir, "blobs"))
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -150,11 +154,11 @@ func TestCLI(t *testing.T) {
 		}
 
 		stderr := errBuf.String()
-		if !strings.Contains(stderr, "starting modules: http-ingest, mcp-query") {
+		if !strings.Contains(stderr, "starting modules:") || !strings.Contains(stderr, "http-ingest") || !strings.Contains(stderr, "mcp-query") {
 			t.Errorf("stderr = %q, want bundled modules started", stderr)
 		}
-		if !strings.Contains(stderr, "http gateway listening on :8080") {
-			t.Errorf("stderr = %q, want substring %q", stderr, "http gateway listening on :8080")
+		if !strings.Contains(stderr, "http gateway listening on :18080") {
+			t.Errorf("stderr = %q, want substring %q", stderr, "http gateway listening on :18080")
 		}
 		if !strings.Contains(stderr, "shutting down") {
 			t.Errorf("stderr = %q, want substring %q", stderr, "shutting down")
