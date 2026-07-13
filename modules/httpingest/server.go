@@ -13,21 +13,27 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const defaultEventType = "trove://type/http/ingest/received/1"
-
 type putBlobResponse struct {
 	BlobRef string `json:"blob_ref"`
 }
 
-func dispatchHTTP(ctx context.Context, emit trovemodule.Emitter, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+type writeResponse struct {
+	EventID      string `json:"event_id"`
+	RecordRef    string `json:"record_ref"`
+	Version      int32  `json:"version"`
+	Completeness string `json:"completeness"`
+	Operation    string `json:"operation"`
+}
+
+func dispatchHTTP(ctx context.Context, writer trovemodule.RecordWriter, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
 	if req == nil {
 		return textResponse(http.StatusBadRequest, "request is required"), nil
 	}
 
 	key := req.Method + " " + req.MatchedPattern
 	switch key {
-	case "POST /ingest/{source}":
-		return handleIngest(ctx, emit, cfg, req)
+	case "POST /records":
+		return handleRecords(ctx, writer, cfg, req)
 	case "PUT /blobs":
 		return handlePutBlob(ctx, blobs, cfg, req)
 	default:
@@ -35,12 +41,7 @@ func dispatchHTTP(ctx context.Context, emit trovemodule.Emitter, blobs trovemodu
 	}
 }
 
-func handleIngest(ctx context.Context, emit trovemodule.Emitter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
-	source := req.PathValues["source"]
-	if source == "" {
-		return textResponse(http.StatusBadRequest, "source is required"), nil
-	}
-
+func handleRecords(ctx context.Context, writer trovemodule.RecordWriter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
 	body := req.Body
 	if len(body) == 0 {
 		return textResponse(http.StatusBadRequest, "request body is required"), nil
@@ -52,23 +53,51 @@ func handleIngest(ctx context.Context, emit trovemodule.Emitter, cfg config, req
 		return textResponse(http.StatusBadRequest, "invalid JSON"), nil
 	}
 
-	event, err := buildEvent(source, body)
+	writeReq, err := buildWriteRequest(body)
 	if err != nil {
 		return textResponse(http.StatusBadRequest, err.Error()), nil
 	}
-
-	if len(cfg.Provides) > 0 && !trovemodule.MatchType(cfg.Provides, event.Type) {
-		return textResponse(http.StatusBadRequest, fmt.Sprintf("type not allowed: %s", event.Type)), nil
+	if writeReq.Source == "" {
+		return textResponse(http.StatusBadRequest, "source is required"), nil
 	}
 
-	if err := emit.Emit(ctx, event); err != nil {
-		if st, ok := status.FromError(err); ok && st.Code() == codes.InvalidArgument {
-			return textResponse(http.StatusBadRequest, st.Message()), nil
+	if writeReq.Operation == "" || writeReq.Operation == "apply" {
+		if writeReq.Type != "" && len(cfg.Provides) > 0 && !trovemodule.MatchType(cfg.Provides, writeReq.Type) {
+			return textResponse(http.StatusBadRequest, fmt.Sprintf("type not allowed: %s", writeReq.Type)), nil
 		}
-		return textResponse(http.StatusInternalServerError, "failed to ingest event"), nil
 	}
 
-	return &troverpc.HTTPResponse{Status: http.StatusNoContent}, nil
+	resp, err := writer.RecordWrite(ctx, writeReq)
+	if err != nil {
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return textResponse(http.StatusBadRequest, st.Message()), nil
+			case codes.NotFound:
+				return textResponse(http.StatusNotFound, st.Message()), nil
+			case codes.FailedPrecondition, codes.AlreadyExists:
+				return textResponse(http.StatusConflict, st.Message()), nil
+			}
+		}
+		return textResponse(http.StatusInternalServerError, "failed to write record"), nil
+	}
+
+	payload, err := json.Marshal(writeResponse{
+		EventID:      resp.GetEventId(),
+		RecordRef:    resp.GetRecordRef(),
+		Version:      resp.GetVersion(),
+		Completeness: resp.GetCompleteness(),
+		Operation:    resp.GetOperation(),
+	})
+	if err != nil {
+		return textResponse(http.StatusInternalServerError, "failed to encode response"), nil
+	}
+
+	return &troverpc.HTTPResponse{
+		Status:  http.StatusCreated,
+		Headers: map[string]string{"Content-Type": "application/json"},
+		Body:    payload,
+	}, nil
 }
 
 func handlePutBlob(ctx context.Context, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
@@ -97,53 +126,84 @@ func handlePutBlob(ctx context.Context, blobs trovemodule.BlobPutter, cfg config
 	}, nil
 }
 
-func buildEvent(source string, body []byte) (*troverpc.Event, error) {
-	event := &troverpc.Event{
-		Type:    defaultEventType,
-		Source:  source,
-		Payload: body,
+func buildWriteRequest(body []byte) (*troverpc.WriteRequest, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("invalid JSON object")
 	}
 
-	var obj map[string]json.RawMessage
-	if err := json.Unmarshal(body, &obj); err != nil {
-		return event, nil
+	req := &troverpc.WriteRequest{
+		Operation: "apply",
+		Payload:   []byte("{}"),
 	}
 
-	payload := make(map[string]json.RawMessage, len(obj))
-	for key, value := range obj {
-		switch key {
-		case "type":
-			var eventType string
-			if err := json.Unmarshal(value, &eventType); err != nil || eventType == "" {
-				return nil, fmt.Errorf("invalid type field")
-			}
-			event.Type = eventType
-		case "time":
-			var timeStr string
-			if err := json.Unmarshal(value, &timeStr); err != nil {
-				return nil, fmt.Errorf("invalid time field")
-			}
-			if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
-				return nil, fmt.Errorf("invalid time field")
-			}
-			event.Time = timeStr
-		case "blob_ref":
-			var blobRef string
-			if err := json.Unmarshal(value, &blobRef); err != nil || blobRef == "" {
-				return nil, fmt.Errorf("invalid blob_ref field")
-			}
-			event.BlobRef = blobRef
-		default:
-			payload[key] = value
+	if v, ok := raw["operation"]; ok {
+		var op string
+		if err := json.Unmarshal(v, &op); err != nil || op == "" {
+			return nil, fmt.Errorf("invalid operation field")
 		}
+		req.Operation = op
+		delete(raw, "operation")
+	}
+	if v, ok := raw["record_ref"]; ok {
+		var ref string
+		if err := json.Unmarshal(v, &ref); err != nil {
+			return nil, fmt.Errorf("invalid record_ref field")
+		}
+		req.RecordRef = ref
+		delete(raw, "record_ref")
+	}
+	if v, ok := raw["type"]; ok {
+		var typ string
+		if err := json.Unmarshal(v, &typ); err != nil {
+			return nil, fmt.Errorf("invalid type field")
+		}
+		req.Type = typ
+		delete(raw, "type")
+	}
+	if v, ok := raw["time"]; ok {
+		var timeStr string
+		if err := json.Unmarshal(v, &timeStr); err != nil {
+			return nil, fmt.Errorf("invalid time field")
+		}
+		if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
+			return nil, fmt.Errorf("invalid time field")
+		}
+		req.Time = timeStr
+		delete(raw, "time")
+	}
+	if v, ok := raw["source"]; ok {
+		var source string
+		if err := json.Unmarshal(v, &source); err != nil || source == "" {
+			return nil, fmt.Errorf("invalid source field")
+		}
+		req.Source = source
+		delete(raw, "source")
+	}
+	if v, ok := raw["blob_ref"]; ok {
+		var blobRef string
+		if err := json.Unmarshal(v, &blobRef); err != nil || blobRef == "" {
+			return nil, fmt.Errorf("invalid blob_ref field")
+		}
+		req.BlobRef = blobRef
+		delete(raw, "blob_ref")
+	}
+	if v, ok := raw["transforms"]; ok {
+		if !json.Valid(v) {
+			return nil, fmt.Errorf("invalid transforms field")
+		}
+		req.Transforms = v
+		delete(raw, "transforms")
 	}
 
-	payloadBytes, err := json.Marshal(payload)
+	payload, err := json.Marshal(raw)
 	if err != nil {
 		return nil, fmt.Errorf("marshal payload")
 	}
-	event.Payload = payloadBytes
-	return event, nil
+	if len(payload) > 0 {
+		req.Payload = payload
+	}
+	return req, nil
 }
 
 func textResponse(status int, message string) *troverpc.HTTPResponse {
