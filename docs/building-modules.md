@@ -113,8 +113,9 @@ Use `trovemodule.Serve` to register the module. Optional interfaces:
 - **HealthChecker** — report liveness to the parent
 
 Event-routing processors and sinks implement `Run` with `trovemodule.WaitCore`
-when they do not stream from `Run` themselves. The parent passes a
-`DispatchContext` with `root_id` and `seen` module names for loop prevention.
+when they do not stream from `Run` themselves. The parent passes a `DispatchContext` with `root_id` and `seen` module names for
+loop prevention. Routed events include `operation` (`apply` or `delete`); return
+early from `Process` / `Handle` when your module should ignore an operation.
 
 The parent enforces ingest policy on `core.Emit` and on derived events returned
 from `Process`. Modules do not open `trove.db` or the blob directory directly.

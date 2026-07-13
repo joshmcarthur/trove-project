@@ -101,7 +101,7 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 - TTDs describe record **body**, not journal envelope
 - No migration from `classify.pending` — wipe dev journals during rollout
 - `retention_days` cascades to record projection tables
-- Processor routing: `consumes_operations` (default `["apply"]`) + `consumes` on type
+- Processor routing: `consumes` on type; modules guard `operation` in `Process`/`Handle`
 - Rebuild: `trove records rebuild` replays all events
 
 ### PR delivery

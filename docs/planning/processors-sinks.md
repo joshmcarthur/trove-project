@@ -41,7 +41,9 @@ processors (for example `mcp-query`) use `[[http.routes]]` instead of `consumes`
 1. Source or processor emits an event → journal append
 2. Router pulls events after `last_dispatched_id` in ULID order (`Watch` for wakeup)
 3. Router matches `consumes` patterns
-4. Core calls `Process` / `Handle` with `DispatchContext{root_id, seen}`
+4. Core calls `Process` / `Handle` with `DispatchContext{root_id, seen}`. Delivered
+   events include `operation` (`apply` or `delete`); ignore operations your module
+   does not handle.
 5. Processor-derived events are validated against `provides` and appended
 6. If a module name is already in `seen`, the event is skipped (loop prevention)
 7. Watermark advances only after successful dispatch (at-least-once delivery)
