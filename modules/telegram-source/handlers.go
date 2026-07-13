@@ -20,7 +20,7 @@ const callbackTypePrefix = "t:"
 type botService struct {
 	cfg      config
 	core     trovemodule.Core
-	journal  *journalAdapter
+	store    *captureStore
 	sessions *sessionStore
 }
 
@@ -28,7 +28,7 @@ func newBotService(cfg config, core trovemodule.Core) *botService {
 	return &botService{
 		cfg:      cfg,
 		core:     core,
-		journal:  &journalAdapter{core: core},
+		store:    &captureStore{core: core},
 		sessions: newSessionStore(cfg.SessionTTLMin),
 	}
 }
@@ -36,7 +36,7 @@ func newBotService(cfg config, core trovemodule.Core) *botService {
 func (s *botService) registerCommands(ctx context.Context, b *bot.Bot) error {
 	commands := []models.BotCommand{
 		{Command: "cancel", Description: "Cancel the current capture"},
-		{Command: "classify", Description: "Classify by ID: /classify <id> <type>"},
+		{Command: "classify", Description: "Classify by ID: /classify <record_ref> <type>"},
 	}
 	for _, cmd := range s.cfg.Commands {
 		if !cmd.FastPath {
@@ -106,8 +106,8 @@ func (s *botService) handleCommand(ctx context.Context, b *bot.Bot, msg *models.
 func (s *botService) handleContent(ctx context.Context, b *bot.Bot, msg *models.Message) {
 	chatID := msg.Chat.ID
 	if _, busy := s.sessions.activePendingID(chatID); busy {
-		if id, ok := s.sessions.get(chatID); ok && id != nil && id.PendingEventID != "" {
-			s.sendText(ctx, b, chatID, fmt.Sprintf("Finish classifying %s or /cancel first.", id.PendingEventID))
+		if id, ok := s.sessions.get(chatID); ok && id != nil && id.PendingRecordRef != "" {
+			s.sendText(ctx, b, chatID, fmt.Sprintf("Finish classifying %s or /cancel first.", id.PendingRecordRef))
 			return
 		}
 		s.sendText(ctx, b, chatID, "Finish the current command or /cancel first.")
@@ -144,7 +144,7 @@ func (s *botService) handleCapture(ctx context.Context, b *bot.Bot, msg *models.
 		return
 	}
 
-	result, err := classify.CapturePendingWithResult(ctx, s.journal, "telegram", draft.CaptureJSON)
+	result, err := classify.Capture(ctx, s.store, "telegram", draft.CaptureJSON)
 	if err != nil {
 		log.Printf("telegram-source: pending chat %d: %v", msg.Chat.ID, err)
 		s.sendText(ctx, b, msg.Chat.ID, "Could not save capture.")
@@ -152,14 +152,14 @@ func (s *botService) handleCapture(ctx context.Context, b *bot.Bot, msg *models.
 	}
 
 	s.sessions.set(msg.Chat.ID, &session{
-		Mode:           modeClassify,
-		PendingEventID: result.EventID,
-		FieldIndex:     -1,
-		Collected:      fieldDefaultsFromDraft(draft),
-		Draft:          draft,
+		Mode:             modeClassify,
+		PendingRecordRef: result.RecordRef,
+		FieldIndex:       -1,
+		Collected:        fieldDefaultsFromDraft(draft),
+		Draft:            draft,
 	})
 
-	text := fmt.Sprintf("Captured %s\nWhat is this?", result.EventID)
+	text := fmt.Sprintf("Captured %s\nWhat is this?", result.RecordRef)
 	s.sendTextWithKeyboard(ctx, b, msg.Chat.ID, text, s.typeKeyboard())
 }
 
@@ -187,7 +187,7 @@ func (s *botService) handleCallback(ctx context.Context, b *bot.Bot, update *mod
 	}
 
 	sess, ok := s.sessions.get(chatID)
-	if !ok || sess == nil || sess.PendingEventID == "" {
+	if !ok || sess == nil || sess.PendingRecordRef == "" {
 		s.sendText(ctx, b, chatID, "No active capture. Send content to start.")
 		return
 	}
@@ -292,35 +292,35 @@ func (s *botService) finishClassify(ctx context.Context, b *bot.Bot, chatID int6
 		s.sendText(ctx, b, chatID, "Could not classify capture.")
 		return
 	}
-	result, err := classify.Classify(ctx, s.journal, classify.ClassifyRequest{
-		SourceEventID: sess.PendingEventID,
-		TargetType:    sess.TargetType,
-		Payload:       payload,
+	result, err := classify.Classify(ctx, s.store, classify.ClassifyRequest{
+		RecordRef:  sess.PendingRecordRef,
+		TargetType: sess.TargetType,
+		Payload:    payload,
 	})
 	if err != nil {
-		log.Printf("telegram-source: classify %s: %v", sess.PendingEventID, err)
-		s.sendText(ctx, b, chatID, fmt.Sprintf("Could not classify %s: %v", sess.PendingEventID, err))
+		log.Printf("telegram-source: classify %s: %v", sess.PendingRecordRef, err)
+		s.sendText(ctx, b, chatID, fmt.Sprintf("Could not classify %s: %v", sess.PendingRecordRef, err))
 		return
 	}
 	s.sessions.clear(chatID)
-	s.sendText(ctx, b, chatID, fmt.Sprintf("Logged as %s (%s)", sess.TargetType, result.TargetEventID))
+	s.sendText(ctx, b, chatID, fmt.Sprintf("Logged as %s (%s v%d)", sess.TargetType, result.RecordRef, result.Version))
 }
 
 func (s *botService) handleClassifyCommand(ctx context.Context, b *bot.Bot, msg *models.Message, args []string) {
 	if len(args) < 2 {
-		s.sendText(ctx, b, msg.Chat.ID, "Usage: /classify <event_id> <target_type>")
+		s.sendText(ctx, b, msg.Chat.ID, "Usage: /classify <record_ref> <target_type>")
 		return
 	}
-	result, err := classify.Classify(ctx, s.journal, classify.ClassifyRequest{
-		SourceEventID: args[0],
-		TargetType:    args[1],
+	result, err := classify.Classify(ctx, s.store, classify.ClassifyRequest{
+		RecordRef:  args[0],
+		TargetType: args[1],
 	})
 	if err != nil {
 		s.sendText(ctx, b, msg.Chat.ID, fmt.Sprintf("Classify failed: %v", err))
 		return
 	}
 	s.sessions.clear(msg.Chat.ID)
-	s.sendText(ctx, b, msg.Chat.ID, fmt.Sprintf("Logged as %s (%s)", args[1], result.TargetEventID))
+	s.sendText(ctx, b, msg.Chat.ID, fmt.Sprintf("Logged as %s (%s v%d)", args[1], result.RecordRef, result.Version))
 }
 
 func (s *botService) startFastPath(ctx context.Context, b *bot.Bot, msg *models.Message, cmd commandConfig) {
@@ -400,7 +400,7 @@ func (s *botService) finishFastPath(ctx context.Context, b *bot.Bot, chatID int6
 		BlobRef: sess.Draft.BlobRef,
 		Payload: payloadBytes,
 	}
-	if err := s.core.Emit(ctx, event); err != nil {
+	if _, err := trovemodule.ApplyRecord(ctx, s.core, event); err != nil {
 		log.Printf("telegram-source: emit fast path: %v", err)
 		s.sendText(ctx, b, chatID, "Could not save.")
 		return

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
+	"github.com/joshmcarthur/trove/internal/records"
 	"github.com/joshmcarthur/trove/pkg/classify"
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
@@ -14,10 +15,35 @@ const noteQuickType = "trove://type/note/quick/1"
 
 type stubCore struct {
 	journal *stubJournal
+	records map[string]*troverpc.Record
 }
 
-func (s *stubCore) Emit(ctx context.Context, event *troverpc.Event) error {
-	return s.journal.Emit(ctx, event)
+func (s *stubCore) RecordWrite(ctx context.Context, req *troverpc.WriteRequest) (*troverpc.WriteResponse, error) {
+	resp, err := s.journal.RecordWrite(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	ref := resp.GetRecordRef()
+	if ref == "" {
+		ref = req.GetRecordRef()
+	}
+	completeness := records.CompletenessIncomplete
+	if req.GetType() != "" {
+		completeness = records.CompletenessComplete
+	}
+	version := resp.GetVersion()
+	if existing, ok := s.records[ref]; ok && req.GetType() != "" {
+		version = existing.GetVersion() + 1
+	}
+	s.records[ref] = &troverpc.Record{
+		RecordRef:    ref,
+		Version:      version,
+		Completeness: completeness,
+		Type:         req.GetType(),
+		Source:       req.GetSource(),
+		Body:         req.GetPayload(),
+	}
+	return resp, nil
 }
 
 func (s *stubCore) Put(_ context.Context, _ []byte) (string, error) {
@@ -64,6 +90,22 @@ func (s *stubCore) ValidateTypeDefinition(context.Context, []byte) (bool, string
 	return false, "", "", nil
 }
 
+func (s *stubCore) GetRecord(_ context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	rec, ok := s.records[req.GetRecordRef()]
+	if !ok {
+		return nil, classify.ErrNotFound
+	}
+	return rec, nil
+}
+
+func (s *stubCore) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+
+func (s *stubCore) ListIncompleteRecords(context.Context, *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+
 var _ trovemodule.Core = (*stubCore)(nil)
 
 type stubJournal struct {
@@ -90,13 +132,26 @@ func (s *stubJournal) GetEventsByType(_ context.Context, eventType string) ([]*t
 	return append([]*troverpc.Event(nil), s.byType[eventType]...), nil
 }
 
-func (s *stubJournal) Emit(_ context.Context, event *troverpc.Event) error {
+func (s *stubJournal) RecordWrite(_ context.Context, req *troverpc.WriteRequest) (*troverpc.WriteResponse, error) {
+	event := &troverpc.Event{
+		Id:        req.GetRecordRef(),
+		Type:      req.GetType(),
+		Source:    req.GetSource(),
+		Payload:   req.GetPayload(),
+		Time:      req.GetTime(),
+		BlobRef:   req.GetBlobRef(),
+		Operation: req.GetOperation(),
+		RecordRef: req.GetRecordRef(),
+	}
 	if event.Id == "" {
 		event.Id = "01JEMIT" + event.Type
 	}
+	if event.RecordRef == "" {
+		event.RecordRef = event.Id
+	}
 	s.events[event.Id] = event
 	s.byType[event.Type] = append(s.byType[event.Type], event)
-	return nil
+	return &troverpc.WriteResponse{EventId: event.Id, RecordRef: event.RecordRef, Version: 1, Operation: req.GetOperation()}, nil
 }
 
 func testConfig() config {
@@ -120,8 +175,8 @@ func TestHandleCaptureBlocksWhenPendingActive(t *testing.T) {
 	store := newSessionStore(30)
 	chatID := int64(100)
 	store.set(chatID, &session{
-		Mode:           modeClassify,
-		PendingEventID: "01JACTIVE",
+		Mode:             modeClassify,
+		PendingRecordRef: "01JACTIVE",
 	})
 
 	if id, busy := store.activePendingID(chatID); !busy || id != "01JACTIVE" {
@@ -133,20 +188,20 @@ func TestFinishClassifyEmitsTypedEvent(t *testing.T) {
 	t.Parallel()
 
 	j := newStubJournal()
-	core := &stubCore{journal: j}
+	core := &stubCore{journal: j, records: make(map[string]*troverpc.Record)}
 	svc := newBotService(testConfig(), core)
 	chatID := int64(100)
 
-	result, err := classify.CapturePendingWithResult(context.Background(), j, "telegram", []byte(`{"text":"hello"}`))
+	result, err := classify.Capture(context.Background(), svc.store, "telegram", []byte(`{"text":"hello"}`))
 	if err != nil {
-		t.Fatalf("CapturePendingWithResult() error = %v", err)
+		t.Fatalf("Capture() error = %v", err)
 	}
 
 	sess := &session{
-		Mode:           modeClassify,
-		PendingEventID: result.EventID,
-		TargetType:     noteQuickType,
-		Collected:      map[string]string{"text": "hello"},
+		Mode:             modeClassify,
+		PendingRecordRef: result.RecordRef,
+		TargetType:       noteQuickType,
+		Collected:        map[string]string{"text": "hello"},
 	}
 	svc.finishClassify(context.Background(), nil, chatID, sess)
 
@@ -156,16 +211,13 @@ func TestFinishClassifyEmitsTypedEvent(t *testing.T) {
 	if len(j.byType[noteQuickType]) != 1 {
 		t.Fatalf("typed events = %#v", j.byType[noteQuickType])
 	}
-	if len(j.byType[classify.AssignedType]) != 1 {
-		t.Fatalf("assigned events = %#v", j.byType[classify.AssignedType])
-	}
 }
 
 func TestFinishFastPathEmitsDirectly(t *testing.T) {
 	t.Parallel()
 
 	j := newStubJournal()
-	core := &stubCore{journal: j}
+	core := &stubCore{journal: j, records: make(map[string]*troverpc.Record)}
 	svc := newBotService(testConfig(), core)
 	chatID := int64(100)
 
@@ -180,9 +232,6 @@ func TestFinishFastPathEmitsDirectly(t *testing.T) {
 	}
 	svc.finishFastPath(context.Background(), nil, chatID, sess)
 
-	if len(j.byType[classify.PendingType]) != 0 {
-		t.Fatal("fast path should not create pending event")
-	}
 	if len(j.byType[noteQuickType]) != 1 {
 		t.Fatalf("typed events = %#v", j.byType[noteQuickType])
 	}

@@ -11,11 +11,23 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
-type journalAdapter struct {
+type captureStore struct {
 	core trovemodule.Core
 }
 
-func (a *journalAdapter) GetEvent(ctx context.Context, id string) (*troverpc.Event, error) {
+func (a *captureStore) GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	return a.core.GetRecord(ctx, req)
+}
+
+func (a *captureStore) ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
+	return a.core.ListIncompleteRecords(ctx, req)
+}
+
+func (a *captureStore) RecordWrite(ctx context.Context, req *troverpc.WriteRequest) (*troverpc.WriteResponse, error) {
+	return a.core.RecordWrite(ctx, req)
+}
+
+func (a *captureStore) GetEvent(ctx context.Context, id string) (*troverpc.Event, error) {
 	event, err := a.core.GetEvent(ctx, id)
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
@@ -24,12 +36,4 @@ func (a *journalAdapter) GetEvent(ctx context.Context, id string) (*troverpc.Eve
 		return nil, err
 	}
 	return event, nil
-}
-
-func (a *journalAdapter) GetEventsByType(ctx context.Context, eventType string) ([]*troverpc.Event, error) {
-	return a.core.GetEventsByType(ctx, &troverpc.GetEventsByTypeRequest{Type: eventType})
-}
-
-func (a *journalAdapter) Emit(ctx context.Context, event *troverpc.Event) error {
-	return a.core.Emit(ctx, event)
 }
