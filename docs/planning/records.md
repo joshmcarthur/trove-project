@@ -36,7 +36,7 @@ POST /records
   "type": "trove://type/note/quick/1",
   "source": "shortcuts",
   "payload": { "text": "hello" },
-  "transforms": [{ "op": "add", "path": "/members/-", "value": "01JREC-photo" }],
+  "transforms": [{ "op": "add", "path": "/tags/-", "value": "photo" }],
   "blob_ref": "sha256-..."
 }
 ```
@@ -101,12 +101,11 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 - No migration from `classify.pending` — wipe dev journals during rollout
 - `retention_days` cascades to record projection tables
 - Processor routing: `consumes_operations` (default `["apply"]`) + `consumes` on type
-- Albums: `trove://type/album/created/1` with `body.members[]` of `record_ref`
 - Rebuild: `trove records rebuild` replays all events
 
 ### PR delivery
 
-See epic branch `cursor/records-layer-71b9` — 13 stacked PRs; major version bump
+See epic branch `cursor/records-layer-71b9` — stacked PRs; major version bump
 on merge (`feat!:`).
 
 ## Acceptance criteria
@@ -133,14 +132,10 @@ on merge (`feat!:`).
 - [ ] Telegram classify uses `record_ref`
 - [ ] capture-classifier module removed
 
-### Albums
-
-- [ ] Album create + member add/remove via transforms
-
 ## Dependencies
 
 - **Blocked by:** none (greenfield during active development)
-- **Blocks:** record-centric embeddings, album workflows
+- **Blocks:** record-centric embeddings
 - **Supersedes:** [deferred-capture](./deferred-capture.md)
 
 ## Open questions
