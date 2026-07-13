@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/joshmcarthur/trove-project/compare/v1.0.1...v1.1.0) (2026-07-13)
+
+
+### Features
+
+* add record fold primitives ([#104](https://github.com/joshmcarthur/trove-project/issues/104)) ([38dd299](https://github.com/joshmcarthur/trove-project/commit/38dd299ef288d13e19a47f40cc485d65469da034))
+* add trove init CLI subcommand ([#98](https://github.com/joshmcarthur/trove-project/issues/98)) ([e4f9f0b](https://github.com/joshmcarthur/trove-project/commit/e4f9f0ba572967a7e63e73a33bcbb5f674620a98))
+
 ## [1.0.1](https://github.com/joshmcarthur/trove-project/compare/v1.0.0...v1.0.1) (2026-07-12)
 
 
