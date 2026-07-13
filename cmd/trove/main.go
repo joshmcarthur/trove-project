@@ -245,7 +245,7 @@ func runDaemon(cfg config.Config, mods []modules.Module) {
 		log.Printf("trove: %s", w)
 	}
 
-	router := modules.NewRouter(store, eventRegistry)
+	router := modules.NewRouter(store, eventRegistry, modules.NewWriteService(store))
 	routerDone := make(chan struct{})
 	go func() {
 		defer close(routerDone)

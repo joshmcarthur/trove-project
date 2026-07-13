@@ -29,15 +29,17 @@ type routingJournal interface {
 type Router struct {
 	journal  journal.Journal
 	registry *EventRegistry
+	writer   *WriteService
 	claims   sync.Map
 	pending  sync.Map
 }
 
 // NewRouter returns a router for the given journal and event registry.
-func NewRouter(j journal.Journal, registry *EventRegistry) *Router {
+func NewRouter(j journal.Journal, registry *EventRegistry, writer *WriteService) *Router {
 	return &Router{
 		journal:  j,
 		registry: registry,
+		writer:   writer,
 	}
 }
 
@@ -135,6 +137,9 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 	}
 
 	for _, binding := range r.registry.processorsSnapshot() {
+		if !matchOperation(binding.consumesOperations, event.Operation) {
+			continue
+		}
 		if !MatchType(binding.consumes, event.Type) {
 			continue
 		}
@@ -149,7 +154,10 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 
 		childSeen := withSeen(dctx.Seen, binding.name)
 		for _, out := range derived {
-			if err := binding.policy.ValidateEvent(&out); err != nil {
+			if out.Operation == "" {
+				out.Operation = journal.OpApply
+			}
+			if err := binding.policy.ValidateApply(&out); err != nil {
 				return fmt.Errorf("processor %q derived event: %w", binding.name, err)
 			}
 			childCtx := DispatchContext{
@@ -163,6 +171,9 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 	}
 
 	for _, binding := range r.registry.sinksSnapshot() {
+		if !matchOperation(binding.consumesOperations, event.Operation) {
+			continue
+		}
 		if !MatchType(binding.consumes, event.Type) {
 			continue
 		}
@@ -192,7 +203,10 @@ func (r *Router) appendDerived(ctx context.Context, routeStore routingJournal, e
 		r.pending.Delete(event.ID)
 		return fmt.Errorf("save event dispatch: %w", err)
 	}
-	if err := r.journal.Append(ctx, event); err != nil {
+	if r.writer == nil {
+		return fmt.Errorf("append derived event: record writer is not configured")
+	}
+	if _, err := r.writer.Write(ctx, event, nil); err != nil {
 		r.pending.Delete(event.ID)
 		_ = routeStore.DeleteEventDispatch(ctx, event.ID)
 		return fmt.Errorf("append derived event: %w", err)

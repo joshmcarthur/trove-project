@@ -11,7 +11,7 @@ import (
 // Core is the module's connection to the Trove parent process. Use it to append
 // events, store blobs, read the journal, invoke module MCP tools, and introspect types.
 type Core interface {
-	Emitter
+	RecordWriter
 	BlobPutter
 	Querier
 	MCPToolCaller
@@ -55,9 +55,8 @@ func (c *coreConn) Close() error {
 	return c.closer.Close()
 }
 
-func (c *coreConn) Emit(ctx context.Context, event *troverpc.Event) error {
-	_, err := c.client.Emit(ctx, event)
-	return err
+func (c *coreConn) RecordWrite(ctx context.Context, req *troverpc.WriteRequest) (*troverpc.WriteResponse, error) {
+	return c.client.RecordWrite(ctx, req)
 }
 
 func (c *coreConn) Put(ctx context.Context, data []byte) (string, error) {
@@ -90,6 +89,26 @@ func (c *coreConn) GetEventsByType(ctx context.Context, req *troverpc.GetEventsB
 
 func (c *coreConn) SummarizeRange(ctx context.Context, req *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
 	return c.client.SummarizeRange(ctx, req)
+}
+
+func (c *coreConn) GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	return c.client.GetRecord(ctx, req)
+}
+
+func (c *coreConn) SearchRecords(ctx context.Context, req *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+	resp, err := c.client.SearchRecords(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetRecords(), nil
+}
+
+func (c *coreConn) ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
+	resp, err := c.client.ListIncompleteRecords(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetRecords(), nil
 }
 
 func (c *coreConn) ListMCPTools(ctx context.Context) ([]MCPToolDescriptor, error) {
