@@ -50,7 +50,7 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 	ln.Close()
 
 	routes := []modules.HTTPRouteEntry{
-		{Route: modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"}, Module: "http-ingest"},
+		{Route: modules.HTTPRoute{Method: "POST", Path: "/records"}, Module: "http-ingest"},
 		{Route: modules.HTTPRoute{Method: "PUT", Path: "/blobs"}, Module: "http-ingest"},
 	}
 	registry := modules.NewHTTPRegistry()
@@ -91,11 +91,11 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		resp, err = http.Post(
-			"http://"+gwAddr+"/ingest/shortcuts",
+			"http://"+gwAddr+"/records",
 			"application/json",
-			strings.NewReader(`{"title":"test"}`),
+			strings.NewReader(`{"source":"shortcuts","type":"trove://type/http/ingest/received/1","title":"test"}`),
 		)
-		if err == nil && resp.StatusCode == http.StatusNoContent {
+		if err == nil && resp.StatusCode == http.StatusCreated {
 			break
 		}
 		if resp != nil {
@@ -104,13 +104,13 @@ func TestHTTPIngestViaGateway(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		t.Fatalf("POST /ingest/shortcuts: %v", err)
+		t.Fatalf("POST /records: %v", err)
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("POST status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST status = %d, want %d", resp.StatusCode, http.StatusCreated)
 	}
 
 	events, err := store.Query(context.Background(), journal.Filter{TypePrefix: "trove://type/http/ingest/received/1"})
@@ -164,7 +164,7 @@ provides = ["trove://type/http/ingest/received/1", "trove://type/note/*", "trove
 
 [[http.routes]]
 method = "POST"
-path = "/ingest/{source}"
+path = "/records"
 
 [[http.routes]]
 method = "PUT"
