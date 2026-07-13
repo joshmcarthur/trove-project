@@ -24,6 +24,7 @@ type coreServicesServer struct {
 	blobs       blob.Store
 	catalog     *types.Catalog
 	query       *query.Service
+	records     *query.RecordService
 	mcpTools    []MCPToolEntry
 	toolModules map[string]string
 	mcpRegistry *MCPRegistry
@@ -93,6 +94,62 @@ func (s *coreServicesServer) SearchEvents(ctx context.Context, req *troverpc.Sea
 		return nil, queryGRPCError(err)
 	}
 	return &troverpc.SearchEventsResponse{Events: queryEventsToProto(events)}, nil
+}
+
+func (s *coreServicesServer) GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	if s.records == nil {
+		return nil, status.Error(codes.Unavailable, "record query is not configured")
+	}
+	if req == nil || req.RecordRef == "" {
+		return nil, status.Error(codes.InvalidArgument, "record_ref is required")
+	}
+	rec, err := s.records.GetRecord(ctx, req.RecordRef, int(req.Version))
+	if err != nil {
+		return nil, queryGRPCError(err)
+	}
+	return queryRecordToProto(rec), nil
+}
+
+func (s *coreServicesServer) SearchRecords(ctx context.Context, req *troverpc.SearchRecordsRequest) (*troverpc.SearchRecordsResponse, error) {
+	if s.records == nil {
+		return nil, status.Error(codes.Unavailable, "record query is not configured")
+	}
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	timeFrom, err := parseOptionalProtoTime(req.TimeFrom)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	timeTo, err := parseOptionalProtoTime(req.TimeTo)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	records, err := s.records.SearchRecords(ctx, req.Query, query.RecordSearchParams{
+		TypePrefix:     req.TypePrefix,
+		Source:         req.Source,
+		TimeFrom:       timeFrom,
+		TimeTo:         timeTo,
+		IncludeDeleted: req.IncludeDeleted,
+	})
+	if err != nil {
+		return nil, queryGRPCError(err)
+	}
+	return &troverpc.SearchRecordsResponse{Records: queryRecordsToProto(records)}, nil
+}
+
+func (s *coreServicesServer) ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) (*troverpc.ListIncompleteRecordsResponse, error) {
+	if s.records == nil {
+		return nil, status.Error(codes.Unavailable, "record query is not configured")
+	}
+	if req == nil {
+		req = &troverpc.ListIncompleteRecordsRequest{}
+	}
+	records, err := s.records.ListIncompleteRecords(ctx, req.Source, int(req.Limit))
+	if err != nil {
+		return nil, queryGRPCError(err)
+	}
+	return &troverpc.ListIncompleteRecordsResponse{Records: queryRecordsToProto(records)}, nil
 }
 
 func (s *coreServicesServer) GetEventsByType(ctx context.Context, req *troverpc.GetEventsByTypeRequest) (*troverpc.SearchEventsResponse, error) {
@@ -282,9 +339,9 @@ func writeGRPCError(err error) error {
 
 func queryGRPCError(err error) error {
 	switch err {
-	case query.ErrNotFound:
+	case query.ErrNotFound, query.ErrRecordNotFound:
 		return status.Error(codes.NotFound, err.Error())
-	case query.ErrEmptyQuery, query.ErrEmptyType, query.ErrInvalidTimeRange:
+	case query.ErrEmptyQuery, query.ErrEmptyType, query.ErrEmptyRecordRef, query.ErrInvalidTimeRange:
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Errorf(codes.Internal, "%v", err)
@@ -325,6 +382,30 @@ func queryEventsToProto(events []query.Event) []*troverpc.Event {
 	out := make([]*troverpc.Event, len(events))
 	for i, e := range events {
 		out[i] = queryEventToProto(e)
+	}
+	return out
+}
+
+func queryRecordsToProto(records []query.Record) []*troverpc.Record {
+	out := make([]*troverpc.Record, len(records))
+	for i, r := range records {
+		out[i] = queryRecordToProto(r)
+	}
+	return out
+}
+
+func queryRecordToProto(r query.Record) *troverpc.Record {
+	out := &troverpc.Record{
+		RecordRef:    r.RecordRef,
+		Version:      int32(r.Version), //nolint:gosec // G115: record version from projection
+		Completeness: r.Completeness,
+		Type:         r.Type,
+		Source:       r.Source,
+		Body:         r.Body,
+		UpdatedAt:    r.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+	if r.ContentRef != nil {
+		out.ContentRef = *r.ContentRef
 	}
 	return out
 }

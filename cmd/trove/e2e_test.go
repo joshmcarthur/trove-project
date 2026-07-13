@@ -83,19 +83,19 @@ listen = %q
 	defer session.Close()
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "search_events",
+		Name: "search_records",
 		Arguments: map[string]any{
 			"query": unique,
 		},
 	})
 	if err != nil {
-		t.Fatalf("CallTool(search_events) error = %v", err)
+		t.Fatalf("CallTool(search_records) error = %v", err)
 	}
 	if result.IsError {
-		t.Fatalf("search_events tool error: %#v", result)
+		t.Fatalf("search_records tool error: %#v", result)
 	}
 	if len(result.Content) == 0 {
-		t.Fatal("search_events returned no content")
+		t.Fatal("search_records returned no content")
 	}
 
 	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {

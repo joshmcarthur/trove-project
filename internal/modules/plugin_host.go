@@ -100,6 +100,7 @@ func (c *moduleClient) Run(ctx context.Context) error {
 			blobs:       c.blobs,
 			catalog:     c.catalog,
 			query:       querySvc,
+			records:     recordsFromJournal(c.journal),
 			mcpTools:    c.mcpTools,
 			toolModules: c.toolModules,
 			mcpRegistry: c.mcpRegistry,

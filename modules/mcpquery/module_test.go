@@ -34,7 +34,7 @@ func (s *stubQuerier) SummarizeRange(context.Context, *troverpc.SummarizeRangeRe
 }
 
 func (s *stubQuerier) GetRecord(context.Context, *troverpc.GetRecordRequest) (*troverpc.Record, error) {
-	return nil, query.ErrNotFound
+	return nil, query.ErrRecordNotFound
 }
 
 func (s *stubQuerier) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
