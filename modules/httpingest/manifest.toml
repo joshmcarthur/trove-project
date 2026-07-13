@@ -46,7 +46,7 @@ schema = "../../types/builtin/shortcuts.clipboard.saved.ttd.json"
 
 [[http.routes]]
 method = "POST"
-path   = "/ingest/{source}"
+path   = "/records"
 
 [[http.routes]]
 method = "PUT"

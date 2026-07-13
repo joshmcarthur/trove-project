@@ -71,7 +71,7 @@ func TestGatewayMethodNotAllowed(t *testing.T) {
 
 	registry := modules.NewHTTPRegistry()
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records"},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
@@ -79,7 +79,7 @@ func TestGatewayMethodNotAllowed(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/ingest/shortcuts", nil)
+	req := httptest.NewRequest(http.MethodGet, "/records", nil)
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
 
@@ -98,7 +98,7 @@ func TestGatewayDispatchesToModule(t *testing.T) {
 	registry.Register("http-ingest", client)
 
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records"},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
@@ -106,8 +106,8 @@ func TestGatewayDispatchesToModule(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	body := `{"title":"test"}`
-	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(body))
+	body := `{"source":"shortcuts","title":"test"}`
+	req := httptest.NewRequest(http.MethodPost, "/records", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
 
@@ -117,11 +117,8 @@ func TestGatewayDispatchesToModule(t *testing.T) {
 	if client.last == nil {
 		t.Fatal("HandleHTTP was not called")
 	}
-	if client.last.MatchedPattern != "/ingest/{source}" {
-		t.Errorf("MatchedPattern = %q, want /ingest/{source}", client.last.MatchedPattern)
-	}
-	if client.last.PathValues["source"] != "shortcuts" {
-		t.Errorf("PathValues[source] = %q, want shortcuts", client.last.PathValues["source"])
+	if client.last.MatchedPattern != "/records" {
+		t.Errorf("MatchedPattern = %q, want /records", client.last.MatchedPattern)
 	}
 	if string(client.last.Body) != body {
 		t.Errorf("Body = %q, want %q", client.last.Body, body)
@@ -133,7 +130,7 @@ func TestGatewayServiceUnavailable(t *testing.T) {
 
 	registry := modules.NewHTTPRegistry()
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records"},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
@@ -141,7 +138,7 @@ func TestGatewayServiceUnavailable(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/records", strings.NewReader(`{"source":"shortcuts"}`))
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
 
@@ -158,7 +155,7 @@ func TestGatewayBodyLimit(t *testing.T) {
 	registry.Register("http-ingest", client)
 
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}", MaxBodyBytes: 8},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records", MaxBodyBytes: 8},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{Listen: ":0", MaxBodyBytes: 1024}, routes, registry, nil)
@@ -166,7 +163,7 @@ func TestGatewayBodyLimit(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/ingest/x", strings.NewReader("123456789"))
+	req := httptest.NewRequest(http.MethodPost, "/records", strings.NewReader("123456789"))
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
 
@@ -185,7 +182,7 @@ func TestGatewayAuthRejectsMissingToken(t *testing.T) {
 	registry.Register("http-gateway", authClient)
 
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records"},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{
@@ -197,7 +194,7 @@ func TestGatewayAuthRejectsMissingToken(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/records", strings.NewReader(`{"source":"shortcuts"}`))
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
 
@@ -219,7 +216,7 @@ func TestGatewayAuthAcceptsBearerToken(t *testing.T) {
 	registry.Register("http-gateway", authClient)
 
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}"},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records"},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{
@@ -231,7 +228,7 @@ func TestGatewayAuthAcceptsBearerToken(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/records", strings.NewReader(`{"source":"shortcuts"}`))
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
@@ -249,7 +246,7 @@ func TestGatewayAuthNoneBypassesValidator(t *testing.T) {
 	registry.Register("http-ingest", client)
 
 	routes := []modules.HTTPRouteEntry{{
-		Route:  modules.HTTPRoute{Method: "POST", Path: "/ingest/{source}", Auth: modules.AuthNone},
+		Route:  modules.HTTPRoute{Method: "POST", Path: "/records", Auth: modules.AuthNone},
 		Module: "http-ingest",
 	}}
 	gw, err := New(Config{
@@ -261,7 +258,7 @@ func TestGatewayAuthNoneBypassesValidator(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/ingest/shortcuts", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/records", strings.NewReader(`{"source":"shortcuts"}`))
 	rec := httptest.NewRecorder()
 	gw.handle(rec, req)
 
