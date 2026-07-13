@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// Operation names persisted on journal events.
+const (
+	OpApply  = "apply"
+	OpDelete = "delete"
+)
+
 // ErrNotFound is returned when an event id does not exist.
 var ErrNotFound = errors.New("journal: event not found")
 
@@ -14,13 +20,16 @@ var ErrConflictingFilter = errors.New("journal: type and type_prefix are mutuall
 
 // Event is an immutable journal record.
 type Event struct {
-	ID        string
-	Time      time.Time
-	Type      string
-	SchemaRef string
-	Source    string
-	Payload   json.RawMessage
-	BlobRef   *string
+	ID         string
+	Time       time.Time
+	Operation  string
+	RecordRef  string
+	Type       string // optional; empty means unset
+	SchemaRef  string
+	Source     string
+	Payload    json.RawMessage
+	BlobRef    *string
+	Transforms json.RawMessage
 }
 
 // Filter constrains journal reads. Text performs FTS5 keyword search when set.

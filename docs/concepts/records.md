@@ -48,7 +48,7 @@ flowchart LR
 ### `apply`
 
 - **Without `record_ref`:** server allocates `record_ref`, opens new record (ingest, capture, MQTT one-shots).
-- **With `record_ref`:** stack change onto existing record (classify, enrich, album edits).
+- **With `record_ref`:** stack change onto existing record (classify, enrich).
 
 Payload merges into body (RFC 7396). Transforms apply RFC 6902 patches after merge.
 
@@ -67,11 +67,6 @@ a new `version` on `record_heads`. Wipe `record_heads` and replay events to rebu
 
 TTDs validate the folded **body** when a record type is set. Captures without a type
 remain `incomplete` until a later `apply` sets `type`.
-
-## Albums
-
-Album records use `body.members[]` of `record_ref` values. Member add/remove uses
-`transforms` on `apply`, not pseudo-schema keys.
 
 ## Implementation
 
