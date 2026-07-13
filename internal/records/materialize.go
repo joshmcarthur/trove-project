@@ -10,36 +10,15 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 )
 
-const schemaDDL = `
-CREATE TABLE IF NOT EXISTS record_heads (
-  record_ref   TEXT PRIMARY KEY,
-  version      INTEGER NOT NULL,
-  completeness TEXT NOT NULL,
-  type         TEXT NOT NULL DEFAULT '',
-  source       TEXT NOT NULL,
-  body         TEXT NOT NULL,
-  content_ref  TEXT,
-  updated_at   TEXT NOT NULL
-);
+// EnsureSchema creates record projection tables when missing.
+func EnsureSchema(db *sql.DB) error {
+	if _, err := db.Exec(journal.RecordsSchemaDDL); err != nil {
+		return fmt.Errorf("records: ensure schema: %w", err)
+	}
+	return nil
+}
 
-CREATE TABLE IF NOT EXISTS record_events (
-  event_id    TEXT PRIMARY KEY,
-  record_ref  TEXT NOT NULL,
-  version     INTEGER NOT NULL,
-  UNIQUE(record_ref, version)
-);
-CREATE INDEX IF NOT EXISTS idx_record_events_ref ON record_events(record_ref);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(
-  record_ref UNINDEXED,
-  type,
-  source,
-  body,
-  tokenize = 'porter'
-);
-`
-
-// Materializer projects journal record events into record_heads and records_fts.
+// Materializer projects journal revisions into record_heads and records_fts.
 type Materializer struct {
 	tx *sql.Tx
 }
@@ -49,17 +28,9 @@ func NewMaterializer(tx *sql.Tx) *Materializer {
 	return &Materializer{tx: tx}
 }
 
-// EnsureSchema creates record projection tables when missing.
-func EnsureSchema(db *sql.DB) error {
-	if _, err := db.Exec(schemaDDL); err != nil {
-		return fmt.Errorf("records: ensure schema: %w", err)
-	}
-	return nil
-}
-
-// Apply materializes e when it is an apply or delete record event.
+// Apply materializes e when it is an apply or delete revision.
 // Returns true when the event was applied, false when skipped.
-func (m *Materializer) Apply(ctx context.Context, e journal.Event) (bool, error) {
+func (m *Materializer) Apply(ctx context.Context, e journal.Revision) (bool, error) {
 	switch e.Operation {
 	case journal.OpApply, journal.OpDelete:
 	default:
@@ -69,7 +40,7 @@ func (m *Materializer) Apply(ctx context.Context, e journal.Event) (bool, error)
 		return false, fmt.Errorf("records: materialize %q: record_ref is required", e.ID)
 	}
 
-	applied, err := m.eventApplied(ctx, e.ID)
+	applied, err := m.revisionApplied(ctx, e.ID)
 	if err != nil {
 		return false, err
 	}
@@ -90,7 +61,7 @@ func (m *Materializer) Apply(ctx context.Context, e journal.Event) (bool, error)
 	if err := m.writeHead(ctx, head); err != nil {
 		return false, err
 	}
-	if err := m.linkEvent(ctx, e.ID, head.RecordRef, head.Version); err != nil {
+	if err := m.linkRevision(ctx, e.ID, head.RecordRef, head.Version); err != nil {
 		return false, err
 	}
 	if err := m.syncFTS(ctx, head); err != nil {
@@ -100,7 +71,7 @@ func (m *Materializer) Apply(ctx context.Context, e journal.Event) (bool, error)
 	return true, nil
 }
 
-// RebuildAll wipes projection tables and replays record events from the journal.
+// RebuildAll wipes projection tables and replays revisions from the journal.
 func RebuildAll(ctx context.Context, db *sql.DB) error {
 	if err := EnsureSchema(db); err != nil {
 		return err
@@ -114,7 +85,7 @@ func RebuildAll(ctx context.Context, db *sql.DB) error {
 
 	for _, stmt := range []string{
 		`DELETE FROM records_fts`,
-		`DELETE FROM record_events`,
+		`DELETE FROM record_revisions`,
 		`DELETE FROM record_heads`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
@@ -122,7 +93,7 @@ func RebuildAll(ctx context.Context, db *sql.DB) error {
 		}
 	}
 
-	events, err := listRecordEvents(ctx, tx)
+	events, err := listRecordRevisions(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -140,7 +111,7 @@ func RebuildAll(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func foldHead(e journal.Event, prev Head, found bool) (Head, error) {
+func foldHead(e journal.Revision, prev Head, found bool) (Head, error) {
 	if e.Operation == journal.OpDelete {
 		if !found {
 			return Head{}, fmt.Errorf("records: delete: record %q not found", e.RecordRef)
@@ -200,9 +171,9 @@ func (m *Materializer) Head(ctx context.Context, recordRef string) (Head, bool, 
 	return m.loadHead(ctx, recordRef)
 }
 
-func (m *Materializer) eventApplied(ctx context.Context, eventID string) (bool, error) {
+func (m *Materializer) revisionApplied(ctx context.Context, eventID string) (bool, error) {
 	var n int
-	err := m.tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM record_events WHERE event_id = ?`, eventID).Scan(&n)
+	err := m.tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM record_revisions WHERE revision_id = ?`, eventID).Scan(&n)
 	if err != nil {
 		return false, fmt.Errorf("records: check event applied: %w", err)
 	}
@@ -257,14 +228,14 @@ func (m *Materializer) writeHead(ctx context.Context, head Head) error {
 	return nil
 }
 
-func (m *Materializer) linkEvent(ctx context.Context, eventID, recordRef string, version int) error {
+func (m *Materializer) linkRevision(ctx context.Context, revisionID, recordRef string, version int) error {
 	_, err := m.tx.ExecContext(ctx, `
-		INSERT INTO record_events (event_id, record_ref, version)
+		INSERT INTO record_revisions (record_ref, version, revision_id)
 		VALUES (?, ?, ?)`,
-		eventID, recordRef, version,
+		recordRef, version, revisionID,
 	)
 	if err != nil {
-		return fmt.Errorf("records: link event %q: %w", eventID, err)
+		return fmt.Errorf("records: link revision %q: %w", revisionID, err)
 	}
 	return nil
 }
@@ -290,30 +261,30 @@ func (m *Materializer) syncFTS(ctx context.Context, head Head) error {
 	return nil
 }
 
-func listRecordEvents(ctx context.Context, q queryer) ([]journal.Event, error) {
+func listRecordRevisions(ctx context.Context, q queryer) ([]journal.Revision, error) {
 	rows, err := q.QueryContext(ctx, `
 		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
-		FROM events
+		FROM revisions
 		WHERE operation IN (?, ?)
 		ORDER BY time ASC`,
 		journal.OpApply,
 		journal.OpDelete,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("records: list record events: %w", err)
+		return nil, fmt.Errorf("records: list revisions: %w", err)
 	}
 	defer rows.Close()
 
-	var events []journal.Event
+	var events []journal.Revision
 	for rows.Next() {
 		e, err := scanRecordEvent(rows)
 		if err != nil {
-			return nil, fmt.Errorf("records: scan record event: %w", err)
+			return nil, fmt.Errorf("records: scan revision: %w", err)
 		}
 		events = append(events, e)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("records: list record events: %w", err)
+		return nil, fmt.Errorf("records: list revisions: %w", err)
 	}
 	return events, nil
 }
@@ -359,9 +330,9 @@ func scanHead(row rowScanner) (Head, error) {
 	return head, nil
 }
 
-func scanRecordEvent(row rowScanner) (journal.Event, error) {
+func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 	var (
-		e          journal.Event
+		e          journal.Revision
 		timeStr    string
 		operation  string
 		payload    string
@@ -380,13 +351,13 @@ func scanRecordEvent(row rowScanner) (journal.Event, error) {
 		&transforms,
 		&blobRef,
 	); err != nil {
-		return journal.Event{}, err
+		return journal.Revision{}, err
 	}
 
 	var err error
 	e.Time, err = time.Parse(time.RFC3339, timeStr)
 	if err != nil {
-		return journal.Event{}, fmt.Errorf("parse time %q: %w", timeStr, err)
+		return journal.Revision{}, fmt.Errorf("parse time %q: %w", timeStr, err)
 	}
 	e.Operation = operation
 	e.Payload = json.RawMessage(payload)

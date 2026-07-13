@@ -5,14 +5,22 @@ import (
 	"fmt"
 )
 
-// migrateSchema upgrades the events table to the records-layer journal shape.
-// Pre-records databases without an operation column are wiped destructively
-// (events_fts rows and events dropped, then recreated). This is intentional
-// during active development — dev journals must be recreated after upgrade.
+// migrateSchema upgrades legacy journal databases.
 func migrateSchema(db *sql.DB) error {
-	hasOperation, err := eventsTableHasColumn(db, "operation")
+	if err := migratePreRecordsShape(db); err != nil {
+		return err
+	}
+	return migrateEventsToRevisions(db)
+}
+
+// migratePreRecordsShape wipes pre-records databases without an operation column.
+func migratePreRecordsShape(db *sql.DB) error {
+	hasOperation, err := tableHasColumn(db, "events", "operation")
 	if err != nil {
 		return err
+	}
+	if !tableExists(db, "events") {
+		return nil
 	}
 	if hasOperation {
 		return nil
@@ -20,25 +28,103 @@ func migrateSchema(db *sql.DB) error {
 
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("journal: migrate schema: begin tx: %w", err)
+		return fmt.Errorf("journal: migrate pre-records: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.Exec(`DROP TABLE IF EXISTS events_fts`); err != nil {
-		return fmt.Errorf("journal: migrate schema: drop events_fts: %w", err)
+		return fmt.Errorf("journal: migrate pre-records: drop events_fts: %w", err)
 	}
 	if _, err := tx.Exec(`DROP TABLE IF EXISTS events`); err != nil {
-		return fmt.Errorf("journal: migrate schema: drop events: %w", err)
+		return fmt.Errorf("journal: migrate pre-records: drop events: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("journal: migrate schema: commit: %w", err)
-	}
-
-	return nil
+	return tx.Commit()
 }
 
-func eventsTableHasColumn(db *sql.DB, column string) (bool, error) {
-	rows, err := db.Query(`PRAGMA table_info(events)`)
+// migrateEventsToRevisions renames legacy events-schema tables to revisions naming.
+func migrateEventsToRevisions(db *sql.DB) error {
+	if !tableExists(db, "events") || tableExists(db, "revisions") {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("journal: migrate events to revisions: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmts := []string{
+		`ALTER TABLE events RENAME TO revisions`,
+		`DROP INDEX IF EXISTS idx_events_time`,
+		`DROP INDEX IF EXISTS idx_events_type`,
+		`DROP INDEX IF EXISTS idx_events_source`,
+		`DROP INDEX IF EXISTS idx_events_operation`,
+		`DROP INDEX IF EXISTS idx_events_record_ref`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_time ON revisions(time)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_type ON revisions(type)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_source ON revisions(source)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_operation ON revisions(operation)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_record_ref ON revisions(record_ref)`,
+	}
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("journal: migrate events to revisions: %s: %w", stmt, err)
+		}
+	}
+
+	if tableExistsTx(tx, "record_events") {
+		if _, err := tx.Exec(`ALTER TABLE record_events RENAME TO record_revisions`); err != nil {
+			return fmt.Errorf("journal: migrate record_events: %w", err)
+		}
+		if _, err := tx.Exec(`ALTER TABLE record_revisions RENAME COLUMN event_id TO revision_id`); err != nil {
+			return fmt.Errorf("journal: migrate record_revisions column: %w", err)
+		}
+		_, _ = tx.Exec(`DROP INDEX IF EXISTS idx_record_events_event_id`)
+		if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_record_revisions_revision_id ON record_revisions(revision_id)`); err != nil {
+			return fmt.Errorf("journal: migrate record_revisions index: %w", err)
+		}
+	}
+
+	if tableExistsTx(tx, "event_dispatch") {
+		if _, err := tx.Exec(`ALTER TABLE event_dispatch RENAME TO revision_dispatch`); err != nil {
+			return fmt.Errorf("journal: migrate event_dispatch: %w", err)
+		}
+		if _, err := tx.Exec(`ALTER TABLE revision_dispatch RENAME COLUMN event_id TO revision_id`); err != nil {
+			return fmt.Errorf("journal: migrate revision_dispatch column: %w", err)
+		}
+	}
+
+	if tableExistsTx(tx, "events_fts") {
+		if _, err := tx.Exec(`DROP TABLE events_fts`); err != nil {
+			return fmt.Errorf("journal: migrate drop events_fts: %w", err)
+		}
+		if _, err := tx.Exec(ftsSchemaDDL); err != nil {
+			return fmt.Errorf("journal: migrate create revisions_fts: %w", err)
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO revisions_fts (revision_id, type, source, payload)
+			SELECT id, type, source, payload FROM revisions`); err != nil {
+			return fmt.Errorf("journal: migrate backfill revisions_fts: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func tableExists(db *sql.DB, name string) bool {
+	var n int
+	err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&n)
+	return err == nil && n > 0
+}
+
+func tableExistsTx(tx *sql.Tx, name string) bool {
+	var n int
+	err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&n)
+	return err == nil && n > 0
+}
+
+func tableHasColumn(db *sql.DB, table, column string) (bool, error) {
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`) //nolint:gosec // G201 table from const
 	if err != nil {
 		return false, fmt.Errorf("journal: migrate schema: table_info: %w", err)
 	}

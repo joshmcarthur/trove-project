@@ -8,13 +8,12 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
-// Core is the module's connection to the Trove parent process. Use it to emit
-// record events, store blobs, read the journal, invoke module MCP tools, and introspect types.
+// Core is the module's connection to the Trove parent process. Modules append and
+// query revisions, store blobs, invoke MCP tools, and introspect types.
 type Core interface {
-	RecordEmitter
-	Emitter
+	RevisionAppender
+	RevisionQuerier
 	BlobPutter
-	Querier
 	MCPToolCaller
 	TypeCatalogReader
 }
@@ -40,7 +39,6 @@ func connectCore(broker *plugin.GRPCBroker, handle uint32) (Core, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Connection lifetime is bound to Run; closed when Run returns.
 	return &coreConn{
 		client: troverpc.NewCoreServicesClient(conn),
 		closer: conn,
@@ -56,13 +54,8 @@ func (c *coreConn) Close() error {
 	return c.closer.Close()
 }
 
-func (c *coreConn) EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
-	return c.client.EmitRecord(ctx, req)
-}
-
-func (c *coreConn) Emit(ctx context.Context, event *troverpc.Event) error {
-	_, err := EmitRecordFromEvent(ctx, c, event)
-	return err
+func (c *coreConn) AppendRevision(ctx context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
+	return c.client.AppendRevision(ctx, req)
 }
 
 func (c *coreConn) Put(ctx context.Context, data []byte) (string, error) {
@@ -73,48 +66,28 @@ func (c *coreConn) Put(ctx context.Context, data []byte) (string, error) {
 	return resp.GetBlobRef(), nil
 }
 
-func (c *coreConn) GetEvent(ctx context.Context, id string) (*troverpc.Event, error) {
-	return c.client.GetEvent(ctx, &troverpc.GetEventRequest{Id: id})
+func (c *coreConn) GetRevision(ctx context.Context, id string) (*troverpc.Revision, error) {
+	return c.client.GetRevision(ctx, &troverpc.GetRevisionRequest{Id: id})
 }
 
-func (c *coreConn) SearchEvents(ctx context.Context, req *troverpc.SearchEventsRequest) ([]*troverpc.Event, error) {
-	resp, err := c.client.SearchEvents(ctx, req)
+func (c *coreConn) SearchRevisions(ctx context.Context, req *troverpc.SearchRevisionsRequest) ([]*troverpc.Revision, error) {
+	resp, err := c.client.SearchRevisions(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return resp.GetEvents(), nil
+	return resp.GetRevisions(), nil
 }
 
-func (c *coreConn) GetEventsByType(ctx context.Context, req *troverpc.GetEventsByTypeRequest) ([]*troverpc.Event, error) {
-	resp, err := c.client.GetEventsByType(ctx, req)
+func (c *coreConn) GetRevisionsByType(ctx context.Context, req *troverpc.GetRevisionsByTypeRequest) ([]*troverpc.Revision, error) {
+	resp, err := c.client.GetRevisionsByType(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return resp.GetEvents(), nil
+	return resp.GetRevisions(), nil
 }
 
 func (c *coreConn) SummarizeRange(ctx context.Context, req *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
 	return c.client.SummarizeRange(ctx, req)
-}
-
-func (c *coreConn) GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error) {
-	return c.client.GetRecord(ctx, req)
-}
-
-func (c *coreConn) SearchRecords(ctx context.Context, req *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
-	resp, err := c.client.SearchRecords(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.GetRecords(), nil
-}
-
-func (c *coreConn) ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
-	resp, err := c.client.ListIncompleteRecords(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp.GetRecords(), nil
 }
 
 func (c *coreConn) ListMCPTools(ctx context.Context) ([]MCPToolDescriptor, error) {

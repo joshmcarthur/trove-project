@@ -13,10 +13,10 @@ import (
 )
 
 type stubProcessor struct {
-	fn func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error)
+	fn func(event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error)
 }
 
-func (s stubProcessor) Process(ctx context.Context, event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
+func (s stubProcessor) Process(ctx context.Context, event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error) {
 	return s.fn(event, dispatch)
 }
 
@@ -55,10 +55,10 @@ func TestRouterProcessorChain(t *testing.T) {
 	}
 	defer store.Close()
 
-	registry := NewEventRegistry()
+	registry := NewRevisionRegistry()
 	registry.RegisterProcessor("step-a", []string{"test.input"}, testPolicy(t, "step-a", []string{"test.step.a"}), stubProcessor{
-		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
-			return []journal.Event{{
+		fn: func(event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error) {
+			return []journal.Revision{{
 				Type:    "test.step.a",
 				Source:  "step-a",
 				Payload: event.Payload,
@@ -66,8 +66,8 @@ func TestRouterProcessorChain(t *testing.T) {
 		},
 	})
 	registry.RegisterProcessor("step-b", []string{"test.step.a"}, testPolicy(t, "step-b", []string{"test.step.b"}), stubProcessor{
-		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
-			return []journal.Event{{
+		fn: func(event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error) {
+			return []journal.Revision{{
 				Type:    "test.step.b",
 				Source:  "step-b",
 				Payload: event.Payload,
@@ -80,7 +80,7 @@ func TestRouterProcessorChain(t *testing.T) {
 		_ = router.Run(ctx)
 	}()
 
-	err = store.Append(ctx, journal.Event{
+	err = store.Append(ctx, journal.Revision{
 		Type:    "test.input",
 		Source:  "test",
 		Payload: json.RawMessage(`{"n":1}`),
@@ -116,11 +116,11 @@ func TestRouterSuppressesLoop(t *testing.T) {
 	defer store.Close()
 
 	var calls atomic.Int32
-	registry := NewEventRegistry()
+	registry := NewRevisionRegistry()
 	registry.RegisterProcessor("looper", []string{"test.loop"}, testPolicy(t, "looper", []string{"test.loop"}), stubProcessor{
-		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
+		fn: func(event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error) {
 			calls.Add(1)
-			return []journal.Event{{
+			return []journal.Revision{{
 				Type:    "test.loop",
 				Source:  "looper",
 				Payload: event.Payload,
@@ -133,7 +133,7 @@ func TestRouterSuppressesLoop(t *testing.T) {
 		_ = router.Run(ctx)
 	}()
 
-	err = store.Append(ctx, journal.Event{
+	err = store.Append(ctx, journal.Revision{
 		Type:    "test.loop",
 		Source:  "test",
 		Payload: json.RawMessage(`{"n":1}`),
@@ -157,10 +157,10 @@ func TestRouterSuppressesLoop(t *testing.T) {
 }
 
 type stubSink struct {
-	fn func(event journal.Event, dispatch DispatchContext) error
+	fn func(event journal.Revision, dispatch DispatchContext) error
 }
 
-func (s stubSink) Handle(ctx context.Context, event journal.Event, dispatch DispatchContext) error {
+func (s stubSink) Handle(ctx context.Context, event journal.Revision, dispatch DispatchContext) error {
 	return s.fn(event, dispatch)
 }
 
@@ -194,7 +194,7 @@ func TestRouterStartupCatchUp(t *testing.T) {
 
 	appendCtx := context.Background()
 	for range 5 {
-		if err := store.Append(appendCtx, journal.Event{
+		if err := store.Append(appendCtx, journal.Revision{
 			Type:    "test.catchup",
 			Source:  "test",
 			Payload: json.RawMessage(`{"n":1}`),
@@ -204,9 +204,9 @@ func TestRouterStartupCatchUp(t *testing.T) {
 	}
 
 	var handled atomic.Int32
-	registry := NewEventRegistry()
+	registry := NewRevisionRegistry()
 	registry.RegisterSink("counter", []string{"test.catchup"}, stubSink{
-		fn: func(event journal.Event, dispatch DispatchContext) error {
+		fn: func(event journal.Revision, dispatch DispatchContext) error {
 			handled.Add(1)
 			return nil
 		},
@@ -252,9 +252,9 @@ func TestRouterWatch(t *testing.T) {
 	defer store.Close()
 
 	var handled atomic.Int32
-	registry := NewEventRegistry()
+	registry := NewRevisionRegistry()
 	registry.RegisterSink("counter", []string{"test.watch"}, stubSink{
-		fn: func(event journal.Event, dispatch DispatchContext) error {
+		fn: func(event journal.Revision, dispatch DispatchContext) error {
 			handled.Add(1)
 			return nil
 		},
@@ -267,7 +267,7 @@ func TestRouterWatch(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	if err := store.Append(ctx, journal.Event{
+	if err := store.Append(ctx, journal.Revision{
 		Type:    "test.watch",
 		Source:  "test",
 		Payload: json.RawMessage(`{"n":1}`),
@@ -293,15 +293,15 @@ func TestRouterRestartPreservesDerivedDispatchContext(t *testing.T) {
 		derivedID = "01JBBB0000000000000000002"
 	)
 
-	if err := store.Append(appendCtx, journal.Event{
+	if err := store.Append(appendCtx, journal.Revision{
 		ID: sourceID, Type: "test.loop", Source: "test", Payload: json.RawMessage(`{"n":1}`),
 	}); err != nil {
 		t.Fatalf("Append(source) error = %v", err)
 	}
-	if err := store.SaveEventDispatch(appendCtx, derivedID, sourceID, []string{"looper"}); err != nil {
-		t.Fatalf("SaveEventDispatch() error = %v", err)
+	if err := store.SaveRevisionDispatch(appendCtx, derivedID, sourceID, []string{"looper"}); err != nil {
+		t.Fatalf("SaveRevisionDispatch() error = %v", err)
 	}
-	if err := store.Append(appendCtx, journal.Event{
+	if err := store.Append(appendCtx, journal.Revision{
 		ID: derivedID, Type: "test.loop", Source: "looper", Payload: json.RawMessage(`{"n":2}`),
 	}); err != nil {
 		t.Fatalf("Append(derived) error = %v", err)
@@ -311,9 +311,9 @@ func TestRouterRestartPreservesDerivedDispatchContext(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	registry := NewEventRegistry()
+	registry := NewRevisionRegistry()
 	registry.RegisterProcessor("looper", []string{"test.loop"}, testPolicy(t, "looper", []string{"test.loop"}), stubProcessor{
-		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
+		fn: func(event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error) {
 			calls.Add(1)
 			return nil, nil
 		},

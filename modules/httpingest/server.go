@@ -18,14 +18,14 @@ type putBlobResponse struct {
 }
 
 type writeResponse struct {
-	EventID      string `json:"event_id"`
+	EventID      string `json:"revision_id"`
 	RecordRef    string `json:"record_ref"`
 	Version      int32  `json:"version"`
 	Completeness string `json:"completeness"`
 	Operation    string `json:"operation"`
 }
 
-func dispatchHTTP(ctx context.Context, writer trovemodule.RecordEmitter, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+func dispatchHTTP(ctx context.Context, writer trovemodule.RevisionAppender, blobs trovemodule.BlobPutter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
 	if req == nil {
 		return textResponse(http.StatusBadRequest, "request is required"), nil
 	}
@@ -41,7 +41,7 @@ func dispatchHTTP(ctx context.Context, writer trovemodule.RecordEmitter, blobs t
 	}
 }
 
-func handleRecords(ctx context.Context, writer trovemodule.RecordEmitter, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
+func handleRecords(ctx context.Context, writer trovemodule.RevisionAppender, cfg config, req *troverpc.HTTPRequest) (*troverpc.HTTPResponse, error) {
 	body := req.Body
 	if len(body) == 0 {
 		return textResponse(http.StatusBadRequest, "request body is required"), nil
@@ -53,7 +53,7 @@ func handleRecords(ctx context.Context, writer trovemodule.RecordEmitter, cfg co
 		return textResponse(http.StatusBadRequest, "invalid JSON"), nil
 	}
 
-	writeReq, err := buildEmitRecordRequest(body)
+	writeReq, err := buildAppendRevisionRequest(body)
 	if err != nil {
 		return textResponse(http.StatusBadRequest, err.Error()), nil
 	}
@@ -67,7 +67,7 @@ func handleRecords(ctx context.Context, writer trovemodule.RecordEmitter, cfg co
 		}
 	}
 
-	resp, err := writer.EmitRecord(ctx, writeReq)
+	resp, err := writer.AppendRevision(ctx, writeReq)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
 			switch st.Code() {
@@ -83,7 +83,7 @@ func handleRecords(ctx context.Context, writer trovemodule.RecordEmitter, cfg co
 	}
 
 	payload, err := json.Marshal(writeResponse{
-		EventID:      resp.GetEventId(),
+		EventID:      resp.GetRevisionId(),
 		RecordRef:    resp.GetRecordRef(),
 		Version:      resp.GetVersion(),
 		Completeness: resp.GetCompleteness(),
@@ -126,13 +126,13 @@ func handlePutBlob(ctx context.Context, blobs trovemodule.BlobPutter, cfg config
 	}, nil
 }
 
-func buildEmitRecordRequest(body []byte) (*troverpc.EmitRecordRequest, error) {
+func buildAppendRevisionRequest(body []byte) (*troverpc.AppendRevisionRequest, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("invalid JSON object")
 	}
 
-	req := &troverpc.EmitRecordRequest{
+	req := &troverpc.AppendRevisionRequest{
 		Operation: "apply",
 		Payload:   []byte("{}"),
 	}

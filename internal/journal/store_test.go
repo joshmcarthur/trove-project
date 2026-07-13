@@ -33,17 +33,17 @@ func TestOpenCreatesDatabase(t *testing.T) {
 	}
 
 	var name string
-	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'`).Scan(&name)
+	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'revisions'`).Scan(&name)
 	if err != nil {
-		t.Fatalf("events table missing: %v", err)
+		t.Fatalf("revisions table missing: %v", err)
 	}
 
-	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events_fts'`).Scan(&name)
+	err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'revisions_fts'`).Scan(&name)
 	if err != nil {
-		t.Fatalf("events_fts table missing: %v", err)
+		t.Fatalf("revisions_fts table missing: %v", err)
 	}
 
-	for _, table := range []string{"record_heads", "record_events", "records_fts"} {
+	for _, table := range []string{"record_heads", "record_revisions", "records_fts"} {
 		err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&name)
 		if err != nil {
 			t.Fatalf("%s table missing: %v", table, err)
@@ -51,9 +51,9 @@ func TestOpenCreatesDatabase(t *testing.T) {
 	}
 
 	var operation string
-	err = store.db.QueryRow(`SELECT name FROM pragma_table_info('events') WHERE name = 'operation'`).Scan(&operation)
+	err = store.db.QueryRow(`SELECT name FROM pragma_table_info('revisions') WHERE name = 'operation'`).Scan(&operation)
 	if err != nil {
-		t.Fatalf("events.operation column missing: %v", err)
+		t.Fatalf("revisions.operation column missing: %v", err)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestAppendPersistsSchemaRef(t *testing.T) {
 
 	ref := "sha256-" + strings.Repeat("a", 64)
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	want := Event{
+	want := Revision{
 		ID:        id,
 		Type:      "trove://type/note/created/1",
 		SchemaRef: ref,
@@ -95,7 +95,7 @@ func TestAppendAndGet(t *testing.T) {
 	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.FixedZone("NZST", 12*60*60))
 	blobRef := "sha256:abc123"
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	want := Event{
+	want := Revision{
 		ID:      id,
 		Time:    when,
 		Type:    "meshtastic.message.received",
@@ -144,7 +144,7 @@ func TestAppendDefaults(t *testing.T) {
 
 	before := time.Now().UTC().Add(-time.Second)
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	event := Event{
+	event := Revision{
 		ID:      id,
 		Type:    "trove://type/mqtt/test/event/1",
 		Source:  "sensor-1",
@@ -181,25 +181,25 @@ func TestAppendValidation(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		event Event
+		event Revision
 	}{
 		{
 			name: "missing source",
-			event: Event{
+			event: Revision{
 				Type:    "test.event",
 				Payload: validPayload,
 			},
 		},
 		{
 			name: "missing payload",
-			event: Event{
+			event: Revision{
 				Type:   "test.event",
 				Source: "src",
 			},
 		},
 		{
 			name: "invalid payload json",
-			event: Event{
+			event: Revision{
 				Type:    "test.event",
 				Source:  "src",
 				Payload: json.RawMessage(`{not-json`),
@@ -236,7 +236,7 @@ func TestAppendDuplicateID(t *testing.T) {
 	ctx := context.Background()
 
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	event := Event{
+	event := Revision{
 		ID:      id,
 		Type:    "test.event",
 		Source:  "src",
@@ -247,7 +247,7 @@ func TestAppendDuplicateID(t *testing.T) {
 		t.Fatalf("first Append() error = %v", err)
 	}
 
-	duplicate := Event{
+	duplicate := Revision{
 		ID:      id,
 		Type:    "test.event",
 		Source:  "src",
@@ -269,7 +269,7 @@ func TestQuery(t *testing.T) {
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 	t4 := time.Date(2026, 7, 10, 11, 0, 0, 0, time.UTC)
 
-	seed := []Event{
+	seed := []Revision{
 		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
 		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "sensor-b", Payload: json.RawMessage(`{"v":3}`)},
@@ -384,7 +384,7 @@ func TestQueryText(t *testing.T) {
 	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 
-	seed := []Event{
+	seed := []Revision{
 		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
 		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"room":"kitchen"}`)},
@@ -481,7 +481,7 @@ CREATE TABLE IF NOT EXISTS events (
   payload   TEXT NOT NULL,
   blob_ref  TEXT
 );`); err != nil {
-		t.Fatalf("create events schema: %v", err)
+		t.Fatalf("create legacy events schema: %v", err)
 	}
 
 	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
@@ -516,9 +516,9 @@ CREATE TABLE IF NOT EXISTS events (
 	}
 
 	var operation string
-	err = store.db.QueryRow(`SELECT name FROM pragma_table_info('events') WHERE name = 'operation'`).Scan(&operation)
+	err = store.db.QueryRow(`SELECT name FROM pragma_table_info('revisions') WHERE name = 'operation'`).Scan(&operation)
 	if err != nil {
-		t.Fatalf("events.operation column missing after migration: %v", err)
+		t.Fatalf("revisions.operation column missing after migration: %v", err)
 	}
 }
 
@@ -531,7 +531,7 @@ func TestAppendRecordFields(t *testing.T) {
 	recordRef := ulid.MustNew(ulid.Now(), rand.Reader).String()
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
 	transforms := json.RawMessage(`[{"op":"add","path":"/tags/-","value":"x"}]`)
-	want := Event{
+	want := Revision{
 		ID:         id,
 		Operation:  OpApply,
 		RecordRef:  recordRef,
@@ -567,7 +567,7 @@ func TestAppendWithoutType(t *testing.T) {
 	ctx := context.Background()
 
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	if err := store.Append(ctx, Event{
+	if err := store.Append(ctx, Revision{
 		ID:      id,
 		Source:  "test",
 		Payload: json.RawMessage(`{"text":"untitled"}`),
@@ -600,7 +600,7 @@ func TestAppendDefaultsRecordRef(t *testing.T) {
 	ctx := context.Background()
 
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	if err := store.Append(ctx, Event{
+	if err := store.Append(ctx, Revision{
 		ID:      id,
 		Type:    "test.event",
 		Source:  "test",
@@ -630,8 +630,8 @@ func openTestStore(t *testing.T) *Store {
 	return store
 }
 
-func testEvent(id string, when time.Time, typ, source string) Event {
-	return Event{
+func testEvent(id string, when time.Time, typ, source string) Revision {
+	return Revision{
 		ID:      id,
 		Time:    when,
 		Type:    typ,
@@ -673,12 +673,12 @@ func TestPruneBefore(t *testing.T) {
 	oldTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	newTime := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
 
-	if err := store.Append(ctx, Event{
+	if err := store.Append(ctx, Revision{
 		ID: "01JOLD0000000000000000001", Time: oldTime, Type: "test.old", Source: "test", Payload: json.RawMessage(`{"v":1}`),
 	}); err != nil {
 		t.Fatalf("Append(old) error = %v", err)
 	}
-	if err := store.Append(ctx, Event{
+	if err := store.Append(ctx, Revision{
 		ID: "01JNEW0000000000000000002", Time: newTime, Type: "test.new", Source: "test", Payload: json.RawMessage(`{"v":2}`),
 	}); err != nil {
 		t.Fatalf("Append(new) error = %v", err)
@@ -715,7 +715,7 @@ func TestQueryAfter(t *testing.T) {
 	}
 	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 	for i, id := range ids {
-		if err := store.Append(ctx, Event{
+		if err := store.Append(ctx, Revision{
 			ID: id, Time: when.Add(time.Duration(i) * time.Minute),
 			Type: "test.after", Source: "test", Payload: json.RawMessage(`{"n":1}`),
 		}); err != nil {
@@ -777,16 +777,16 @@ func TestEventDispatchRoundTrip(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 
 	const eventID = "01JDISP000000000000000001"
-	if err := store.SaveEventDispatch(ctx, eventID, "01JROOT000000000000000001", []string{"step-a", "step-b"}); err != nil {
-		t.Fatalf("SaveEventDispatch() error = %v", err)
+	if err := store.SaveRevisionDispatch(ctx, eventID, "01JROOT000000000000000001", []string{"step-a", "step-b"}); err != nil {
+		t.Fatalf("SaveRevisionDispatch() error = %v", err)
 	}
 
-	rootID, seen, ok, err := store.LoadEventDispatch(ctx, eventID)
+	rootID, seen, ok, err := store.LoadRevisionDispatch(ctx, eventID)
 	if err != nil {
-		t.Fatalf("LoadEventDispatch() error = %v", err)
+		t.Fatalf("LoadRevisionDispatch() error = %v", err)
 	}
 	if !ok {
-		t.Fatal("LoadEventDispatch() ok = false, want true")
+		t.Fatal("LoadRevisionDispatch() ok = false, want true")
 	}
 	if rootID != "01JROOT000000000000000001" {
 		t.Fatalf("rootID = %q, want root id", rootID)
@@ -795,15 +795,15 @@ func TestEventDispatchRoundTrip(t *testing.T) {
 		t.Fatalf("seen = %#v, want [step-a step-b]", seen)
 	}
 
-	if err := store.DeleteEventDispatch(ctx, eventID); err != nil {
-		t.Fatalf("DeleteEventDispatch() error = %v", err)
+	if err := store.DeleteRevisionDispatch(ctx, eventID); err != nil {
+		t.Fatalf("DeleteRevisionDispatch() error = %v", err)
 	}
-	_, _, ok, err = store.LoadEventDispatch(ctx, eventID)
+	_, _, ok, err = store.LoadRevisionDispatch(ctx, eventID)
 	if err != nil {
-		t.Fatalf("LoadEventDispatch() after delete error = %v", err)
+		t.Fatalf("LoadRevisionDispatch() after delete error = %v", err)
 	}
 	if ok {
-		t.Fatal("LoadEventDispatch() after delete ok = true, want false")
+		t.Fatal("LoadRevisionDispatch() after delete ok = true, want false")
 	}
 }
 
@@ -821,7 +821,7 @@ func TestWatch(t *testing.T) {
 		t.Fatalf("Watch() error = %v", err)
 	}
 
-	if err := store.Append(ctx, Event{
+	if err := store.Append(ctx, Revision{
 		Type: "test.watch", Source: "test", Payload: json.RawMessage(`{"n":1}`),
 	}); err != nil {
 		t.Fatalf("Append() error = %v", err)

@@ -25,11 +25,11 @@ func openTestRecordService(t *testing.T) (*journal.Store, *RecordService) {
 	return store, &RecordService{DB: store.DB()}
 }
 
-func materializeEvent(t *testing.T, store *journal.Store, e journal.Event) {
+func materializeEvent(t *testing.T, store *journal.Store, e journal.Revision) {
 	t.Helper()
 
 	ctx := context.Background()
-	err := store.AppendTransactional(ctx, e, func(ctx context.Context, tx *sql.Tx, e journal.Event) error {
+	err := store.AppendTransactional(ctx, e, func(ctx context.Context, tx *sql.Tx, e journal.Revision) error {
 		_, err := records.NewMaterializer(tx).Apply(ctx, e)
 		return err
 	})
@@ -41,7 +41,7 @@ func materializeEvent(t *testing.T, store *journal.Store, e journal.Event) {
 func seedRecord(t *testing.T, store *journal.Store, eventID, ref string, when time.Time, source, body string, typ string) {
 	t.Helper()
 
-	e := journal.Event{
+	e := journal.Revision{
 		ID:        eventID,
 		Time:      when,
 		Operation: journal.OpApply,
@@ -129,7 +129,7 @@ func TestSearchRecords(t *testing.T) {
 	seedRecord(t, store, "01JEVT00000000000000000011", refB, t2, "sensor-a", `{"reading":"dry"}`, "trove://type/mqtt/sensor/humidity/1")
 	seedRecord(t, store, "01JEVT00000000000000000012", refC, t3, "kitchen-light", `{"room":"kitchen"}`, "ha.light.on")
 
-	materializeEvent(t, store, journal.Event{
+	materializeEvent(t, store, journal.Revision{
 		ID:        "01JEVT00000000000000000099",
 		Time:      t3.Add(time.Minute),
 		Operation: journal.OpDelete,

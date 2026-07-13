@@ -10,7 +10,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 )
 
-const maxNotableEvents = 5
+const maxNotableRevisions = 5
 
 // Service implements the internal query RPC API over a journal.
 type Service struct {
@@ -26,19 +26,19 @@ type SearchParams struct {
 }
 
 // GetEvent returns the event with id.
-func (s *Service) GetEvent(ctx context.Context, id string) (Event, error) {
+func (s *Service) GetRevision(ctx context.Context, id string) (Revision, error) {
 	e, err := s.Journal.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, journal.ErrNotFound) {
-			return Event{}, ErrNotFound
+			return Revision{}, ErrNotFound
 		}
-		return Event{}, err
+		return Revision{}, err
 	}
-	return eventFromJournal(e), nil
+	return revisionFromJournal(e), nil
 }
 
 // SearchEvents performs FTS5 keyword search over the journal.
-func (s *Service) SearchEvents(ctx context.Context, query string, params SearchParams) ([]Event, error) {
+func (s *Service) SearchRevisions(ctx context.Context, query string, params SearchParams) ([]Revision, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, ErrEmptyQuery
@@ -55,15 +55,15 @@ func (s *Service) SearchEvents(ctx context.Context, query string, params SearchP
 		return nil, err
 	}
 
-	out := make([]Event, len(events))
+	out := make([]Revision, len(events))
 	for i, e := range events {
-		out[i] = eventFromJournal(e)
+		out[i] = revisionFromJournal(e)
 	}
 	return out, nil
 }
 
 // GetEventsByType returns events with the exact type, optionally narrowed by time range.
-func (s *Service) GetEventsByType(ctx context.Context, eventType string, timeFrom, timeTo *time.Time) ([]Event, error) {
+func (s *Service) GetRevisionsByType(ctx context.Context, eventType string, timeFrom, timeTo *time.Time) ([]Revision, error) {
 	eventType = strings.TrimSpace(eventType)
 	if eventType == "" {
 		return nil, ErrEmptyType
@@ -81,9 +81,9 @@ func (s *Service) GetEventsByType(ctx context.Context, eventType string, timeFro
 		return nil, err
 	}
 
-	out := make([]Event, len(events))
+	out := make([]Revision, len(events))
 	for i, e := range events {
-		out[i] = eventFromJournal(e)
+		out[i] = revisionFromJournal(e)
 	}
 	return out, nil
 }
@@ -107,7 +107,7 @@ func (s *Service) SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time
 		byType[e.Type]++
 	}
 
-	notable := selectNotableEvents(events, maxNotableEvents)
+	notable := selectNotableRevisions(events, maxNotableRevisions)
 
 	return Summary{
 		TimeFrom: timeFrom,
@@ -118,12 +118,12 @@ func (s *Service) SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time
 	}, nil
 }
 
-func selectNotableEvents(events []journal.Event, limit int) []Event {
+func selectNotableRevisions(events []journal.Revision, limit int) []Revision {
 	if len(events) == 0 || limit <= 0 {
 		return nil
 	}
 
-	sorted := make([]journal.Event, len(events))
+	sorted := make([]journal.Revision, len(events))
 	copy(sorted, events)
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].Time.After(sorted[j].Time)
@@ -133,9 +133,9 @@ func selectNotableEvents(events []journal.Event, limit int) []Event {
 		sorted = sorted[:limit]
 	}
 
-	out := make([]Event, len(sorted))
+	out := make([]Revision, len(sorted))
 	for i, e := range sorted {
-		out[i] = eventFromJournal(e)
+		out[i] = revisionFromJournal(e)
 	}
 	return out
 }

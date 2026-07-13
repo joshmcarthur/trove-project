@@ -22,7 +22,7 @@ var ErrNotIncomplete = errors.New("capture: record is not incomplete")
 type Store interface {
 	GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error)
 	ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error)
-	EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error)
+	AppendRevision(ctx context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error)
 }
 
 // ClassifyRequest identifies an incomplete record and desired target type.
@@ -35,7 +35,7 @@ type ClassifyRequest struct {
 // ClassifyResult returns the write response identifiers.
 type ClassifyResult struct {
 	RecordRef string `json:"record_ref"`
-	EventID   string `json:"event_id"`
+	EventID   string `json:"revision_id"`
 	Version   int32  `json:"version"`
 }
 
@@ -62,13 +62,13 @@ func Capture(ctx context.Context, s Store, source string, body []byte) (CaptureR
 	if err != nil {
 		return CaptureResult{}, err
 	}
-	resp, err := s.EmitRecord(ctx, req)
+	resp, err := s.AppendRevision(ctx, req)
 	if err != nil {
 		return CaptureResult{}, err
 	}
 	return CaptureResult{
 		RecordRef: resp.GetRecordRef(),
-		EventID:   resp.GetEventId(),
+		EventID:   resp.GetRevisionId(),
 	}, nil
 }
 
@@ -99,7 +99,7 @@ func Classify(ctx context.Context, s Store, req ClassifyRequest) (ClassifyResult
 		return ClassifyResult{}, err
 	}
 
-	resp, err := s.EmitRecord(ctx, &troverpc.EmitRecordRequest{
+	resp, err := s.AppendRevision(ctx, &troverpc.AppendRevisionRequest{
 		Operation: "apply",
 		RecordRef: req.RecordRef,
 		Type:      req.TargetType,
@@ -111,7 +111,7 @@ func Classify(ctx context.Context, s Store, req ClassifyRequest) (ClassifyResult
 	}
 	return ClassifyResult{
 		RecordRef: resp.GetRecordRef(),
-		EventID:   resp.GetEventId(),
+		EventID:   resp.GetRevisionId(),
 		Version:   resp.GetVersion(),
 	}, nil
 }
@@ -124,8 +124,8 @@ func ListIncomplete(ctx context.Context, s Store, source string, limit int32) ([
 	})
 }
 
-func buildCaptureRequest(source string, body []byte) (*troverpc.EmitRecordRequest, error) {
-	req := &troverpc.EmitRecordRequest{
+func buildCaptureRequest(source string, body []byte) (*troverpc.AppendRevisionRequest, error) {
+	req := &troverpc.AppendRevisionRequest{
 		Operation: "apply",
 		Source:    source,
 		Payload:   body,

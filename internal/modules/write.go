@@ -32,7 +32,7 @@ func NewWriteService(store *journal.Store) *WriteService {
 }
 
 // Write persists a validated record event and materializes the projection.
-func (s *WriteService) Write(ctx context.Context, event journal.Event, policy *WritePolicy) (WriteResult, error) {
+func (s *WriteService) Write(ctx context.Context, event journal.Revision, policy *WritePolicy) (WriteResult, error) {
 	if s == nil || s.store == nil {
 		return WriteResult{}, fmt.Errorf("modules: write: journal is not configured")
 	}
@@ -50,8 +50,8 @@ func (s *WriteService) Write(ctx context.Context, event journal.Event, policy *W
 	}
 
 	var head records.Head
-	var written journal.Event
-	err := s.store.AppendTransactional(ctx, event, func(ctx context.Context, tx *sql.Tx, e journal.Event) error {
+	var written journal.Revision
+	err := s.store.AppendTransactional(ctx, event, func(ctx context.Context, tx *sql.Tx, e journal.Revision) error {
 		written = e
 		mat := records.NewMaterializer(tx)
 		if _, matErr := mat.Apply(ctx, e); matErr != nil {
@@ -81,9 +81,9 @@ func (s *WriteService) Write(ctx context.Context, event journal.Event, policy *W
 	}, nil
 }
 
-// EmitRecordFromRPC converts req, applies policy when set, and appends the record event.
-func (s *WriteService) EmitRecordFromRPC(ctx context.Context, req *troverpc.EmitRecordRequest, policy WritePolicy) (*troverpc.EmitRecordResponse, error) {
-	event, err := rpcEmitRecordRequestToJournal(req)
+// AppendRevisionFromRPC converts req, applies policy when set, and appends the record event.
+func (s *WriteService) AppendRevisionFromRPC(ctx context.Context, req *troverpc.AppendRevisionRequest, policy WritePolicy) (*troverpc.AppendRevisionResponse, error) {
+	event, err := rpcAppendRevisionRequestToJournal(req)
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +91,10 @@ func (s *WriteService) EmitRecordFromRPC(ctx context.Context, req *troverpc.Emit
 	if err != nil {
 		return nil, err
 	}
-	return emitRecordResultToProto(result), nil
+	return appendRevisionResultToProto(result), nil
 }
 
-func validateWriteEvent(event *journal.Event) error {
+func validateWriteEvent(event *journal.Revision) error {
 	if event == nil {
 		return fmt.Errorf("modules: write: event is nil")
 	}
@@ -142,9 +142,9 @@ func validateWriteEvent(event *journal.Event) error {
 	return nil
 }
 
-func emitRecordResultToProto(result WriteResult) *troverpc.EmitRecordResponse {
-	return &troverpc.EmitRecordResponse{
-		EventId:      result.EventID,
+func appendRevisionResultToProto(result WriteResult) *troverpc.AppendRevisionResponse {
+	return &troverpc.AppendRevisionResponse{
+		RevisionId:   result.EventID,
 		RecordRef:    result.RecordRef,
 		Version:      int32(result.Version), //nolint:gosec // G115: record version from materializer
 		Completeness: result.Completeness,

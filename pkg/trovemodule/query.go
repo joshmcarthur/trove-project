@@ -8,15 +8,12 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
-// Querier reads journal and record data via Core query RPCs.
-type Querier interface {
-	GetEvent(ctx context.Context, id string) (*troverpc.Event, error)
-	SearchEvents(ctx context.Context, req *troverpc.SearchEventsRequest) ([]*troverpc.Event, error)
-	GetEventsByType(ctx context.Context, req *troverpc.GetEventsByTypeRequest) ([]*troverpc.Event, error)
+// RevisionQuerier reads journal revisions via Core query RPCs.
+type RevisionQuerier interface {
+	GetRevision(ctx context.Context, id string) (*troverpc.Revision, error)
+	SearchRevisions(ctx context.Context, req *troverpc.SearchRevisionsRequest) ([]*troverpc.Revision, error)
+	GetRevisionsByType(ctx context.Context, req *troverpc.GetRevisionsByTypeRequest) ([]*troverpc.Revision, error)
 	SummarizeRange(ctx context.Context, req *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error)
-	GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error)
-	SearchRecords(ctx context.Context, req *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error)
-	ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error)
 }
 
 // ParseRFC3339Optional parses an optional RFC3339 timestamp string.

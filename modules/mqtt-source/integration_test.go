@@ -15,18 +15,18 @@ import (
 	"github.com/mochi-mqtt/server/v2/listeners"
 )
 
-type channelEmitter struct {
+type channelAppender struct {
 	mu     sync.Mutex
-	events []*troverpc.Event
+	events []*troverpc.Revision
 	notify chan struct{}
 }
 
-func newChannelEmitter() *channelEmitter {
-	return &channelEmitter{notify: make(chan struct{}, 8)}
+func newChannelEmitter() *channelAppender {
+	return &channelAppender{notify: make(chan struct{}, 8)}
 }
 
-func (e *channelEmitter) EmitRecord(_ context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
-	event := &troverpc.Event{
+func (e *channelAppender) AppendRevision(_ context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
+	event := &troverpc.Revision{
 		Type:    req.GetType(),
 		Source:  req.GetSource(),
 		Payload: req.GetPayload(),
@@ -38,10 +38,10 @@ func (e *channelEmitter) EmitRecord(_ context.Context, req *troverpc.EmitRecordR
 	case e.notify <- struct{}{}:
 	default:
 	}
-	return &troverpc.EmitRecordResponse{EventId: "01JTEST", RecordRef: "01JREC", Version: 1, Operation: req.GetOperation()}, nil
+	return &troverpc.AppendRevisionResponse{RevisionId: "01JTEST", RecordRef: "01JREC", Version: 1, Operation: req.GetOperation()}, nil
 }
 
-func (e *channelEmitter) waitForEvents(t *testing.T, count int, timeout time.Duration) []*troverpc.Event {
+func (e *channelAppender) waitForEvents(t *testing.T, count int, timeout time.Duration) []*troverpc.Revision {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
@@ -50,7 +50,7 @@ func (e *channelEmitter) waitForEvents(t *testing.T, count int, timeout time.Dur
 		e.mu.Unlock()
 		if n >= count {
 			e.mu.Lock()
-			out := append([]*troverpc.Event(nil), e.events...)
+			out := append([]*troverpc.Revision(nil), e.events...)
 			e.mu.Unlock()
 			return out
 		}
@@ -162,4 +162,4 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 	}
 }
 
-var _ trovemodule.RecordEmitter = (*channelEmitter)(nil)
+var _ trovemodule.RevisionAppender = (*channelAppender)(nil)

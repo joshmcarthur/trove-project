@@ -18,8 +18,8 @@ type stubCore struct {
 	records map[string]*troverpc.Record
 }
 
-func (s *stubCore) EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
-	resp, err := s.journal.EmitRecord(ctx, req)
+func (s *stubCore) AppendRevision(ctx context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
+	resp, err := s.journal.AppendRevision(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -46,25 +46,20 @@ func (s *stubCore) EmitRecord(ctx context.Context, req *troverpc.EmitRecordReque
 	return resp, nil
 }
 
-func (s *stubCore) Emit(ctx context.Context, event *troverpc.Event) error {
-	_, err := trovemodule.EmitRecordFromEvent(ctx, s, event)
-	return err
-}
-
 func (s *stubCore) Put(_ context.Context, _ []byte) (string, error) {
 	return "blob:stub", nil
 }
 
-func (s *stubCore) GetEvent(ctx context.Context, id string) (*troverpc.Event, error) {
-	return s.journal.GetEvent(ctx, id)
+func (s *stubCore) GetRevision(ctx context.Context, id string) (*troverpc.Revision, error) {
+	return s.journal.GetRevision(ctx, id)
 }
 
-func (s *stubCore) SearchEvents(_ context.Context, _ *troverpc.SearchEventsRequest) ([]*troverpc.Event, error) {
+func (s *stubCore) SearchRevisions(_ context.Context, _ *troverpc.SearchRevisionsRequest) ([]*troverpc.Revision, error) {
 	return nil, nil
 }
 
-func (s *stubCore) GetEventsByType(ctx context.Context, req *troverpc.GetEventsByTypeRequest) ([]*troverpc.Event, error) {
-	return s.journal.GetEventsByType(ctx, req.Type)
+func (s *stubCore) GetRevisionsByType(ctx context.Context, req *troverpc.GetRevisionsByTypeRequest) ([]*troverpc.Revision, error) {
+	return s.journal.GetRevisionsByType(ctx, req.Type)
 }
 
 func (s *stubCore) SummarizeRange(_ context.Context, _ *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
@@ -111,21 +106,34 @@ func (s *stubCore) ListIncompleteRecords(context.Context, *troverpc.ListIncomple
 	return nil, nil
 }
 
-var _ trovemodule.Core = (*stubCore)(nil)
+var (
+	_ trovemodule.Core                   = (*stubCore)(nil)
+	_ trovemodule.RecordProjectionReader = (*stubCore)(nil)
+)
+
+func mustNewBotService(t *testing.T, cfg config, core *stubCore) *botService {
+	t.Helper()
+	return &botService{
+		cfg:      cfg,
+		core:     core,
+		store:    &captureStore{core: core, records: core},
+		sessions: newSessionStore(cfg.SessionTTLMin),
+	}
+}
 
 type stubJournal struct {
-	events map[string]*troverpc.Event
-	byType map[string][]*troverpc.Event
+	events map[string]*troverpc.Revision
+	byType map[string][]*troverpc.Revision
 }
 
 func newStubJournal() *stubJournal {
 	return &stubJournal{
-		events: make(map[string]*troverpc.Event),
-		byType: make(map[string][]*troverpc.Event),
+		events: make(map[string]*troverpc.Revision),
+		byType: make(map[string][]*troverpc.Revision),
 	}
 }
 
-func (s *stubJournal) GetEvent(_ context.Context, id string) (*troverpc.Event, error) {
+func (s *stubJournal) GetRevision(_ context.Context, id string) (*troverpc.Revision, error) {
 	event, ok := s.events[id]
 	if !ok {
 		return nil, classify.ErrNotFound
@@ -133,12 +141,12 @@ func (s *stubJournal) GetEvent(_ context.Context, id string) (*troverpc.Event, e
 	return event, nil
 }
 
-func (s *stubJournal) GetEventsByType(_ context.Context, eventType string) ([]*troverpc.Event, error) {
-	return append([]*troverpc.Event(nil), s.byType[eventType]...), nil
+func (s *stubJournal) GetRevisionsByType(_ context.Context, eventType string) ([]*troverpc.Revision, error) {
+	return append([]*troverpc.Revision(nil), s.byType[eventType]...), nil
 }
 
-func (s *stubJournal) EmitRecord(_ context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
-	event := &troverpc.Event{
+func (s *stubJournal) AppendRevision(_ context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
+	event := &troverpc.Revision{
 		Id:        req.GetRecordRef(),
 		Type:      req.GetType(),
 		Source:    req.GetSource(),
@@ -156,7 +164,7 @@ func (s *stubJournal) EmitRecord(_ context.Context, req *troverpc.EmitRecordRequ
 	}
 	s.events[event.Id] = event
 	s.byType[event.Type] = append(s.byType[event.Type], event)
-	return &troverpc.EmitRecordResponse{EventId: event.Id, RecordRef: event.RecordRef, Version: 1, Operation: req.GetOperation()}, nil
+	return &troverpc.AppendRevisionResponse{RevisionId: event.Id, RecordRef: event.RecordRef, Version: 1, Operation: req.GetOperation()}, nil
 }
 
 func testConfig() config {
@@ -194,7 +202,7 @@ func TestFinishClassifyEmitsTypedEvent(t *testing.T) {
 
 	j := newStubJournal()
 	core := &stubCore{journal: j, records: make(map[string]*troverpc.Record)}
-	svc := newBotService(testConfig(), core)
+	svc := mustNewBotService(t, testConfig(), core)
 	chatID := int64(100)
 
 	result, err := classify.Capture(context.Background(), svc.store, "telegram", []byte(`{"text":"hello"}`))
@@ -223,7 +231,7 @@ func TestFinishFastPathEmitsDirectly(t *testing.T) {
 
 	j := newStubJournal()
 	core := &stubCore{journal: j, records: make(map[string]*troverpc.Record)}
-	svc := newBotService(testConfig(), core)
+	svc := mustNewBotService(t, testConfig(), core)
 	chatID := int64(100)
 
 	sess := &session{

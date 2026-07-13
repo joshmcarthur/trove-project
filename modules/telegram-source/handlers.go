@@ -24,13 +24,17 @@ type botService struct {
 	sessions *sessionStore
 }
 
-func newBotService(cfg config, core trovemodule.Core) *botService {
+func newBotService(cfg config, core trovemodule.Core) (*botService, error) {
+	store, err := newCaptureStore(core)
+	if err != nil {
+		return nil, err
+	}
 	return &botService{
 		cfg:      cfg,
 		core:     core,
-		store:    &captureStore{core: core},
+		store:    store,
 		sessions: newSessionStore(cfg.SessionTTLMin),
-	}
+	}, nil
 }
 
 func (s *botService) registerCommands(ctx context.Context, b *bot.Bot) error {
@@ -393,14 +397,14 @@ func (s *botService) finishFastPath(ctx context.Context, b *bot.Bot, chatID int6
 		s.sendText(ctx, b, chatID, "Could not save.")
 		return
 	}
-	event := &troverpc.Event{
+	event := &troverpc.Revision{
 		Type:    sess.TargetType,
 		Source:  "telegram",
 		Time:    sess.Draft.Time,
 		BlobRef: sess.Draft.BlobRef,
 		Payload: payloadBytes,
 	}
-	if _, err := trovemodule.EmitRecordFromEvent(ctx, s.core, event); err != nil {
+	if _, err := trovemodule.AppendRevisionFromMessage(ctx, s.core, event); err != nil {
 		log.Printf("telegram-source: emit fast path: %v", err)
 		s.sendText(ctx, b, chatID, "Could not save.")
 		return

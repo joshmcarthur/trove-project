@@ -8,7 +8,7 @@ import (
 
 // ValidateEmit checks allowed patterns, catalog registration, and payload shape.
 // It returns the catalog schema_ref for the event type on success.
-func (c *Catalog) ValidateEmit(event journal.Event, allowedPatterns []string) (schemaRef string, err error) {
+func (c *Catalog) ValidateEmit(event journal.Revision, allowedPatterns []string) (schemaRef string, err error) {
 	if c == nil {
 		return "", fmt.Errorf("types: catalog is required")
 	}

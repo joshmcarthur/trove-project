@@ -19,13 +19,13 @@ const (
 	mqttMessageReceivedType = "trove://type/mqtt/message/received/1"
 )
 
-func runMQTT(ctx context.Context, emitter trovemodule.RecordEmitter, cfg config, state *subscriptionState) error {
+func runMQTT(ctx context.Context, emitter trovemodule.RevisionAppender, cfg config, state *subscriptionState) error {
 	messageHandler := func(_ mqtt.Client, msg mqtt.Message) {
-		event, err := buildEvent(msg.Topic(), msg.Payload())
+		event, err := buildRevision(msg.Topic(), msg.Payload())
 		if err != nil {
 			return
 		}
-		_, _ = trovemodule.EmitRecordFromEvent(ctx, emitter, event)
+		_, _ = trovemodule.AppendRevisionFromMessage(ctx, emitter, event)
 	}
 
 	subscribeTopics := func(client mqtt.Client) error {
@@ -96,13 +96,13 @@ func runMQTT(ctx context.Context, emitter trovemodule.RecordEmitter, cfg config,
 	return nil
 }
 
-func buildEvent(topic string, payload []byte) (*troverpc.Event, error) {
+func buildRevision(topic string, payload []byte) (*troverpc.Revision, error) {
 	body, err := buildPayload(topic, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	return &troverpc.Event{
+	return &troverpc.Revision{
 		Type:    mqttMessageReceivedType,
 		Source:  topic,
 		Payload: body,

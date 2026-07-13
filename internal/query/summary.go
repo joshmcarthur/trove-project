@@ -8,5 +8,5 @@ type Summary struct {
 	TimeTo   time.Time      `json:"time_to"`
 	Total    int            `json:"total"`
 	ByType   map[string]int `json:"by_type"`
-	Notable  []Event        `json:"notable"`
+	Notable  []Revision     `json:"notable"`
 }

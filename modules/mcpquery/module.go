@@ -28,12 +28,16 @@ func New() trovemodule.Module {
 }
 
 func (m *Module) Run(ctx context.Context, core trovemodule.Core) error {
+	records, err := trovemodule.RecordProjection(core)
+	if err != nil {
+		return err
+	}
 	tools, err := core.ListMCPTools(ctx)
 	if err != nil {
 		return err
 	}
 	m.handler = query.MCPHandler(query.MCPDeps{
-		Querier: &queryAdapter{q: core},
+		Records: &recordAdapter{records: records},
 		Tools:   tools,
 		Caller:  core,
 	})
@@ -71,31 +75,12 @@ func Manifest() (modules.Manifest, error) {
 	return modules.ParseManifest(manifestBytes)
 }
 
-type queryAdapter struct {
-	q trovemodule.Querier
+type recordAdapter struct {
+	records trovemodule.RecordProjectionReader
 }
 
-func (a *queryAdapter) GetEvent(ctx context.Context, id string) (query.Event, error) {
-	event, err := a.q.GetEvent(ctx, id)
-	if err != nil {
-		return query.Event{}, err
-	}
-	return protoToQueryEvent(event)
-}
-
-func (a *queryAdapter) SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (query.Summary, error) {
-	summary, err := a.q.SummarizeRange(ctx, &troverpc.SummarizeRangeRequest{
-		TimeFrom: timeFrom.Format(time.RFC3339),
-		TimeTo:   timeTo.Format(time.RFC3339),
-	})
-	if err != nil {
-		return query.Summary{}, err
-	}
-	return protoToQuerySummary(summary)
-}
-
-func (a *queryAdapter) GetRecord(ctx context.Context, recordRef string, version int) (query.Record, error) {
-	record, err := a.q.GetRecord(ctx, &troverpc.GetRecordRequest{
+func (a *recordAdapter) GetRecord(ctx context.Context, recordRef string, version int) (query.Record, error) {
+	record, err := a.records.GetRecord(ctx, &troverpc.GetRecordRequest{
 		RecordRef: recordRef,
 		Version:   int32(version), //nolint:gosec // G115: MCP tool version filter
 	})
@@ -105,8 +90,8 @@ func (a *queryAdapter) GetRecord(ctx context.Context, recordRef string, version 
 	return protoToQueryRecord(record)
 }
 
-func (a *queryAdapter) SearchRecords(ctx context.Context, text string, params query.RecordSearchParams) ([]query.Record, error) {
-	records, err := a.q.SearchRecords(ctx, &troverpc.SearchRecordsRequest{
+func (a *recordAdapter) SearchRecords(ctx context.Context, text string, params query.RecordSearchParams) ([]query.Record, error) {
+	records, err := a.records.SearchRecords(ctx, &troverpc.SearchRecordsRequest{
 		Query:          text,
 		TypePrefix:     params.TypePrefix,
 		Source:         params.Source,
@@ -120,8 +105,8 @@ func (a *queryAdapter) SearchRecords(ctx context.Context, text string, params qu
 	return protoToQueryRecords(records)
 }
 
-func (a *queryAdapter) ListIncompleteRecords(ctx context.Context, source string, limit int) ([]query.Record, error) {
-	records, err := a.q.ListIncompleteRecords(ctx, &troverpc.ListIncompleteRecordsRequest{
+func (a *recordAdapter) ListIncompleteRecords(ctx context.Context, source string, limit int) ([]query.Record, error) {
+	records, err := a.records.ListIncompleteRecords(ctx, &troverpc.ListIncompleteRecordsRequest{
 		Source: source,
 		Limit:  int32(limit), //nolint:gosec // G115: MCP tool limit
 	})
@@ -129,64 +114,6 @@ func (a *queryAdapter) ListIncompleteRecords(ctx context.Context, source string,
 		return nil, err
 	}
 	return protoToQueryRecords(records)
-}
-
-func protoToQueryEvent(event *troverpc.Event) (query.Event, error) {
-	if event == nil {
-		return query.Event{}, query.ErrNotFound
-	}
-	t, err := time.Parse(time.RFC3339, event.Time)
-	if err != nil {
-		return query.Event{}, err
-	}
-	out := query.Event{
-		ID:         event.Id,
-		Time:       t,
-		Operation:  event.Operation,
-		RecordRef:  event.RecordRef,
-		Type:       event.Type,
-		Source:     event.Source,
-		Payload:    event.Payload,
-		Transforms: event.Transforms,
-	}
-	if event.BlobRef != "" {
-		ref := event.BlobRef
-		out.BlobRef = &ref
-	}
-	return out, nil
-}
-
-func protoToQuerySummary(summary *troverpc.Summary) (query.Summary, error) {
-	if summary == nil {
-		return query.Summary{}, nil
-	}
-	timeFrom, err := time.Parse(time.RFC3339, summary.TimeFrom)
-	if err != nil {
-		return query.Summary{}, err
-	}
-	timeTo, err := time.Parse(time.RFC3339, summary.TimeTo)
-	if err != nil {
-		return query.Summary{}, err
-	}
-	byType := make(map[string]int, len(summary.ByType))
-	for k, v := range summary.ByType {
-		byType[k] = int(v)
-	}
-	notable := make([]query.Event, 0, len(summary.Notable))
-	for _, event := range summary.Notable {
-		converted, err := protoToQueryEvent(event)
-		if err != nil {
-			return query.Summary{}, err
-		}
-		notable = append(notable, converted)
-	}
-	return query.Summary{
-		TimeFrom: timeFrom,
-		TimeTo:   timeTo,
-		Total:    int(summary.Total),
-		ByType:   byType,
-		Notable:  notable,
-	}, nil
 }
 
 func protoToQueryRecord(record *troverpc.Record) (query.Record, error) {

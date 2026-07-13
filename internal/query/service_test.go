@@ -25,7 +25,7 @@ func openTestJournal(t *testing.T) journal.Journal {
 	return store
 }
 
-func TestGetEvent(t *testing.T) {
+func TestGetRevision(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -35,7 +35,7 @@ func TestGetEvent(t *testing.T) {
 	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 	blobRef := "sha256:abc123"
 	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	want := journal.Event{
+	want := journal.Revision{
 		ID:      id,
 		Time:    when,
 		Type:    "trove://type/http/ingest/received/1",
@@ -47,9 +47,9 @@ func TestGetEvent(t *testing.T) {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	got, err := svc.GetEvent(ctx, id)
+	got, err := svc.GetRevision(ctx, id)
 	if err != nil {
-		t.Fatalf("GetEvent() error = %v", err)
+		t.Fatalf("GetRevision() error = %v", err)
 	}
 	if got.ID != want.ID {
 		t.Errorf("ID = %q, want %q", got.ID, want.ID)
@@ -77,13 +77,13 @@ func TestGetEventNotFound(t *testing.T) {
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
 
-	_, err := svc.GetEvent(ctx, "01J0000000000000000000000")
+	_, err := svc.GetRevision(ctx, "01J0000000000000000000000")
 	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("GetEvent() error = %v, want %v", err, ErrNotFound)
+		t.Fatalf("GetRevision() error = %v, want %v", err, ErrNotFound)
 	}
 }
 
-func TestSearchEvents(t *testing.T) {
+func TestSearchRevisions(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -94,7 +94,7 @@ func TestSearchEvents(t *testing.T) {
 	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 
-	seed := []journal.Event{
+	seed := []journal.Revision{
 		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"balmy"}`)},
 		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"reading":"dry"}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "ha.light.on", Source: "kitchen-light", Payload: json.RawMessage(`{"room":"kitchen"}`)},
@@ -162,12 +162,12 @@ func TestSearchEvents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := svc.SearchEvents(ctx, tt.query, tt.params)
+			got, err := svc.SearchRevisions(ctx, tt.query, tt.params)
 			if err != nil {
-				t.Fatalf("SearchEvents() error = %v", err)
+				t.Fatalf("SearchRevisions() error = %v", err)
 			}
 			if len(got) != len(tt.wantIDs) {
-				t.Fatalf("SearchEvents() returned %d events, want %d", len(got), len(tt.wantIDs))
+				t.Fatalf("SearchRevisions() returned %d events, want %d", len(got), len(tt.wantIDs))
 			}
 			for i, e := range got {
 				if e.ID != tt.wantIDs[i] {
@@ -184,13 +184,13 @@ func TestSearchEventsEmptyQuery(t *testing.T) {
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
 
-	_, err := svc.SearchEvents(ctx, "   ", SearchParams{})
+	_, err := svc.SearchRevisions(ctx, "   ", SearchParams{})
 	if !errors.Is(err, ErrEmptyQuery) {
-		t.Fatalf("SearchEvents() error = %v, want %v", err, ErrEmptyQuery)
+		t.Fatalf("SearchRevisions() error = %v, want %v", err, ErrEmptyQuery)
 	}
 }
 
-func TestGetEventsByType(t *testing.T) {
+func TestGetRevisionsByType(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -201,7 +201,7 @@ func TestGetEventsByType(t *testing.T) {
 	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 
-	seed := []journal.Event{
+	seed := []journal.Revision{
 		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
 		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
 		{ID: "01JEVT00000000000000000003", Time: t3, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-b", Payload: json.RawMessage(`{"v":3}`)},
@@ -242,12 +242,12 @@ func TestGetEventsByType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := svc.GetEventsByType(ctx, tt.eventType, tt.timeFrom, tt.timeTo)
+			got, err := svc.GetRevisionsByType(ctx, tt.eventType, tt.timeFrom, tt.timeTo)
 			if err != nil {
-				t.Fatalf("GetEventsByType() error = %v", err)
+				t.Fatalf("GetRevisionsByType() error = %v", err)
 			}
 			if len(got) != len(tt.wantIDs) {
-				t.Fatalf("GetEventsByType() returned %d events, want %d", len(got), len(tt.wantIDs))
+				t.Fatalf("GetRevisionsByType() returned %d events, want %d", len(got), len(tt.wantIDs))
 			}
 			for i, e := range got {
 				if e.ID != tt.wantIDs[i] {
@@ -264,9 +264,9 @@ func TestGetEventsByTypeEmptyType(t *testing.T) {
 	ctx := context.Background()
 	svc := &Service{Journal: openTestJournal(t)}
 
-	_, err := svc.GetEventsByType(ctx, "   ", nil, nil)
+	_, err := svc.GetRevisionsByType(ctx, "   ", nil, nil)
 	if !errors.Is(err, ErrEmptyType) {
-		t.Fatalf("GetEventsByType() error = %v, want %v", err, ErrEmptyType)
+		t.Fatalf("GetRevisionsByType() error = %v, want %v", err, ErrEmptyType)
 	}
 }
 
@@ -279,9 +279,9 @@ func TestGetEventsByTypeInvalidRange(t *testing.T) {
 	timeFrom := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 	timeTo := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
 
-	_, err := svc.GetEventsByType(ctx, "trove://type/mqtt/sensor/temp/1", &timeFrom, &timeTo)
+	_, err := svc.GetRevisionsByType(ctx, "trove://type/mqtt/sensor/temp/1", &timeFrom, &timeTo)
 	if !errors.Is(err, ErrInvalidTimeRange) {
-		t.Fatalf("GetEventsByType() error = %v, want %v", err, ErrInvalidTimeRange)
+		t.Fatalf("GetRevisionsByType() error = %v, want %v", err, ErrInvalidTimeRange)
 	}
 }
 
@@ -295,7 +295,7 @@ func TestSummarizeRange(t *testing.T) {
 	timeFrom := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
 	timeTo := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 
-	seed := []journal.Event{
+	seed := []journal.Revision{
 		{ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC), Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
 		{ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC), Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
 		{ID: "01JEVT00000000000000000003", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), Type: "trove://type/http/ingest/received/1", Source: "shortcuts", Payload: json.RawMessage(`{"v":3}`)},
@@ -359,15 +359,15 @@ func TestSummarizeRangeExcludesOutside(t *testing.T) {
 	store := openTestJournal(t)
 	svc := &Service{Journal: store}
 
-	inside := journal.Event{
+	inside := journal.Revision{
 		ID: "01JEVT00000000000000000001", Time: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC),
 		Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{}`),
 	}
-	outside := journal.Event{
+	outside := journal.Revision{
 		ID: "01JEVT00000000000000000002", Time: time.Date(2026, 7, 11, 10, 0, 0, 0, time.UTC),
 		Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{}`),
 	}
-	for _, e := range []journal.Event{inside, outside} {
+	for _, e := range []journal.Revision{inside, outside} {
 		if err := store.Append(ctx, e); err != nil {
 			t.Fatalf("Append() error = %v", err)
 		}
@@ -399,7 +399,7 @@ func TestSummarizeRangeNotableCap(t *testing.T) {
 	timeTo := time.Date(2026, 7, 10, 23, 59, 59, 0, time.UTC)
 
 	for i := range 7 {
-		e := journal.Event{
+		e := journal.Revision{
 			ID:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
 			Time:    time.Date(2026, 7, 10, i+1, 0, 0, 0, time.UTC),
 			Type:    "trove://type/mqtt/sensor/temp/1",
@@ -418,8 +418,8 @@ func TestSummarizeRangeNotableCap(t *testing.T) {
 	if got.Total != 7 {
 		t.Errorf("Total = %d, want 7", got.Total)
 	}
-	if len(got.Notable) != maxNotableEvents {
-		t.Errorf("len(Notable) = %d, want %d", len(got.Notable), maxNotableEvents)
+	if len(got.Notable) != maxNotableRevisions {
+		t.Errorf("len(Notable) = %d, want %d", len(got.Notable), maxNotableRevisions)
 	}
 }
 

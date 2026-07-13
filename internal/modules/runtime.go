@@ -30,7 +30,7 @@ func StartSource(
 	blobs blob.Store,
 	httpRegistry *HTTPRegistry,
 	mcpRegistry *MCPRegistry,
-	eventRegistry *EventRegistry,
+	eventRegistry *RevisionRegistry,
 	mcpTools []MCPToolEntry,
 	toolModules map[string]string,
 	settings *SettingsStore,

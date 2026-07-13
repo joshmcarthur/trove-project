@@ -67,7 +67,7 @@ func TestRuntimeBuildsCatalogFromModules(t *testing.T) {
 	t.Cleanup(func() { _ = handle.Close() })
 
 	const eventType = "trove://type/test/typed/emit/1"
-	var events []journal.Event
+	var events []journal.Revision
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		events, err = store.Query(context.Background(), journal.Filter{TypePrefix: eventType})
