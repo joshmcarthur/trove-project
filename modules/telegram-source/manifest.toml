@@ -2,22 +2,8 @@ name     = "telegram-source"
 version  = "1.0"
 kind     = "source"
 provides = [
-  "trove://type/classify/pending/1",
-  "trove://type/classify/assigned/1",
   "trove://type/note/*",
 ]
-
-[[types]]
-name = "classify.pending"
-version = 1
-schema = "../../types/builtin/classify.pending.ttd.json"
-
-[[types]]
-name = "classify.assigned"
-version = 1
-schema = "../../types/builtin/classify.assigned.ttd.json"
-
-[[types]]
 name = "note.quick"
 version = 1
 schema = "../../types/builtin/note.quick.ttd.json"

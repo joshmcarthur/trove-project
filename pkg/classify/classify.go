@@ -2,7 +2,6 @@ package classify
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,215 +9,131 @@ import (
 	"time"
 
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
-	"github.com/oklog/ulid"
+	"github.com/joshmcarthur/trove/internal/records"
 )
 
-const (
-	// PendingType is the event type for quick captures awaiting classification.
-	PendingType = "trove://type/classify/pending/1"
-	// AssignedType records a completed classification.
-	AssignedType = "trove://type/classify/assigned/1"
-)
+// ErrNotFound indicates the record does not exist.
+var ErrNotFound = errors.New("capture: record not found")
 
-// ErrNotFound indicates the source event does not exist.
-var ErrNotFound = errors.New("classify: event not found")
+// ErrNotIncomplete indicates the record is not awaiting classification.
+var ErrNotIncomplete = errors.New("capture: record is not incomplete")
 
-// ErrNotPending indicates the source event is not a pending capture.
-var ErrNotPending = errors.New("classify: source event is not classify.pending")
-
-// ErrAlreadyClassified indicates the pending event was already classified.
-var ErrAlreadyClassified = errors.New("classify: event already classified")
-
-// Journal supports classify capture and assignment operations.
-type Journal interface {
-	GetEvent(ctx context.Context, id string) (*troverpc.Event, error)
-	GetEventsByType(ctx context.Context, eventType string) ([]*troverpc.Event, error)
-	Emit(ctx context.Context, event *troverpc.Event) error
+// Store supports incomplete capture and classification.
+type Store interface {
+	GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error)
+	ListIncompleteRecords(ctx context.Context, req *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error)
+	EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error)
 }
 
-// ClassifyRequest identifies a pending capture and desired target type.
+// ClassifyRequest identifies an incomplete record and desired target type.
 type ClassifyRequest struct {
-	SourceEventID string
-	TargetType    string
-	Payload       json.RawMessage
+	RecordRef  string
+	TargetType string
+	Payload    json.RawMessage
 }
 
-// ClassifyResult returns the new event identifiers.
+// ClassifyResult returns the write response identifiers.
 type ClassifyResult struct {
-	TargetEventID         string `json:"target_event_id"`
-	ClassificationEventID string `json:"classification_event_id"`
+	RecordRef string `json:"record_ref"`
+	EventID   string `json:"event_id"`
+	Version   int32  `json:"version"`
 }
 
-// CapturePendingResult is returned when a pending capture is stored.
-type CapturePendingResult struct {
-	EventID string
+// CaptureResult is returned when an incomplete capture is stored.
+type CaptureResult struct {
+	RecordRef string
+	EventID   string
 }
 
-// CapturePending stores a quick capture as classify.pending.
-func CapturePending(ctx context.Context, j Journal, source string, body []byte) error {
-	_, err := CapturePendingWithResult(ctx, j, source, body)
-	return err
-}
-
-// CapturePendingWithResult stores a quick capture and returns the assigned event ID.
-func CapturePendingWithResult(ctx context.Context, j Journal, source string, body []byte) (CapturePendingResult, error) {
+// Capture stores a quick capture without a record type.
+func Capture(ctx context.Context, s Store, source string, body []byte) (CaptureResult, error) {
 	source = strings.TrimSpace(source)
 	if source == "" {
-		return CapturePendingResult{}, fmt.Errorf("classify: source is required")
+		return CaptureResult{}, fmt.Errorf("capture: source is required")
 	}
 	if len(body) == 0 {
-		return CapturePendingResult{}, fmt.Errorf("classify: body is required")
+		return CaptureResult{}, fmt.Errorf("capture: body is required")
 	}
 	if !json.Valid(body) {
-		return CapturePendingResult{}, fmt.Errorf("classify: body must be valid JSON")
+		return CaptureResult{}, fmt.Errorf("capture: body must be valid JSON")
 	}
 
-	event, err := buildPendingEvent(source, body)
+	req, err := buildCaptureRequest(source, body)
 	if err != nil {
-		return CapturePendingResult{}, err
+		return CaptureResult{}, err
 	}
-	event.Id = ulid.MustNew(ulid.Now(), rand.Reader).String()
-	if err := j.Emit(ctx, event); err != nil {
-		return CapturePendingResult{}, err
-	}
-	return CapturePendingResult{EventID: event.Id}, nil
-}
-
-// Classify creates a typed event and classify.assigned link from a pending capture.
-func Classify(ctx context.Context, j Journal, req ClassifyRequest) (ClassifyResult, error) {
-	req.SourceEventID = strings.TrimSpace(req.SourceEventID)
-	req.TargetType = strings.TrimSpace(req.TargetType)
-	if req.SourceEventID == "" {
-		return ClassifyResult{}, fmt.Errorf("classify: source_event_id is required")
-	}
-	if req.TargetType == "" {
-		return ClassifyResult{}, fmt.Errorf("classify: target_type is required")
-	}
-
-	source, err := j.GetEvent(ctx, req.SourceEventID)
+	resp, err := s.EmitRecord(ctx, req)
 	if err != nil {
-		return ClassifyResult{}, err
+		return CaptureResult{}, err
 	}
-	if source == nil {
-		return ClassifyResult{}, ErrNotFound
-	}
-	if source.Type != PendingType {
-		return ClassifyResult{}, ErrNotPending
-	}
-
-	classified, err := isClassified(ctx, j, req.SourceEventID)
-	if err != nil {
-		return ClassifyResult{}, err
-	}
-	if classified {
-		return ClassifyResult{}, ErrAlreadyClassified
-	}
-
-	targetPayload, err := mergePayload(source.Payload, req.Payload, req.SourceEventID)
-	if err != nil {
-		return ClassifyResult{}, err
-	}
-
-	target := &troverpc.Event{
-		Id:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		Type:    req.TargetType,
-		Source:  source.Source,
-		Payload: targetPayload,
-		Time:    source.Time,
-		BlobRef: source.BlobRef,
-	}
-	if err := j.Emit(ctx, target); err != nil {
-		return ClassifyResult{}, err
-	}
-
-	linkPayload, err := json.Marshal(map[string]string{
-		"source_event_id": req.SourceEventID,
-		"target_event_id": target.Id,
-		"target_type":     req.TargetType,
-	})
-	if err != nil {
-		return ClassifyResult{}, fmt.Errorf("classify: marshal link payload: %w", err)
-	}
-
-	link := &troverpc.Event{
-		Id:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		Type:    AssignedType,
-		Source:  source.Source,
-		Payload: linkPayload,
-		Time:    source.Time,
-	}
-	if err := j.Emit(ctx, link); err != nil {
-		return ClassifyResult{}, err
-	}
-
-	return ClassifyResult{
-		TargetEventID:         target.Id,
-		ClassificationEventID: link.Id,
+	return CaptureResult{
+		RecordRef: resp.GetRecordRef(),
+		EventID:   resp.GetEventId(),
 	}, nil
 }
 
-// ListUnclassified returns pending captures without a classify.assigned link.
-func ListUnclassified(ctx context.Context, j Journal) ([]*troverpc.Event, error) {
-	pending, err := j.GetEventsByType(ctx, PendingType)
-	if err != nil {
-		return nil, err
+// Classify sets the type on an incomplete record via apply.
+func Classify(ctx context.Context, s Store, req ClassifyRequest) (ClassifyResult, error) {
+	req.RecordRef = strings.TrimSpace(req.RecordRef)
+	req.TargetType = strings.TrimSpace(req.TargetType)
+	if req.RecordRef == "" {
+		return ClassifyResult{}, fmt.Errorf("capture: record_ref is required")
 	}
-	assigned, err := j.GetEventsByType(ctx, AssignedType)
-	if err != nil {
-		return nil, err
-	}
-
-	classified := make(map[string]struct{}, len(assigned))
-	for _, event := range assigned {
-		var link struct {
-			SourceEventID string `json:"source_event_id"`
-		}
-		if err := json.Unmarshal(event.Payload, &link); err != nil {
-			continue
-		}
-		if link.SourceEventID != "" {
-			classified[link.SourceEventID] = struct{}{}
-		}
+	if req.TargetType == "" {
+		return ClassifyResult{}, fmt.Errorf("capture: target_type is required")
 	}
 
-	out := make([]*troverpc.Event, 0, len(pending))
-	for _, event := range pending {
-		if _, done := classified[event.Id]; !done {
-			out = append(out, event)
-		}
+	rec, err := s.GetRecord(ctx, &troverpc.GetRecordRequest{RecordRef: req.RecordRef})
+	if err != nil {
+		return ClassifyResult{}, err
 	}
-	return out, nil
+	if rec == nil {
+		return ClassifyResult{}, ErrNotFound
+	}
+	if rec.GetCompleteness() != records.CompletenessIncomplete {
+		return ClassifyResult{}, ErrNotIncomplete
+	}
+
+	payload, err := mergePayload(rec.GetBody(), req.Payload)
+	if err != nil {
+		return ClassifyResult{}, err
+	}
+
+	resp, err := s.EmitRecord(ctx, &troverpc.EmitRecordRequest{
+		Operation: "apply",
+		RecordRef: req.RecordRef,
+		Type:      req.TargetType,
+		Source:    rec.GetSource(),
+		Payload:   payload,
+	})
+	if err != nil {
+		return ClassifyResult{}, err
+	}
+	return ClassifyResult{
+		RecordRef: resp.GetRecordRef(),
+		EventID:   resp.GetEventId(),
+		Version:   resp.GetVersion(),
+	}, nil
 }
 
-func isClassified(ctx context.Context, j Journal, sourceID string) (bool, error) {
-	assigned, err := j.GetEventsByType(ctx, AssignedType)
-	if err != nil {
-		return false, err
-	}
-	for _, event := range assigned {
-		var link struct {
-			SourceEventID string `json:"source_event_id"`
-		}
-		if err := json.Unmarshal(event.Payload, &link); err != nil {
-			continue
-		}
-		if link.SourceEventID == sourceID {
-			return true, nil
-		}
-	}
-	return false, nil
+// ListIncomplete returns records awaiting classification.
+func ListIncomplete(ctx context.Context, s Store, source string, limit int32) ([]*troverpc.Record, error) {
+	return s.ListIncompleteRecords(ctx, &troverpc.ListIncompleteRecordsRequest{
+		Source: source,
+		Limit:  limit,
+	})
 }
 
-func buildPendingEvent(source string, body []byte) (*troverpc.Event, error) {
-	event := &troverpc.Event{
-		Type:    PendingType,
-		Source:  source,
-		Payload: body,
+func buildCaptureRequest(source string, body []byte) (*troverpc.EmitRecordRequest, error) {
+	req := &troverpc.EmitRecordRequest{
+		Operation: "apply",
+		Source:    source,
+		Payload:   body,
 	}
 
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(body, &obj); err != nil {
-		return event, nil
+		return req, nil
 	}
 
 	payload := make(map[string]json.RawMessage, len(obj))
@@ -227,18 +142,18 @@ func buildPendingEvent(source string, body []byte) (*troverpc.Event, error) {
 		case "time":
 			var timeStr string
 			if err := json.Unmarshal(value, &timeStr); err != nil {
-				return nil, fmt.Errorf("classify: invalid time field")
+				return nil, fmt.Errorf("capture: invalid time field")
 			}
 			if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
-				return nil, fmt.Errorf("classify: invalid time field")
+				return nil, fmt.Errorf("capture: invalid time field")
 			}
-			event.Time = timeStr
+			req.Time = timeStr
 		case "blob_ref":
 			var blobRef string
 			if err := json.Unmarshal(value, &blobRef); err != nil || blobRef == "" {
-				return nil, fmt.Errorf("classify: invalid blob_ref field")
+				return nil, fmt.Errorf("capture: invalid blob_ref field")
 			}
-			event.BlobRef = blobRef
+			req.BlobRef = blobRef
 		default:
 			payload[key] = value
 		}
@@ -246,39 +161,31 @@ func buildPendingEvent(source string, body []byte) (*troverpc.Event, error) {
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("classify: marshal payload: %w", err)
+		return nil, fmt.Errorf("capture: marshal payload: %w", err)
 	}
-	event.Payload = payloadBytes
-	return event, nil
+	req.Payload = payloadBytes
+	return req, nil
 }
 
-func mergePayload(source json.RawMessage, overrides json.RawMessage, derivedFrom string) ([]byte, error) {
+func mergePayload(body []byte, overrides json.RawMessage) ([]byte, error) {
 	base := map[string]any{}
-	if len(source) > 0 {
-		if err := json.Unmarshal(source, &base); err != nil {
-			return nil, fmt.Errorf("classify: parse source payload: %w", err)
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &base); err != nil {
+			return nil, fmt.Errorf("capture: parse record body: %w", err)
 		}
 	}
 	if len(overrides) > 0 {
 		extra := map[string]any{}
 		if err := json.Unmarshal(overrides, &extra); err != nil {
-			return nil, fmt.Errorf("classify: parse override payload: %w", err)
+			return nil, fmt.Errorf("capture: parse override payload: %w", err)
 		}
 		for key, value := range extra {
 			base[key] = value
 		}
 	}
-
-	trove, _ := base["_trove"].(map[string]any)
-	if trove == nil {
-		trove = map[string]any{}
-	}
-	trove["derived_from"] = derivedFrom
-	base["_trove"] = trove
-
 	out, err := json.Marshal(base)
 	if err != nil {
-		return nil, fmt.Errorf("classify: marshal merged payload: %w", err)
+		return nil, fmt.Errorf("capture: marshal merged payload: %w", err)
 	}
 	return out, nil
 }
