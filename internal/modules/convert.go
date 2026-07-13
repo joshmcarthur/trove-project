@@ -26,13 +26,9 @@ func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
 		return journal.Event{}, fmt.Errorf("modules: payload must be valid JSON")
 	}
 
-	var eventTime time.Time
-	if e.Time != "" {
-		parsed, err := time.Parse(time.RFC3339, e.Time)
-		if err != nil {
-			return journal.Event{}, fmt.Errorf("modules: time: %w", err)
-		}
-		eventTime = parsed.UTC()
+	eventTime, err := parseProtoTime(e.Time)
+	if err != nil {
+		return journal.Event{}, fmt.Errorf("modules: time: %w", err)
 	}
 
 	var blobRef *string
@@ -41,24 +37,79 @@ func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
 		blobRef = &ref
 	}
 
+	operation := e.Operation
+	if operation == "" {
+		operation = journal.OpApply
+	}
+
 	return journal.Event{
-		ID:        e.Id,
-		Time:      eventTime,
-		Type:      e.Type,
-		SchemaRef: e.SchemaRef,
-		Source:    e.Source,
-		Payload:   json.RawMessage(e.Payload),
-		BlobRef:   blobRef,
+		ID:         e.Id,
+		Time:       eventTime,
+		Operation:  operation,
+		RecordRef:  e.RecordRef,
+		Type:       e.Type,
+		SchemaRef:  e.SchemaRef,
+		Source:     e.Source,
+		Payload:    json.RawMessage(e.Payload),
+		BlobRef:    blobRef,
+		Transforms: json.RawMessage(e.Transforms),
 	}, nil
+}
+
+func rpcWriteRequestToJournal(req *troverpc.WriteRequest) (journal.Event, error) {
+	if req == nil {
+		return journal.Event{}, fmt.Errorf("modules: write request is nil")
+	}
+
+	eventTime, err := parseProtoTime(req.Time)
+	if err != nil {
+		return journal.Event{}, fmt.Errorf("modules: time: %w", err)
+	}
+
+	var blobRef *string
+	if req.BlobRef != "" {
+		ref := req.BlobRef
+		blobRef = &ref
+	}
+
+	operation := req.Operation
+	if operation == "" {
+		operation = journal.OpApply
+	}
+
+	return journal.Event{
+		Time:       eventTime,
+		Operation:  operation,
+		RecordRef:  req.RecordRef,
+		Type:       req.Type,
+		Source:     req.Source,
+		Payload:    json.RawMessage(req.Payload),
+		BlobRef:    blobRef,
+		Transforms: json.RawMessage(req.Transforms),
+	}, nil
+}
+
+func parseProtoTime(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsed.UTC(), nil
 }
 
 func journalEventToRPC(e journal.Event) *troverpc.Event {
 	out := &troverpc.Event{
-		Id:        e.ID,
-		Type:      e.Type,
-		SchemaRef: e.SchemaRef,
-		Source:    e.Source,
-		Payload:   e.Payload,
+		Id:         e.ID,
+		Type:       e.Type,
+		SchemaRef:  e.SchemaRef,
+		Source:     e.Source,
+		Payload:    e.Payload,
+		Operation:  e.Operation,
+		RecordRef:  e.RecordRef,
+		Transforms: e.Transforms,
 	}
 	if !e.Time.IsZero() {
 		out.Time = e.Time.UTC().Format(time.RFC3339)

@@ -240,7 +240,7 @@ provides = ["trove://type/http/ingest/received/1"]
 
 [[http.routes]]
 method = "POST"
-path = "/ingest/{source}"
+path = "/records"
 `)
 	got, err := ParseManifest(data)
 	if err != nil {
@@ -249,8 +249,8 @@ path = "/ingest/{source}"
 	if len(got.HTTPRoutes()) != 1 {
 		t.Fatalf("HTTPRoutes len = %d, want 1", len(got.HTTPRoutes()))
 	}
-	if got.HTTPRoutes()[0].Method != "POST" || got.HTTPRoutes()[0].Path != "/ingest/{source}" {
-		t.Errorf("route = %#v, want POST /ingest/{source}", got.HTTPRoutes()[0])
+	if got.HTTPRoutes()[0].Method != "POST" || got.HTTPRoutes()[0].Path != "/records" {
+		t.Errorf("route = %#v, want POST /records", got.HTTPRoutes()[0])
 	}
 }
 

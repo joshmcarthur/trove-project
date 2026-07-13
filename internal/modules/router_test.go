@@ -56,7 +56,7 @@ func TestRouterProcessorChain(t *testing.T) {
 	defer store.Close()
 
 	registry := NewEventRegistry()
-	registry.RegisterProcessor("step-a", []string{"test.input"}, testPolicy(t, "step-a", []string{"test.step.a"}), stubProcessor{
+	registry.RegisterProcessor("step-a", []string{"test.input"}, nil, testPolicy(t, "step-a", []string{"test.step.a"}), stubProcessor{
 		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
 			return []journal.Event{{
 				Type:    "test.step.a",
@@ -65,7 +65,7 @@ func TestRouterProcessorChain(t *testing.T) {
 			}}, nil
 		},
 	})
-	registry.RegisterProcessor("step-b", []string{"test.step.a"}, testPolicy(t, "step-b", []string{"test.step.b"}), stubProcessor{
+	registry.RegisterProcessor("step-b", []string{"test.step.a"}, nil, testPolicy(t, "step-b", []string{"test.step.b"}), stubProcessor{
 		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
 			return []journal.Event{{
 				Type:    "test.step.b",
@@ -75,7 +75,7 @@ func TestRouterProcessorChain(t *testing.T) {
 		},
 	})
 
-	router := NewRouter(store, registry)
+	router := NewRouter(store, registry, NewWriteService(store))
 	go func() {
 		_ = router.Run(ctx)
 	}()
@@ -117,7 +117,7 @@ func TestRouterSuppressesLoop(t *testing.T) {
 
 	var calls atomic.Int32
 	registry := NewEventRegistry()
-	registry.RegisterProcessor("looper", []string{"test.loop"}, testPolicy(t, "looper", []string{"test.loop"}), stubProcessor{
+	registry.RegisterProcessor("looper", []string{"test.loop"}, nil, testPolicy(t, "looper", []string{"test.loop"}), stubProcessor{
 		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
 			calls.Add(1)
 			return []journal.Event{{
@@ -128,7 +128,7 @@ func TestRouterSuppressesLoop(t *testing.T) {
 		},
 	})
 
-	router := NewRouter(store, registry)
+	router := NewRouter(store, registry, NewWriteService(store))
 	go func() {
 		_ = router.Run(ctx)
 	}()
@@ -205,14 +205,14 @@ func TestRouterStartupCatchUp(t *testing.T) {
 
 	var handled atomic.Int32
 	registry := NewEventRegistry()
-	registry.RegisterSink("counter", []string{"test.catchup"}, stubSink{
+	registry.RegisterSink("counter", []string{"test.catchup"}, nil, stubSink{
 		fn: func(event journal.Event, dispatch DispatchContext) error {
 			handled.Add(1)
 			return nil
 		},
 	})
 
-	router := NewRouter(store, registry)
+	router := NewRouter(store, registry, NewWriteService(store))
 	go func() {
 		_ = router.Run(ctx)
 	}()
@@ -253,14 +253,14 @@ func TestRouterWatch(t *testing.T) {
 
 	var handled atomic.Int32
 	registry := NewEventRegistry()
-	registry.RegisterSink("counter", []string{"test.watch"}, stubSink{
+	registry.RegisterSink("counter", []string{"test.watch"}, nil, stubSink{
 		fn: func(event journal.Event, dispatch DispatchContext) error {
 			handled.Add(1)
 			return nil
 		},
 	})
 
-	router := NewRouter(store, registry)
+	router := NewRouter(store, registry, NewWriteService(store))
 	go func() {
 		_ = router.Run(ctx)
 	}()
@@ -312,7 +312,7 @@ func TestRouterRestartPreservesDerivedDispatchContext(t *testing.T) {
 
 	var calls atomic.Int32
 	registry := NewEventRegistry()
-	registry.RegisterProcessor("looper", []string{"test.loop"}, testPolicy(t, "looper", []string{"test.loop"}), stubProcessor{
+	registry.RegisterProcessor("looper", []string{"test.loop"}, nil, testPolicy(t, "looper", []string{"test.loop"}), stubProcessor{
 		fn: func(event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
 			calls.Add(1)
 			return nil, nil
@@ -322,7 +322,7 @@ func TestRouterRestartPreservesDerivedDispatchContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	router := NewRouter(store, registry)
+	router := NewRouter(store, registry, NewWriteService(store))
 	go func() {
 		_ = router.Run(ctx)
 	}()

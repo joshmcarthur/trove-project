@@ -22,7 +22,7 @@ func main() {
 			_ = os.WriteFile(counterPath, []byte(strconv.Itoa(count)), 0o644)
 		}
 
-		if err := core.Emit(ctx, &troverpc.Event{
+		if _, err := trovemodule.ApplyRecord(ctx, core, &troverpc.Event{
 			Type:    "test.crash.restart",
 			Source:  "crash-restart",
 			Payload: []byte(fmt.Sprintf(`{"run":%d}`, count)),
