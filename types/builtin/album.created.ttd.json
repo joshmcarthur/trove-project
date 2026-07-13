@@ -1,0 +1,15 @@
+{
+  "$id": "trove://type/album/created/1",
+  "title": "Album",
+  "definition": {
+    "properties": {
+      "title": { "type": "string" },
+      "members": {
+        "elements": { "type": "string" }
+      }
+    },
+    "optionalProperties": {
+      "description": { "type": "string" }
+    }
+  }
+}

@@ -15,9 +15,10 @@ import (
 // Querier is the journal query API used by MCP handlers.
 type Querier interface {
 	GetEvent(ctx context.Context, id string) (Event, error)
-	SearchEvents(ctx context.Context, query string, params SearchParams) ([]Event, error)
-	GetEventsByType(ctx context.Context, eventType string, timeFrom, timeTo *time.Time) ([]Event, error)
 	SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (Summary, error)
+	GetRecord(ctx context.Context, recordRef string, version int) (Record, error)
+	SearchRecords(ctx context.Context, query string, params RecordSearchParams) ([]Record, error)
+	ListIncompleteRecords(ctx context.Context, source string, limit int) ([]Record, error)
 }
 
 // MCPDeps bundles dependencies for the MCP HTTP handler.
@@ -62,7 +63,7 @@ func registerQueryTools(server *mcp.Server, q Querier) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_event",
-		Description: "Return a journal event by ULID",
+		Description: "Return a journal event by ULID for audit",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, params getEventParams) (*mcp.CallToolResult, any, error) {
 		event, err := q.GetEvent(ctx, params.ID)
 		if err != nil {
@@ -71,52 +72,60 @@ func registerQueryTools(server *mcp.Server, q Querier) {
 		return textToolResult(event)
 	})
 
-	type searchEventsParams struct {
-		Query      string `json:"query" jsonschema:"required,Keyword search query"`
-		TypePrefix string `json:"type_prefix,omitempty" jsonschema:"Optional event type prefix filter"`
-		Source     string `json:"source,omitempty" jsonschema:"Optional source filter"`
-		TimeFrom   string `json:"time_from,omitempty" jsonschema:"Optional RFC3339 start of time range"`
-		TimeTo     string `json:"time_to,omitempty" jsonschema:"Optional RFC3339 end of time range"`
+	type getRecordParams struct {
+		RecordRef string `json:"record_ref" jsonschema:"required,Record reference to retrieve"`
+		Version   int    `json:"version,omitempty" jsonschema:"Optional version; omit for latest"`
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "search_events",
-		Description: "Search journal events by keyword using FTS5",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, params searchEventsParams) (*mcp.CallToolResult, any, error) {
-		searchParams, err := searchParamsFromMCP(params.TypePrefix, params.Source, params.TimeFrom, params.TimeTo)
+		Name:        "get_record",
+		Description: "Return a folded record by record_ref",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, params getRecordParams) (*mcp.CallToolResult, any, error) {
+		record, err := q.GetRecord(ctx, params.RecordRef, params.Version)
 		if err != nil {
 			return nil, nil, err
 		}
-		events, err := q.SearchEvents(ctx, params.Query, searchParams)
-		if err != nil {
-			return nil, nil, err
-		}
-		return textToolResult(events)
+		return textToolResult(record)
 	})
 
-	type getEventsByTypeParams struct {
-		Type     string `json:"type" jsonschema:"required,Exact event type to retrieve"`
-		TimeFrom string `json:"time_from,omitempty" jsonschema:"Optional RFC3339 start of time range"`
-		TimeTo   string `json:"time_to,omitempty" jsonschema:"Optional RFC3339 end of time range"`
+	type searchRecordsParams struct {
+		Query          string `json:"query" jsonschema:"required,Keyword search query"`
+		TypePrefix     string `json:"type_prefix,omitempty" jsonschema:"Optional record type prefix filter"`
+		Source         string `json:"source,omitempty" jsonschema:"Optional source filter"`
+		TimeFrom       string `json:"time_from,omitempty" jsonschema:"Optional RFC3339 start of updated_at range"`
+		TimeTo         string `json:"time_to,omitempty" jsonschema:"Optional RFC3339 end of updated_at range"`
+		IncludeDeleted bool   `json:"include_deleted,omitempty" jsonschema:"Include deleted records in search results"`
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "get_events_by_type",
-		Description: "Return journal events matching an exact event type",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, params getEventsByTypeParams) (*mcp.CallToolResult, any, error) {
-		timeFrom, err := parseOptionalRFC3339(params.TimeFrom)
+		Name:        "search_records",
+		Description: "Search folded records by keyword using FTS5",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, params searchRecordsParams) (*mcp.CallToolResult, any, error) {
+		searchParams, err := recordSearchParamsFromMCP(params.TypePrefix, params.Source, params.TimeFrom, params.TimeTo, params.IncludeDeleted)
 		if err != nil {
 			return nil, nil, err
 		}
-		timeTo, err := parseOptionalRFC3339(params.TimeTo)
+		records, err := q.SearchRecords(ctx, params.Query, searchParams)
 		if err != nil {
 			return nil, nil, err
 		}
-		events, err := q.GetEventsByType(ctx, params.Type, timeFrom, timeTo)
+		return textToolResult(records)
+	})
+
+	type listIncompleteRecordsParams struct {
+		Source string `json:"source,omitempty" jsonschema:"Optional source filter"`
+		Limit  int    `json:"limit,omitempty" jsonschema:"Maximum records to return"`
+	}
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "list_incomplete_records",
+		Description: "List records with completeness incomplete",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, params listIncompleteRecordsParams) (*mcp.CallToolResult, any, error) {
+		records, err := q.ListIncompleteRecords(ctx, params.Source, params.Limit)
 		if err != nil {
 			return nil, nil, err
 		}
-		return textToolResult(events)
+		return textToolResult(records)
 	})
 
 	type summarizeRangeParams struct {
@@ -180,20 +189,21 @@ func textToolResult(v any) (*mcp.CallToolResult, any, error) {
 	}, nil, nil
 }
 
-func searchParamsFromMCP(typePrefix, source, timeFrom, timeTo string) (SearchParams, error) {
+func recordSearchParamsFromMCP(typePrefix, source, timeFrom, timeTo string, includeDeleted bool) (RecordSearchParams, error) {
 	from, err := parseOptionalRFC3339(timeFrom)
 	if err != nil {
-		return SearchParams{}, err
+		return RecordSearchParams{}, err
 	}
 	to, err := parseOptionalRFC3339(timeTo)
 	if err != nil {
-		return SearchParams{}, err
+		return RecordSearchParams{}, err
 	}
-	return SearchParams{
-		TypePrefix: typePrefix,
-		Source:     source,
-		TimeFrom:   from,
-		TimeTo:     to,
+	return RecordSearchParams{
+		TypePrefix:     typePrefix,
+		Source:         source,
+		TimeFrom:       from,
+		TimeTo:         to,
+		IncludeDeleted: includeDeleted,
 	}, nil
 }
 

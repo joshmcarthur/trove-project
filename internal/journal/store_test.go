@@ -42,6 +42,19 @@ func TestOpenCreatesDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("events_fts table missing: %v", err)
 	}
+
+	for _, table := range []string{"record_heads", "record_events", "records_fts"} {
+		err = store.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&name)
+		if err != nil {
+			t.Fatalf("%s table missing: %v", table, err)
+		}
+	}
+
+	var operation string
+	err = store.db.QueryRow(`SELECT name FROM pragma_table_info('events') WHERE name = 'operation'`).Scan(&operation)
+	if err != nil {
+		t.Fatalf("events.operation column missing: %v", err)
+	}
 }
 
 func TestAppendPersistsSchemaRef(t *testing.T) {
@@ -170,13 +183,6 @@ func TestAppendValidation(t *testing.T) {
 		name  string
 		event Event
 	}{
-		{
-			name: "missing type",
-			event: Event{
-				Source:  "src",
-				Payload: validPayload,
-			},
-		},
 		{
 			name: "missing source",
 			event: Event{
@@ -455,7 +461,7 @@ func TestQueryText(t *testing.T) {
 	}
 }
 
-func TestMigrateFTSBackfill(t *testing.T) {
+func TestMigrateLegacySchemaDevWipe(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -505,11 +511,110 @@ CREATE TABLE IF NOT EXISTS events (
 	if err != nil {
 		t.Fatalf("Query() error = %v", err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("Query() returned %d events, want 1", len(got))
+	if len(got) != 0 {
+		t.Fatalf("Query() returned %d events, want 0 after dev wipe", len(got))
 	}
-	if got[0].ID != "01JEVT00000000000000000099" {
-		t.Errorf("ID = %q, want legacy event id", got[0].ID)
+
+	var operation string
+	err = store.db.QueryRow(`SELECT name FROM pragma_table_info('events') WHERE name = 'operation'`).Scan(&operation)
+	if err != nil {
+		t.Fatalf("events.operation column missing after migration: %v", err)
+	}
+}
+
+func TestAppendRecordFields(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	recordRef := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	transforms := json.RawMessage(`[{"op":"add","path":"/tags/-","value":"x"}]`)
+	want := Event{
+		ID:         id,
+		Operation:  OpApply,
+		RecordRef:  recordRef,
+		Type:       "trove://type/note/created/1",
+		Source:     "test",
+		Payload:    json.RawMessage(`{"title":"x"}`),
+		Transforms: transforms,
+	}
+
+	if err := store.Append(ctx, want); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got, err := store.Get(ctx, id)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.Operation != OpApply {
+		t.Errorf("Operation = %q, want %q", got.Operation, OpApply)
+	}
+	if got.RecordRef != recordRef {
+		t.Errorf("RecordRef = %q, want %q", got.RecordRef, recordRef)
+	}
+	if string(got.Transforms) != string(transforms) {
+		t.Errorf("Transforms = %s, want %s", got.Transforms, transforms)
+	}
+}
+
+func TestAppendWithoutType(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	if err := store.Append(ctx, Event{
+		ID:      id,
+		Source:  "test",
+		Payload: json.RawMessage(`{"text":"untitled"}`),
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got, err := store.Get(ctx, id)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.Type != "" {
+		t.Errorf("Type = %q, want empty", got.Type)
+	}
+	if got.Operation != OpApply {
+		t.Errorf("Operation = %q, want %q", got.Operation, OpApply)
+	}
+	if got.RecordRef == "" {
+		t.Fatal("RecordRef is empty, want server-assigned ULID")
+	}
+	if string(got.Transforms) != "[]" {
+		t.Errorf("Transforms = %s, want []", got.Transforms)
+	}
+}
+
+func TestAppendDefaultsRecordRef(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	if err := store.Append(ctx, Event{
+		ID:      id,
+		Type:    "test.event",
+		Source:  "test",
+		Payload: json.RawMessage(`{"n":1}`),
+	}); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	got, err := store.Get(ctx, id)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.RecordRef == "" {
+		t.Fatal("RecordRef is empty, want server-assigned ULID")
 	}
 }
 

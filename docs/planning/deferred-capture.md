@@ -6,7 +6,7 @@ nav_order: 12
 
 # Deferred capture
 
-**Status:** Supported\
+**Status:** Superseded by [records layer](./records.md)\
 **Milestone:** 3 — MCP query\
 **Spec:** [Events §3](../spec.md#3-core-concepts), [Sources §6](../spec.md#6-sources)\
 **Package:** `modules/capture-classifier`, `pkg/classify`

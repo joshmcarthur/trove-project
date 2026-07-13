@@ -18,15 +18,20 @@ const schemaDDL = `
 CREATE TABLE IF NOT EXISTS events (
   id         TEXT PRIMARY KEY,
   time       TEXT NOT NULL,
-  type       TEXT NOT NULL,
+  operation  TEXT NOT NULL,
+  record_ref TEXT NOT NULL,
+  type       TEXT,
   schema_ref TEXT NOT NULL,
   source     TEXT NOT NULL,
   payload    TEXT NOT NULL,
+  transforms TEXT NOT NULL DEFAULT '[]',
   blob_ref   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(time);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_source ON events(source);
+CREATE INDEX IF NOT EXISTS idx_events_operation ON events(operation);
+CREATE INDEX IF NOT EXISTS idx_events_record_ref ON events(record_ref);
 `
 
 var _ Journal = (*Store)(nil)
@@ -45,14 +50,19 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("journal: open %q: %w", path, err)
 	}
 
+	if err := migrateSchema(db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
 	if _, err := db.Exec(schemaDDL); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("journal: init schema: %w", err)
 	}
 
-	if err := migrateSchema(db); err != nil {
+	if _, err := db.Exec(recordsSchemaDDL); err != nil {
 		_ = db.Close()
-		return nil, err
+		return nil, fmt.Errorf("journal: init records schema: %w", err)
 	}
 
 	if _, err := db.Exec(routingSchemaDDL); err != nil {
@@ -90,6 +100,11 @@ func configureDB(db *sql.DB) error {
 	return nil
 }
 
+// DB returns the underlying SQLite handle for record projection queries.
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
+
 // Close closes active subscriptions and the underlying database.
 func (s *Store) Close() error {
 	s.mu.Lock()
@@ -121,6 +136,25 @@ func (s *Store) PruneBefore(ctx context.Context, cutoff time.Time) (int64, error
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM records_fts
+		WHERE record_ref IN (
+			SELECT DISTINCT record_ref FROM record_events
+			WHERE event_id IN (SELECT id FROM events WHERE time < ?)
+		)`, cutoffStr); err != nil {
+		return 0, fmt.Errorf("journal: prune records fts: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM record_events
+		WHERE event_id IN (SELECT id FROM events WHERE time < ?)`, cutoffStr); err != nil {
+		return 0, fmt.Errorf("journal: prune record_events: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM record_heads
+		WHERE record_ref NOT IN (SELECT DISTINCT record_ref FROM record_events)`); err != nil {
+		return 0, fmt.Errorf("journal: prune record_heads: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM events_fts
 		WHERE event_id IN (SELECT id FROM events WHERE time < ?)`, cutoffStr); err != nil {
 		return 0, fmt.Errorf("journal: prune fts: %w", err)
@@ -142,17 +176,32 @@ func (s *Store) PruneBefore(ctx context.Context, cutoff time.Time) (int64, error
 
 // Append persists e, generating ID and Time when unset.
 func (s *Store) Append(ctx context.Context, e Event) error {
-	if e.Type == "" {
-		return fmt.Errorf("journal: append: type is required")
+	return s.AppendTransactional(ctx, e, nil)
+}
+
+func prepareAppend(e *Event) error {
+	if e.Operation == "" {
+		e.Operation = OpApply
+	}
+	if e.Operation != OpApply && e.Operation != OpDelete {
+		return fmt.Errorf("journal: append: operation must be %q or %q", OpApply, OpDelete)
 	}
 	if e.Source == "" {
 		return fmt.Errorf("journal: append: source is required")
+	}
+	if e.Operation == OpDelete && e.RecordRef == "" {
+		return fmt.Errorf("journal: append: record_ref is required for delete")
 	}
 	if len(e.Payload) == 0 {
 		return fmt.Errorf("journal: append: payload is required")
 	}
 	if !json.Valid(e.Payload) {
 		return fmt.Errorf("journal: append: payload must be valid JSON")
+	}
+	if len(e.Transforms) == 0 {
+		e.Transforms = json.RawMessage(`[]`)
+	} else if !json.Valid(e.Transforms) {
+		return fmt.Errorf("journal: append: transforms must be valid JSON")
 	}
 
 	if e.ID == "" {
@@ -161,27 +210,36 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 	if e.Time.IsZero() {
 		e.Time = time.Now().UTC()
 	}
+	if e.RecordRef == "" {
+		e.RecordRef = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
+	return nil
+}
 
-	var blobRef sql.NullString
+func appendEventInTx(ctx context.Context, tx *sql.Tx, e Event) error {
+	var (
+		blobRef sql.NullString
+		typ     sql.NullString
+	)
 	if e.BlobRef != nil {
 		blobRef = sql.NullString{String: *e.BlobRef, Valid: true}
 	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("journal: append: begin tx: %w", err)
+	if e.Type != "" {
+		typ = sql.NullString{String: e.Type, Valid: true}
 	}
-	defer func() { _ = tx.Rollback() }()
 
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO events (id, time, type, schema_ref, source, payload, blob_ref)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO events (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
-		e.Type,
+		e.Operation,
+		e.RecordRef,
+		typ,
 		e.SchemaRef,
 		e.Source,
 		string(e.Payload),
+		string(e.Transforms),
 		blobRef,
 	)
 	if err != nil {
@@ -199,12 +257,6 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 	if err != nil {
 		return fmt.Errorf("journal: append fts: %w", err)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("journal: append: commit: %w", err)
-	}
-
-	s.signalWatchers()
 	return nil
 }
 
@@ -223,14 +275,14 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 	ftsQuery := formatFTSQuery(f.Text)
 	if ftsQuery != "" {
 		query = `
-			SELECT e.id, e.time, e.type, e.schema_ref, e.source, e.payload, e.blob_ref
+			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.payload, e.transforms, e.blob_ref
 			FROM events e
 			INNER JOIN events_fts ON events_fts.event_id = e.id`
 		predicates = append(predicates, "events_fts MATCH ?")
 		args = append(args, ftsQuery)
 	} else {
 		query = `
-			SELECT id, time, type, schema_ref, source, payload, blob_ref
+			SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
 			FROM events`
 	}
 
@@ -294,7 +346,7 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 // Get returns the event with id.
 func (s *Store) Get(ctx context.Context, id string) (Event, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, time, type, schema_ref, source, payload, blob_ref
+		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
 		FROM events
 		WHERE id = ?`, id)
 
@@ -315,19 +367,24 @@ type rowScanner interface {
 
 func scanEvent(row rowScanner) (Event, error) {
 	var (
-		e       Event
-		timeStr string
-		payload string
-		blobRef sql.NullString
+		e          Event
+		timeStr    string
+		payload    string
+		transforms string
+		typ        sql.NullString
+		blobRef    sql.NullString
 	)
 
 	if err := row.Scan(
 		&e.ID,
 		&timeStr,
-		&e.Type,
+		&e.Operation,
+		&e.RecordRef,
+		&typ,
 		&e.SchemaRef,
 		&e.Source,
 		&payload,
+		&transforms,
 		&blobRef,
 	); err != nil {
 		return Event{}, err
@@ -339,7 +396,11 @@ func scanEvent(row rowScanner) (Event, error) {
 		return Event{}, fmt.Errorf("parse time %q: %w", timeStr, err)
 	}
 
+	if typ.Valid {
+		e.Type = typ.String
+	}
 	e.Payload = json.RawMessage(payload)
+	e.Transforms = json.RawMessage(transforms)
 	if blobRef.Valid {
 		ref := blobRef.String
 		e.BlobRef = &ref

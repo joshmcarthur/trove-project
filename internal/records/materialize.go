@@ -196,6 +196,10 @@ func completenessFor(recordType string) string {
 	return CompletenessIncomplete
 }
 
+func (m *Materializer) Head(ctx context.Context, recordRef string) (Head, bool, error) {
+	return m.loadHead(ctx, recordRef)
+}
+
 func (m *Materializer) eventApplied(ctx context.Context, eventID string) (bool, error) {
 	var n int
 	err := m.tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM record_events WHERE event_id = ?`, eventID).Scan(&n)

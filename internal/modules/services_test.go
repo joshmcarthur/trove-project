@@ -12,7 +12,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/types"
 )
 
-func TestCoreServicesEmit(t *testing.T) {
+func TestCoreServicesRecordWrite(t *testing.T) {
 	t.Parallel()
 
 	store, err := blob.OpenFilesystem(t.TempDir())
@@ -29,23 +29,26 @@ func TestCoreServicesEmit(t *testing.T) {
 	catalog := types.NewCatalog()
 	registerPermissiveCatalogType(t, catalog, "test.event")
 
-	policy, err := NewEmitPolicy([]string{"test.event"}, catalog, "test")
+	policy, err := NewWritePolicy([]string{"test.event"}, catalog, "test")
 	if err != nil {
-		t.Fatalf("NewEmitPolicy() error = %v", err)
+		t.Fatalf("NewWritePolicy() error = %v", err)
 	}
 
 	srv := &coreServicesServer{
 		journal: j,
+		store:   j,
 		policy:  policy,
+		writer:  NewWriteService(j),
 		blobs:   store,
 	}
-	_, err = srv.Emit(context.Background(), &troverpc.Event{
-		Type:    "test.event",
-		Source:  "src",
-		Payload: []byte(`{"ok":true}`),
+	_, err = srv.RecordWrite(context.Background(), &troverpc.WriteRequest{
+		Operation: "apply",
+		Type:      "test.event",
+		Source:    "src",
+		Payload:   []byte(`{"ok":true}`),
 	})
 	if err != nil {
-		t.Fatalf("Emit() error = %v", err)
+		t.Fatalf("RecordWrite() error = %v", err)
 	}
 }
 
@@ -135,16 +138,16 @@ func TestCoreServicesCallMCPTool(t *testing.T) {
 
 	registry := NewMCPRegistry()
 	dispatcher := &stubMCPDispatcher{}
-	registry.Register("capture-classifier", dispatcher)
+	registry.Register("example-module", dispatcher)
 
 	srv := &coreServicesServer{
-		toolModules: map[string]string{"classify_event": "capture-classifier"},
+		toolModules: map[string]string{"example_tool": "example-module"},
 		mcpRegistry: registry,
 	}
 
 	resp, err := srv.CallMCPTool(context.Background(), &troverpc.MCPToolCallRequest{
-		Name:          "classify_event",
-		ArgumentsJson: []byte(`{"source_event_id":"01JTEST","target_type":"trove://type/note/created/1"}`),
+		Name:          "example_tool",
+		ArgumentsJson: []byte(`{"query":"test"}`),
 	})
 	if err != nil {
 		t.Fatalf("CallMCPTool() error = %v", err)

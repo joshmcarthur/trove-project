@@ -156,7 +156,7 @@ func validatePatchPath(path string) error {
 			return fmt.Errorf("path contains empty segment")
 		}
 		if part == ".." {
-			return fmt.Errorf("path must not contain ..")
+			return fmt.Errorf("path must not contain parent segments")
 		}
 		if strings.Contains(part, "~") {
 			return fmt.Errorf("path must not contain escapes")

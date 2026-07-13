@@ -17,17 +17,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type mockEmitter struct {
-	events []*troverpc.Event
+type mockWriter struct {
+	writes []*troverpc.WriteRequest
 	err    error
 }
 
-func (m *mockEmitter) Emit(_ context.Context, event *troverpc.Event) error {
+func (m *mockWriter) RecordWrite(_ context.Context, req *troverpc.WriteRequest) (*troverpc.WriteResponse, error) {
 	if m.err != nil {
-		return m.err
+		return nil, m.err
 	}
-	m.events = append(m.events, event)
-	return nil
+	m.writes = append(m.writes, req)
+	return &troverpc.WriteResponse{EventId: "01JTEST", RecordRef: "01JREC", Version: 1, Operation: req.GetOperation()}, nil
 }
 
 type mockBlobPutter struct {
@@ -50,14 +50,25 @@ func defaultTestConfig() config {
 	}
 }
 
-func ingestRequest(source, body string) *troverpc.HTTPRequest {
+func recordsRequest(body string) *troverpc.HTTPRequest {
 	return &troverpc.HTTPRequest{
 		Method:         http.MethodPost,
-		Path:           "/ingest/" + source,
-		MatchedPattern: "/ingest/{source}",
-		PathValues:     map[string]string{"source": source},
+		Path:           "/records",
+		MatchedPattern: "/records",
 		Body:           []byte(body),
 	}
+}
+
+func ingestRequest(source, body string) *troverpc.HTTPRequest {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(body), &obj); err != nil {
+		wrapped, _ := json.Marshal(map[string]string{"source": source, "payload": body})
+		return recordsRequest(string(wrapped))
+	}
+	sourceBytes, _ := json.Marshal(source)
+	obj["source"] = sourceBytes
+	out, _ := json.Marshal(obj)
+	return recordsRequest(string(out))
 }
 
 func putBlobRequest(body string) *troverpc.HTTPRequest {
@@ -175,7 +186,7 @@ func TestPutBlobIngestRoundTrip(t *testing.T) {
 
 	blobs := &mockBlobPutter{}
 	cfg := defaultTestConfig()
-	emit := &mockEmitter{}
+	emit := &mockWriter{}
 	blobData := []byte("round-trip-bytes")
 
 	putResp, err := handlePutBlob(context.Background(), blobs, cfg, putBlobRequest(string(blobData)))
@@ -191,27 +202,27 @@ func TestPutBlobIngestRoundTrip(t *testing.T) {
 		t.Fatalf("decode PUT response: %v", err)
 	}
 
-	ingestBody := `{"blob_ref":"` + putBody.BlobRef + `","title":"photo note"}`
-	ingestResp, err := handleIngest(context.Background(), emit, cfg, ingestRequest("shortcuts", ingestBody))
+	ingestBody := `{"source":"shortcuts","blob_ref":"` + putBody.BlobRef + `","title":"photo note","type":"trove://type/http/ingest/received/1"}`
+	ingestResp, err := handleRecords(context.Background(), emit, cfg, ingestRequest("shortcuts", ingestBody))
 	if err != nil {
-		t.Fatalf("handleIngest() error = %v", err)
+		t.Fatalf("handleRecords() error = %v", err)
 	}
 
-	if int(ingestResp.Status) != http.StatusNoContent {
-		t.Fatalf("POST status = %d, want %d; body = %q", ingestResp.Status, http.StatusNoContent, ingestResp.Body)
+	if int(ingestResp.Status) != http.StatusCreated {
+		t.Fatalf("POST status = %d, want %d; body = %q", ingestResp.Status, http.StatusCreated, ingestResp.Body)
 	}
-	if len(emit.events) != 1 {
-		t.Fatalf("Emit calls = %d, want 1", len(emit.events))
+	if len(emit.writes) != 1 {
+		t.Fatalf("RecordWrite calls = %d, want 1", len(emit.writes))
 	}
-	if emit.events[0].BlobRef != putBody.BlobRef {
-		t.Errorf("BlobRef = %q, want %q", emit.events[0].BlobRef, putBody.BlobRef)
+	if emit.writes[0].BlobRef != putBody.BlobRef {
+		t.Errorf("BlobRef = %q, want %q", emit.writes[0].BlobRef, putBody.BlobRef)
 	}
 	if !bytes.Equal(blobs.refs[putBody.BlobRef], blobData) {
 		t.Errorf("stored data = %q, want %q", blobs.refs[putBody.BlobRef], blobData)
 	}
 }
 
-func TestHandleIngest(t *testing.T) {
+func TestHandleRecords(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -221,24 +232,24 @@ func TestHandleIngest(t *testing.T) {
 		emitErr    error
 		wantStatus int
 		wantEmit   bool
-		checkEvent func(t *testing.T, event *troverpc.Event)
+		checkWrite func(t *testing.T, req *troverpc.WriteRequest)
 	}{
 		{
 			name:       "valid object",
 			source:     "shortcuts",
 			body:       `{"title":"test"}`,
-			wantStatus: http.StatusNoContent,
+			wantStatus: http.StatusCreated,
 			wantEmit:   true,
-			checkEvent: func(t *testing.T, event *troverpc.Event) {
+			checkWrite: func(t *testing.T, req *troverpc.WriteRequest) {
 				t.Helper()
-				if event.Source != "shortcuts" {
-					t.Errorf("Source = %q, want shortcuts", event.Source)
+				if req.Source != "shortcuts" {
+					t.Errorf("Source = %q, want shortcuts", req.Source)
 				}
-				if event.Type != defaultEventType {
-					t.Errorf("Type = %q, want %q", event.Type, defaultEventType)
+				if req.Type != "" {
+					t.Errorf("Type = %q, want empty", req.Type)
 				}
-				if string(event.Payload) != `{"title":"test"}` {
-					t.Errorf("Payload = %s, want %s", event.Payload, `{"title":"test"}`)
+				if string(req.Payload) != `{"title":"test"}` {
+					t.Errorf("Payload = %s, want %s", req.Payload, `{"title":"test"}`)
 				}
 			},
 		},
@@ -246,18 +257,18 @@ func TestHandleIngest(t *testing.T) {
 			name:       "custom type and time",
 			source:     "shortcuts",
 			body:       `{"type":"trove://type/note/created/1","time":"2026-07-10T12:00:00Z","title":"test"}`,
-			wantStatus: http.StatusNoContent,
+			wantStatus: http.StatusCreated,
 			wantEmit:   true,
-			checkEvent: func(t *testing.T, event *troverpc.Event) {
+			checkWrite: func(t *testing.T, req *troverpc.WriteRequest) {
 				t.Helper()
-				if event.Type != "trove://type/note/created/1" {
-					t.Errorf("Type = %q, want trove://type/note/created/1", event.Type)
+				if req.Type != "trove://type/note/created/1" {
+					t.Errorf("Type = %q, want trove://type/note/created/1", req.Type)
 				}
-				if event.Time != "2026-07-10T12:00:00Z" {
-					t.Errorf("Time = %q, want RFC3339 timestamp", event.Time)
+				if req.Time != "2026-07-10T12:00:00Z" {
+					t.Errorf("Time = %q, want RFC3339 timestamp", req.Time)
 				}
-				if string(event.Payload) != `{"title":"test"}` {
-					t.Errorf("Payload = %s, want %s", event.Payload, `{"title":"test"}`)
+				if string(req.Payload) != `{"title":"test"}` {
+					t.Errorf("Payload = %s, want %s", req.Payload, `{"title":"test"}`)
 				}
 			},
 		},
@@ -265,38 +276,32 @@ func TestHandleIngest(t *testing.T) {
 			name:       "array payload",
 			source:     "shortcuts",
 			body:       `["a","b"]`,
-			wantStatus: http.StatusNoContent,
-			wantEmit:   true,
-			checkEvent: func(t *testing.T, event *troverpc.Event) {
-				t.Helper()
-				if string(event.Payload) != `["a","b"]` {
-					t.Errorf("Payload = %s, want %s", event.Payload, `["a","b"]`)
-				}
-			},
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "blob_ref field",
 			source:     "shortcuts",
 			body:       `{"blob_ref":"sha256-deadbeef","title":"photo note"}`,
-			wantStatus: http.StatusNoContent,
+			wantStatus: http.StatusCreated,
 			wantEmit:   true,
-			checkEvent: func(t *testing.T, event *troverpc.Event) {
+			checkWrite: func(t *testing.T, req *troverpc.WriteRequest) {
 				t.Helper()
-				if event.BlobRef != "sha256-deadbeef" {
-					t.Errorf("BlobRef = %q, want sha256-deadbeef", event.BlobRef)
+				if req.BlobRef != "sha256-deadbeef" {
+					t.Errorf("BlobRef = %q, want sha256-deadbeef", req.BlobRef)
 				}
-				if string(event.Payload) != `{"title":"photo note"}` {
-					t.Errorf("Payload = %s, want %s", event.Payload, `{"title":"photo note"}`)
+				if string(req.Payload) != `{"title":"photo note"}` {
+					t.Errorf("Payload = %s, want %s", req.Payload, `{"title":"photo note"}`)
 				}
 			},
 		},
 		{
 			name:       "invalid blob_ref field",
 			source:     "shortcuts",
-			body:       `{"blob_ref":123}`,
+			body:       `{"source":"shortcuts","blob_ref":123}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
+			name:       "invalid json",
 			source:     "shortcuts",
 			body:       `{not-json`,
 			wantStatus: http.StatusBadRequest,
@@ -310,32 +315,32 @@ func TestHandleIngest(t *testing.T) {
 		{
 			name:       "invalid type field",
 			source:     "shortcuts",
-			body:       `{"type":123}`,
+			body:       `{"source":"shortcuts","type":123}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "invalid time field",
 			source:     "shortcuts",
-			body:       `{"time":"not-a-time"}`,
+			body:       `{"source":"shortcuts","time":"not-a-time"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "disallowed type",
 			source:     "shortcuts",
-			body:       `{"type":"trove://type/mqtt/sensor/temp/1","title":"test"}`,
+			body:       `{"source":"shortcuts","type":"trove://type/mqtt/sensor/temp/1","title":"test"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "emit invalid argument",
 			source:     "shortcuts",
-			body:       `{"title":"test"}`,
+			body:       `{"source":"shortcuts","type":"trove://type/http/ingest/received/1","title":"test"}`,
 			emitErr:    status.Error(codes.InvalidArgument, "payload does not match schema for type \"trove://type/http/ingest/received/1\": missing title"),
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "emit failure",
 			source:     "shortcuts",
-			body:       `{"title":"test"}`,
+			body:       `{"source":"shortcuts","type":"trove://type/http/ingest/received/1","title":"test"}`,
 			emitErr:    errors.New("emit failed"),
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -345,10 +350,16 @@ func TestHandleIngest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			emit := &mockEmitter{err: tt.emitErr}
-			resp, err := handleIngest(context.Background(), emit, defaultTestConfig(), ingestRequest(tt.source, tt.body))
+			emit := &mockWriter{err: tt.emitErr}
+			var req *troverpc.HTTPRequest
+			if tt.wantStatus == http.StatusCreated {
+				req = ingestRequest(tt.source, tt.body)
+			} else {
+				req = recordsRequest(tt.body)
+			}
+			resp, err := handleRecords(context.Background(), emit, defaultTestConfig(), req)
 			if err != nil {
-				t.Fatalf("handleIngest() error = %v", err)
+				t.Fatalf("handleRecords() error = %v", err)
 			}
 
 			if int(resp.Status) != tt.wantStatus {
@@ -356,14 +367,14 @@ func TestHandleIngest(t *testing.T) {
 			}
 
 			if tt.wantEmit {
-				if len(emit.events) != 1 {
-					t.Fatalf("Emit calls = %d, want 1", len(emit.events))
+				if len(emit.writes) != 1 {
+					t.Fatalf("RecordWrite calls = %d, want 1", len(emit.writes))
 				}
-				if tt.checkEvent != nil {
-					tt.checkEvent(t, emit.events[0])
+				if tt.checkWrite != nil {
+					tt.checkWrite(t, emit.writes[0])
 				}
-			} else if len(emit.events) != 0 {
-				t.Fatalf("Emit calls = %d, want 0", len(emit.events))
+			} else if len(emit.writes) != 0 {
+				t.Fatalf("RecordWrite calls = %d, want 0", len(emit.writes))
 			}
 		})
 	}
@@ -405,5 +416,5 @@ func TestLoadConfigCustomMaxBody(t *testing.T) {
 	}
 }
 
-var _ trovemodule.Emitter = (*mockEmitter)(nil)
+var _ trovemodule.RecordWriter = (*mockWriter)(nil)
 var _ trovemodule.BlobPutter = (*mockBlobPutter)(nil)

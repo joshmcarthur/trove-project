@@ -73,8 +73,8 @@ listen = %q
 	waitForIngest(t, addr, 15*time.Second)
 
 	unique := fmt.Sprintf("e2e-marker-%d", time.Now().UnixNano())
-	payload := fmt.Sprintf(`{"type":"trove://type/http/ingest/received/1","text":%q}`, unique)
-	postIngestUntilOK(t, "http://"+addr+"/ingest/e2e", payload, 15*time.Second)
+	payload := fmt.Sprintf(`{"source":"e2e","type":"trove://type/http/ingest/received/1","text":%q}`, unique)
+	postRecordsUntilOK(t, "http://"+addr+"/records", payload, 15*time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -83,19 +83,19 @@ listen = %q
 	defer session.Close()
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "search_events",
+		Name: "search_records",
 		Arguments: map[string]any{
 			"query": unique,
 		},
 	})
 	if err != nil {
-		t.Fatalf("CallTool(search_events) error = %v", err)
+		t.Fatalf("CallTool(search_records) error = %v", err)
 	}
 	if result.IsError {
-		t.Fatalf("search_events tool error: %#v", result)
+		t.Fatalf("search_records tool error: %#v", result)
 	}
 	if len(result.Content) == 0 {
-		t.Fatal("search_events returned no content")
+		t.Fatal("search_records returned no content")
 	}
 
 	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
@@ -120,10 +120,10 @@ listen = %q
 
 func waitForIngest(t *testing.T, addr string, timeout time.Duration) {
 	t.Helper()
-	postIngestUntilOK(t, "http://"+addr+"/ingest/e2e", `{"text":"probe"}`, timeout)
+	postRecordsUntilOK(t, "http://"+addr+"/records", `{"source":"e2e","type":"trove://type/http/ingest/received/1","text":"probe"}`, timeout)
 }
 
-func postIngestUntilOK(t *testing.T, url, payload string, timeout time.Duration) {
+func postRecordsUntilOK(t *testing.T, url, payload string, timeout time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	var lastStatus int
@@ -135,7 +135,7 @@ func postIngestUntilOK(t *testing.T, url, payload string, timeout time.Duration)
 			resp.Body.Close()
 			lastStatus = resp.StatusCode
 			lastBody = strings.TrimSpace(string(body))
-			if resp.StatusCode == http.StatusNoContent {
+			if resp.StatusCode == http.StatusCreated {
 				return
 			}
 		}

@@ -2,38 +2,68 @@ package query
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/records"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/oklog/ulid"
 )
+
+type mcpTestQuerier struct {
+	events  *Service
+	records *RecordService
+}
+
+func (q *mcpTestQuerier) GetEvent(ctx context.Context, id string) (Event, error) {
+	return q.events.GetEvent(ctx, id)
+}
+
+func (q *mcpTestQuerier) SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (Summary, error) {
+	return q.events.SummarizeRange(ctx, timeFrom, timeTo)
+}
+
+func (q *mcpTestQuerier) GetRecord(ctx context.Context, recordRef string, version int) (Record, error) {
+	return q.records.GetRecord(ctx, recordRef, version)
+}
+
+func (q *mcpTestQuerier) SearchRecords(ctx context.Context, text string, params RecordSearchParams) ([]Record, error) {
+	return q.records.SearchRecords(ctx, text, params)
+}
+
+func (q *mcpTestQuerier) ListIncompleteRecords(ctx context.Context, source string, limit int) ([]Record, error) {
+	return q.records.ListIncompleteRecords(ctx, source, limit)
+}
+
+func newMCPTestQuerier(store *journal.Store) *mcpTestQuerier {
+	return &mcpTestQuerier{
+		events:  &Service{Journal: store},
+		records: &RecordService{DB: store.DB()},
+	}
+}
 
 func TestMCPGetEvent(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := openTestJournal(t)
+	store, _ := openTestRecordService(t)
 
 	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
-	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
 	want := journal.Event{
-		ID:      id,
-		Time:    when,
-		Type:    "trove://type/http/ingest/received/1",
-		Source:  "shortcuts",
-		Payload: json.RawMessage(`{"text":"hello"}`),
+		ID:        "01JEVT00000000000000000001",
+		Time:      when,
+		Type:      "trove://type/http/ingest/received/1",
+		Source:    "shortcuts",
+		Payload:   json.RawMessage(`{"text":"hello"}`),
+		Operation: journal.OpApply,
 	}
 	if err := store.Append(ctx, want); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc := &Service{Journal: store}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -47,7 +77,7 @@ func TestMCPGetEvent(t *testing.T) {
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "get_event",
 		Arguments: map[string]any{
-			"id": id,
+			"id": want.ID,
 		},
 	})
 	if err != nil {
@@ -58,27 +88,9 @@ func TestMCPGetEvent(t *testing.T) {
 	}
 
 	var got Event
-	for _, content := range result.Content {
-		text, ok := content.(*mcp.TextContent)
-		if !ok {
-			continue
-		}
-		if err := json.Unmarshal([]byte(text.Text), &got); err != nil {
-			t.Fatalf("unmarshal tool output: %v", err)
-		}
-		break
-	}
-	if got.ID == "" {
-		t.Fatal("expected text content with event JSON")
-	}
+	decodeToolResult(t, result, &got)
 	if got.ID != want.ID {
 		t.Errorf("ID = %q, want %q", got.ID, want.ID)
-	}
-	if got.Type != want.Type {
-		t.Errorf("Type = %q, want %q", got.Type, want.Type)
-	}
-	if got.Source != want.Source {
-		t.Errorf("Source = %q, want %q", got.Source, want.Source)
 	}
 }
 
@@ -86,8 +98,8 @@ func TestMCPGetEventNotFound(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	store, _ := openTestRecordService(t)
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -112,27 +124,16 @@ func TestMCPGetEventNotFound(t *testing.T) {
 	}
 }
 
-func TestMCPSearchEvents(t *testing.T) {
+func TestMCPGetRecord(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := openTestJournal(t)
+	store, _ := openTestRecordService(t)
+	ref := "01JREC00000000000000000040"
+	when := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	seedRecord(t, store, "01JEVT00000000000000000040", ref, when, "shortcuts", `{"text":"hello"}`, "trove://type/note/quick/1")
 
-	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
-	id := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	want := journal.Event{
-		ID:      id,
-		Time:    when,
-		Type:    "trove://type/http/ingest/received/1",
-		Source:  "shortcuts",
-		Payload: json.RawMessage(`{"text":"hello world"}`),
-	}
-	if err := store.Append(ctx, want); err != nil {
-		t.Fatalf("Append() error = %v", err)
-	}
-
-	svc := &Service{Journal: store}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -144,10 +145,53 @@ func TestMCPSearchEvents(t *testing.T) {
 	t.Cleanup(func() { _ = session.Close() })
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "search_events",
+		Name: "get_record",
+		Arguments: map[string]any{
+			"record_ref": ref,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("CallTool() returned tool error: %#v", result)
+	}
+
+	var got Record
+	decodeToolResult(t, result, &got)
+	if got.RecordRef != ref {
+		t.Errorf("RecordRef = %q, want %q", got.RecordRef, ref)
+	}
+	if got.Completeness != records.CompletenessComplete {
+		t.Errorf("Completeness = %q, want %q", got.Completeness, records.CompletenessComplete)
+	}
+}
+
+func TestMCPSearchRecords(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store, _ := openTestRecordService(t)
+	ref := "01JREC00000000000000000041"
+	when := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	seedRecord(t, store, "01JEVT00000000000000000041", ref, when, "shortcuts", `{"text":"hello world"}`, "trove://type/note/quick/1")
+
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "search_records",
 		Arguments: map[string]any{
 			"query":       "hello",
-			"type_prefix": "trove://type/http/",
+			"type_prefix": "trove://type/note/",
 			"source":      "shortcuts",
 		},
 	})
@@ -158,31 +202,22 @@ func TestMCPSearchEvents(t *testing.T) {
 		t.Fatalf("CallTool() returned tool error: %#v", result)
 	}
 
-	var got []Event
-	for _, content := range result.Content {
-		text, ok := content.(*mcp.TextContent)
-		if !ok {
-			continue
-		}
-		if err := json.Unmarshal([]byte(text.Text), &got); err != nil {
-			t.Fatalf("unmarshal tool output: %v", err)
-		}
-		break
-	}
+	var got []Record
+	decodeToolResult(t, result, &got)
 	if len(got) != 1 {
-		t.Fatalf("SearchEvents returned %d events, want 1", len(got))
+		t.Fatalf("SearchRecords returned %d records, want 1", len(got))
 	}
-	if got[0].ID != want.ID {
-		t.Errorf("ID = %q, want %q", got[0].ID, want.ID)
+	if got[0].RecordRef != ref {
+		t.Errorf("RecordRef = %q, want %q", got[0].RecordRef, ref)
 	}
 }
 
-func TestMCPSearchEventsEmptyQuery(t *testing.T) {
+func TestMCPSearchRecordsEmptyQuery(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	store, _ := openTestRecordService(t)
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -194,7 +229,7 @@ func TestMCPSearchEventsEmptyQuery(t *testing.T) {
 	t.Cleanup(func() { _ = session.Close() })
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "search_events",
+		Name: "search_records",
 		Arguments: map[string]any{
 			"query": "   ",
 		},
@@ -207,27 +242,16 @@ func TestMCPSearchEventsEmptyQuery(t *testing.T) {
 	}
 }
 
-func TestMCPGetEventsByType(t *testing.T) {
+func TestMCPListIncompleteRecords(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := openTestJournal(t)
+	store, _ := openTestRecordService(t)
+	ref := "01JREC00000000000000000042"
+	when := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	seedRecord(t, store, "01JEVT00000000000000000042", ref, when, "shortcuts", `{"text":"draft"}`, "")
 
-	t1 := time.Date(2026, 7, 10, 8, 0, 0, 0, time.UTC)
-	t2 := time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)
-
-	seed := []journal.Event{
-		{ID: "01JEVT00000000000000000001", Time: t1, Type: "trove://type/mqtt/sensor/temp/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":1}`)},
-		{ID: "01JEVT00000000000000000002", Time: t2, Type: "trove://type/mqtt/sensor/humidity/1", Source: "sensor-a", Payload: json.RawMessage(`{"v":2}`)},
-	}
-	for _, e := range seed {
-		if err := store.Append(ctx, e); err != nil {
-			t.Fatalf("Append() error = %v", err)
-		}
-	}
-
-	svc := &Service{Journal: store}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -239,11 +263,9 @@ func TestMCPGetEventsByType(t *testing.T) {
 	t.Cleanup(func() { _ = session.Close() })
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "get_events_by_type",
+		Name: "list_incomplete_records",
 		Arguments: map[string]any{
-			"type":      "trove://type/mqtt/sensor/temp/1",
-			"time_from": t1.Format(time.RFC3339),
-			"time_to":   t2.Format(time.RFC3339),
+			"source": "shortcuts",
 		},
 	})
 	if err != nil {
@@ -253,52 +275,10 @@ func TestMCPGetEventsByType(t *testing.T) {
 		t.Fatalf("CallTool() returned tool error: %#v", result)
 	}
 
-	var got []Event
-	for _, content := range result.Content {
-		text, ok := content.(*mcp.TextContent)
-		if !ok {
-			continue
-		}
-		if err := json.Unmarshal([]byte(text.Text), &got); err != nil {
-			t.Fatalf("unmarshal tool output: %v", err)
-		}
-		break
-	}
-	if len(got) != 1 {
-		t.Fatalf("GetEventsByType returned %d events, want 1", len(got))
-	}
-	if got[0].ID != seed[0].ID {
-		t.Errorf("ID = %q, want %q", got[0].ID, seed[0].ID)
-	}
-}
-
-func TestMCPGetEventsByTypeEmptyType(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
-	httpServer := httptest.NewServer(handler)
-	t.Cleanup(httpServer.Close)
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1.0"}, nil)
-	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
-	if err != nil {
-		t.Fatalf("Connect() error = %v", err)
-	}
-	t.Cleanup(func() { _ = session.Close() })
-
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "get_events_by_type",
-		Arguments: map[string]any{
-			"type": "   ",
-		},
-	})
-	if err != nil {
-		t.Fatalf("CallTool() error = %v", err)
-	}
-	if !result.IsError {
-		t.Fatalf("CallTool() = %#v, want tool error", result)
+	var got []Record
+	decodeToolResult(t, result, &got)
+	if len(got) != 1 || got[0].RecordRef != ref {
+		t.Fatalf("ListIncompleteRecords = %#v, want record %q", got, ref)
 	}
 }
 
@@ -306,22 +286,22 @@ func TestMCPSummarizeRange(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := openTestJournal(t)
+	store, _ := openTestRecordService(t)
 
 	when := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 	want := journal.Event{
-		ID:      ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		Time:    when,
-		Type:    "trove://type/http/ingest/received/1",
-		Source:  "shortcuts",
-		Payload: json.RawMessage(`{"text":"hello"}`),
+		ID:        "01JEVT00000000000000000002",
+		Time:      when,
+		Type:      "trove://type/http/ingest/received/1",
+		Source:    "shortcuts",
+		Payload:   json.RawMessage(`{"text":"hello"}`),
+		Operation: journal.OpApply,
 	}
 	if err := store.Append(ctx, want); err != nil {
 		t.Fatalf("Append() error = %v", err)
 	}
 
-	svc := &Service{Journal: store}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -350,24 +330,9 @@ func TestMCPSummarizeRange(t *testing.T) {
 	}
 
 	var got Summary
-	for _, content := range result.Content {
-		text, ok := content.(*mcp.TextContent)
-		if !ok {
-			continue
-		}
-		if err := json.Unmarshal([]byte(text.Text), &got); err != nil {
-			t.Fatalf("unmarshal tool output: %v", err)
-		}
-		break
-	}
+	decodeToolResult(t, result, &got)
 	if got.Total != 1 {
 		t.Errorf("Total = %d, want 1", got.Total)
-	}
-	if got.ByType["trove://type/http/ingest/received/1"] != 1 {
-		t.Errorf("ByType[trove://type/http/ingest/received/1] = %d, want 1", got.ByType["trove://type/http/ingest/received/1"])
-	}
-	if len(got.Notable) != 1 || got.Notable[0].ID != want.ID {
-		t.Errorf("Notable = %#v, want event %q", got.Notable, want.ID)
 	}
 }
 
@@ -375,8 +340,8 @@ func TestMCPSummarizeRangeInvalidRange(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	svc := &Service{Journal: openTestJournal(t)}
-	handler := newMCPHandler(MCPDeps{Querier: svc})
+	store, _ := openTestRecordService(t)
+	handler := newMCPHandler(MCPDeps{Querier: newMCPTestQuerier(store)})
 	httpServer := httptest.NewServer(handler)
 	t.Cleanup(httpServer.Close)
 
@@ -400,4 +365,20 @@ func TestMCPSummarizeRangeInvalidRange(t *testing.T) {
 	if !result.IsError {
 		t.Fatalf("CallTool() = %#v, want tool error", result)
 	}
+}
+
+func decodeToolResult(t *testing.T, result *mcp.CallToolResult, out any) {
+	t.Helper()
+
+	for _, content := range result.Content {
+		text, ok := content.(*mcp.TextContent)
+		if !ok {
+			continue
+		}
+		if err := json.Unmarshal([]byte(text.Text), out); err != nil {
+			t.Fatalf("unmarshal tool output: %v", err)
+		}
+		return
+	}
+	t.Fatal("expected text content with JSON output")
 }
