@@ -20,14 +20,14 @@ type captureDraft struct {
 }
 
 type session struct {
-	Mode            sessionMode
-	PendingEventID  string
-	TargetType      string
-	AwaitingContent bool
-	FieldIndex      int
-	Collected       map[string]string
-	Draft           *captureDraft
-	UpdatedAt       time.Time
+	Mode             sessionMode
+	PendingRecordRef string
+	TargetType       string
+	AwaitingContent  bool
+	FieldIndex       int
+	Collected        map[string]string
+	Draft            *captureDraft
+	UpdatedAt        time.Time
 }
 
 type sessionStore struct {
@@ -73,8 +73,8 @@ func (s *sessionStore) activePendingID(chatID int64) (string, bool) {
 	if !ok || sess == nil {
 		return "", false
 	}
-	if sess.Mode == modeClassify && sess.PendingEventID != "" {
-		return sess.PendingEventID, true
+	if sess.Mode == modeClassify && sess.PendingRecordRef != "" {
+		return sess.PendingRecordRef, true
 	}
 	if sess.Mode == modeFastPath {
 		return "", true
