@@ -20,6 +20,26 @@ func (s *stubCore) Emit(ctx context.Context, event *troverpc.Event) error {
 	return s.journal.Emit(ctx, event)
 }
 
+func (s *stubCore) EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+	if req == nil {
+		req = &troverpc.EmitRecordRequest{}
+	}
+	err := s.Emit(ctx, &troverpc.Event{
+		Operation:  req.GetOperation(),
+		RecordRef:  req.GetRecordRef(),
+		Type:       req.GetType(),
+		Time:       req.GetTime(),
+		Source:     req.GetSource(),
+		Payload:    req.GetPayload(),
+		Transforms: req.GetTransforms(),
+		BlobRef:    req.GetBlobRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &troverpc.EmitRecordResponse{}, nil
+}
+
 func (s *stubCore) Put(_ context.Context, _ []byte) (string, error) {
 	return "blob:stub", nil
 }
@@ -37,6 +57,18 @@ func (s *stubCore) GetEventsByType(ctx context.Context, req *troverpc.GetEventsB
 }
 
 func (s *stubCore) SummarizeRange(_ context.Context, _ *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
+	return nil, nil
+}
+
+func (s *stubCore) GetRecord(_ context.Context, _ *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	return nil, nil
+}
+
+func (s *stubCore) SearchRecords(_ context.Context, _ *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+
+func (s *stubCore) ListIncompleteRecords(_ context.Context, _ *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
 	return nil, nil
 }
 

@@ -147,7 +147,7 @@ func TestEmitPolicyValidateEvent(t *testing.T) {
 	}
 }
 
-func TestCoreServicesEmitEnforcesPolicy(t *testing.T) {
+func TestCoreServicesEmitRecordEnforcesPolicy(t *testing.T) {
 	t.Parallel()
 
 	store := openTestJournal(t)
@@ -156,30 +156,33 @@ func TestCoreServicesEmitEnforcesPolicy(t *testing.T) {
 	catalog := types.NewCatalog()
 	registerPermissiveCatalogType(t, catalog, "trove://type/allowed/event/1")
 
-	policy, err := NewEmitPolicy([]string{"trove://type/allowed/event/1"}, catalog, "test-source")
+	policy, err := NewWritePolicy([]string{"trove://type/allowed/event/1"}, catalog, "test-source")
 	if err != nil {
-		t.Fatalf("NewEmitPolicy() error = %v", err)
+		t.Fatalf("NewWritePolicy() error = %v", err)
 	}
 
 	server := &coreServicesServer{
 		journal: store,
+		store:   store,
 		policy:  policy,
+		writer:  NewWriteService(store),
 	}
 
-	_, err = server.Emit(context.Background(), &troverpc.Event{
-		Type:    "trove://type/denied/event/1",
-		Source:  "src",
-		Payload: []byte(`{"ok":true}`),
+	_, err = server.EmitRecord(context.Background(), &troverpc.EmitRecordRequest{
+		Operation: "apply",
+		Type:      "trove://type/denied/event/1",
+		Source:    "src",
+		Payload:   []byte(`{"ok":true}`),
 	})
 	if err == nil {
-		t.Fatal("Emit() error = nil, want InvalidArgument")
+		t.Fatal("EmitRecord() error = nil, want InvalidArgument")
 	}
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.InvalidArgument {
-		t.Fatalf("Emit() code = %v, want InvalidArgument", err)
+		t.Fatalf("EmitRecord() code = %v, want InvalidArgument", err)
 	}
 	if !strings.Contains(st.Message(), `type "trove://type/denied/event/1" not allowed`) {
-		t.Fatalf("Emit() message = %q, want type not allowed", st.Message())
+		t.Fatalf("EmitRecord() message = %q, want type not allowed", st.Message())
 	}
 }
 

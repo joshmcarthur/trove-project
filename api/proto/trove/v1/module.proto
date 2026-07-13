@@ -13,19 +13,42 @@ message Event {
   bytes payload = 5; // JSON
   string blob_ref = 6;
   string schema_ref = 7;
+  string operation = 8;
+  string record_ref = 9;
+  bytes transforms = 10; // JSON Patch array
 }
 
-message EmitResponse {}
+message EmitRecordRequest {
+  string operation = 1;
+  string record_ref = 2;
+  string type = 3;
+  string time = 4; // RFC3339
+  string source = 5;
+  bytes payload = 6;
+  bytes transforms = 7;
+  string blob_ref = 8;
+}
+
+message EmitRecordResponse {
+  string event_id = 1;
+  string record_ref = 2;
+  int32 version = 3;
+  string completeness = 4;
+  string operation = 5;
+}
 
 // CoreServices is implemented by the Trove parent process. Modules reach it
 // through trovemodule.Core; see RunRequest.services_broker_id for the internal
 // plugin wire format.
 service CoreServices {
-  rpc Emit(Event) returns (EmitResponse);
+  rpc EmitRecord(EmitRecordRequest) returns (EmitRecordResponse);
   rpc BlobPut(BlobPutRequest) returns (BlobPutResponse);
   rpc GetEvent(GetEventRequest) returns (Event);
   rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse);
   rpc GetEventsByType(GetEventsByTypeRequest) returns (SearchEventsResponse);
+  rpc GetRecord(GetRecordRequest) returns (Record);
+  rpc SearchRecords(SearchRecordsRequest) returns (SearchRecordsResponse);
+  rpc ListIncompleteRecords(ListIncompleteRecordsRequest) returns (ListIncompleteRecordsResponse);
   rpc SummarizeRange(SummarizeRangeRequest) returns (Summary);
   rpc ListMCPTools(ListMCPToolsRequest) returns (ListMCPToolsResponse);
   rpc CallMCPTool(MCPToolCallRequest) returns (MCPToolCallResponse);
@@ -63,6 +86,45 @@ message GetEventsByTypeRequest {
   string type = 1;
   string time_from = 2; // optional RFC3339
   string time_to = 3;   // optional RFC3339
+}
+
+// Record mirrors the folded record_heads projection for RPC transport.
+message Record {
+  string record_ref = 1;
+  int32 version = 2;
+  string completeness = 3;
+  string type = 4;
+  string source = 5;
+  bytes body = 6; // JSON
+  string content_ref = 7;
+  string updated_at = 8; // RFC3339
+}
+
+message GetRecordRequest {
+  string record_ref = 1;
+  int32 version = 2; // optional; 0 returns latest
+}
+
+message SearchRecordsRequest {
+  string query = 1;
+  string type_prefix = 2;
+  string source = 3;
+  string time_from = 4; // optional RFC3339
+  string time_to = 5;   // optional RFC3339
+  bool include_deleted = 6;
+}
+
+message SearchRecordsResponse {
+  repeated Record records = 1;
+}
+
+message ListIncompleteRecordsRequest {
+  string source = 1;
+  int32 limit = 2;
+}
+
+message ListIncompleteRecordsResponse {
+  repeated Record records = 1;
 }
 
 message SummarizeRangeRequest {
