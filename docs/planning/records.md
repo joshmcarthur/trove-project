@@ -132,6 +132,10 @@ on merge (`feat!:`).
 - [ ] Telegram classify uses `record_ref`
 - [ ] capture-classifier module removed
 
+### Retention
+
+- [x] `PruneBefore` cascades to `record_heads`, `record_events`, and `records_fts`
+
 ## Dependencies
 
 - **Blocked by:** none (greenfield during active development)
