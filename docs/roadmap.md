@@ -43,6 +43,7 @@ Build order from spec §11:
 | Blob store (filesystem) | Supported | §5 | [blobs](./planning/blobs.md) | `internal/blob` |
 | MCP tool registration | Supported | §8, §9 | [mcp-tools](./planning/mcp-tools.md) | `internal/modules` + `modules/mcp-query` |
 | Deferred capture / classify | Supported | §3, §6 | [deferred-capture](./planning/deferred-capture.md) | `modules/capture-classifier` |
+| Records layer (apply/delete) | Planned | §3, §4, §9 | [records](./planning/records.md) | `internal/records` |
 | Telegram source | Supported | §6 | [telegram-source](./planning/telegram-source.md) | `modules/telegram-source` |
 | Network auth (HTTP ingest + MCP) | Supported | §13 | [auth](./planning/auth.md) | `internal/gateway` + `modules/http-gateway` |
 | Journal retention / pruning | Supported | §13 | [journal](./planning/journal.md) | `internal/journal` |
