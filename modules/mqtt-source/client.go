@@ -19,13 +19,13 @@ const (
 	mqttMessageReceivedType = "trove://type/mqtt/message/received/1"
 )
 
-func runMQTT(ctx context.Context, emit trovemodule.Emitter, cfg config, state *subscriptionState) error {
+func runMQTT(ctx context.Context, emitter trovemodule.RecordEmitter, cfg config, state *subscriptionState) error {
 	messageHandler := func(_ mqtt.Client, msg mqtt.Message) {
 		event, err := buildEvent(msg.Topic(), msg.Payload())
 		if err != nil {
 			return
 		}
-		_ = emit.Emit(ctx, event)
+		_, _ = trovemodule.EmitRecordFromEvent(ctx, emitter, event)
 	}
 
 	subscribeTopics := func(client mqtt.Client) error {
