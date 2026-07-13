@@ -33,7 +33,7 @@ listed package, update the [roadmap](./roadmap.md).
 | [MCP query server](./mcp-query.md) | `internal/query` + `modules/mcp-query` |
 | [MCP tool registration](./mcp-tools.md) | `internal/modules` |
 | [Network auth](./auth.md) | `internal/gateway` + `modules/http-gateway` |
-| [Deferred capture](./deferred-capture.md) | `modules/capture-classifier` |
+| [Deferred capture](./deferred-capture.md) (superseded) | — |
 | [Telegram source](./telegram-source.md) | `modules/telegram-source` |
 | [Processors and sinks](./processors-sinks.md) | `internal/modules` + modules |
 | [CLI command registration](./cli-commands.md) | `internal/modules` + `cmd/trove` |

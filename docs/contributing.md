@@ -40,8 +40,7 @@ at the parent `modules/` directory (or an install tree with the same layout).
 
 Per-module build targets (also run as part of `make build`):
 `build-http-gateway`, `build-http-ingest`, `build-mqtt-source`,
-`build-telegram-source`, `build-mcp-query`, `build-capture-classifier`,
-`build-type-catalog`.
+`build-telegram-source`, `build-mcp-query`, `build-type-catalog`.
 
 ## Workflow
 

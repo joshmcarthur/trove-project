@@ -6,7 +6,7 @@ nav_order: 14
 
 # Records layer
 
-**Status:** Planned\
+**Status:** Supported\
 **Milestone:** 5a — Records projection\
 **Spec:** [Core concepts §3](../spec.md#3-core-concepts), [Journal §4](../spec.md#4-journal), [Query §9](../spec.md#9-query-interface-mcp-over-rpc)\
 **Package:** `internal/records`, `internal/journal`, `internal/query`, `internal/modules`
@@ -101,7 +101,7 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 - TTDs describe record **body**, not journal envelope
 - No migration from `classify.pending` — wipe dev journals during rollout
 - `retention_days` cascades to record projection tables
-- Processor routing: `consumes_operations` (default `["apply"]`) + `consumes` on type
+- Processor routing: `consumes` on type; modules guard `operation` in `Process`/`Handle`
 - Rebuild: `trove records rebuild` replays all events
 
 ### PR delivery
@@ -113,25 +113,29 @@ on merge (`feat!:`).
 
 ### Core
 
-- [ ] `EmitRecord` `apply` without `record_ref` creates record at version 1
-- [ ] `EmitRecord` `apply` with `record_ref` increments version
-- [ ] `EmitRecord` `delete` sets completeness `deleted` and retains body
-- [ ] Fold order: merge payload → transforms → type/blob_ref → validate
-- [ ] Materialization in same txn as event append
-- [ ] `trove records rebuild` reproduces identical `record_heads`
+- [x] `EmitRecord` `apply` without `record_ref` creates record at version 1
+- [x] `EmitRecord` `apply` with `record_ref` increments version
+- [x] `EmitRecord` `delete` sets completeness `deleted` and retains body
+- [x] Fold order: merge payload → transforms → type/blob_ref → validate
+- [x] Materialization in same txn as event append
+- [x] `trove records rebuild` reproduces identical `record_heads`
 
 ### Query
 
-- [ ] MCP `get_record`, `search_records`, `list_incomplete_records`
-- [ ] FTS on `records_fts`; deleted excluded from default search
-- [ ] `get_event` available for audit
+- [x] MCP `get_record`, `search_records`, `list_incomplete_records`
+- [x] FTS on `records_fts`; deleted excluded from default search
+- [x] `get_event` available for audit
 
 ### Sources
 
-- [ ] `POST /records` handles `apply` and `delete`
-- [ ] MQTT one-message-one-record
-- [ ] Telegram classify uses `record_ref`
-- [ ] capture-classifier module removed
+- [x] `POST /records` handles `apply` and `delete`
+- [x] MQTT one-message-one-record
+- [x] Telegram classify uses `record_ref`
+- [x] capture-classifier module removed
+
+### Retention
+
+- [x] `PruneBefore` cascades to `record_heads`, `record_events`, and `records_fts`
 
 ## Dependencies
 
