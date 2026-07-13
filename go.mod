@@ -20,6 +20,7 @@ require (
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect

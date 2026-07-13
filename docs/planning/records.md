@@ -87,7 +87,7 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 ### Fold order (`apply`)
 
 1. Merge `payload` into previous body (RFC 7396)
-2. Apply `transforms` (RFC 6902, body-rooted sandbox)
+2. Apply `transforms` (RFC 6902) against the body object
 3. Set `type` / `content_ref` from event fields
 4. Validate folded body against TTD when type set
 5. Write `record_heads` + FTS
