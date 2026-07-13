@@ -69,7 +69,7 @@ type moduleClient struct {
 	cliClient       troverpc.CLIModuleClient
 	broker          *plugin.GRPCBroker
 	journal         journal.Journal
-	policy          EmitPolicy
+	policy          WritePolicy
 	blobs           blob.Store
 	catalog         *types.Catalog
 	mcpTools        []MCPToolEntry
@@ -94,7 +94,9 @@ func (c *moduleClient) Run(ctx context.Context) error {
 		}
 		troverpc.RegisterCoreServicesServer(s, &coreServicesServer{
 			journal:     c.journal,
+			store:       storeFromJournal(c.journal),
 			policy:      c.policy,
+			writer:      writerFromJournal(c.journal),
 			blobs:       c.blobs,
 			catalog:     c.catalog,
 			query:       querySvc,
@@ -186,7 +188,7 @@ func (c *moduleClient) Handle(ctx context.Context, event journal.Event, dispatch
 type moduleGRPCPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 	journal     journal.Journal
-	policy      EmitPolicy
+	policy      WritePolicy
 	moduleName  string
 	blobs       blob.Store
 	catalog     *types.Catalog
@@ -223,7 +225,7 @@ func (p *moduleGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 
 func hostPluginSet(
 	j journal.Journal,
-	policy EmitPolicy,
+	policy WritePolicy,
 	moduleName string,
 	blobs blob.Store,
 	caps moduleCapabilities,

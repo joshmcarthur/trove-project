@@ -9,10 +9,11 @@ import (
 
 func main() {
 	trovemodule.Serve(trovemodule.RunFunc(func(ctx context.Context, core trovemodule.Core) error {
-		return core.Emit(ctx, &troverpc.Event{
+		_, err := trovemodule.EmitRecordFromEvent(ctx, core, &troverpc.Event{
 			Type:    "test.emit.once",
 			Source:  "emit-once",
 			Payload: []byte(`{"hello":"world"}`),
 		})
+		return err
 	}))
 }

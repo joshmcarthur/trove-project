@@ -20,11 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CoreServices_Emit_FullMethodName                   = "/trove.v1.CoreServices/Emit"
+	CoreServices_EmitRecord_FullMethodName             = "/trove.v1.CoreServices/EmitRecord"
 	CoreServices_BlobPut_FullMethodName                = "/trove.v1.CoreServices/BlobPut"
 	CoreServices_GetEvent_FullMethodName               = "/trove.v1.CoreServices/GetEvent"
 	CoreServices_SearchEvents_FullMethodName           = "/trove.v1.CoreServices/SearchEvents"
 	CoreServices_GetEventsByType_FullMethodName        = "/trove.v1.CoreServices/GetEventsByType"
+	CoreServices_GetRecord_FullMethodName              = "/trove.v1.CoreServices/GetRecord"
+	CoreServices_SearchRecords_FullMethodName          = "/trove.v1.CoreServices/SearchRecords"
+	CoreServices_ListIncompleteRecords_FullMethodName  = "/trove.v1.CoreServices/ListIncompleteRecords"
 	CoreServices_SummarizeRange_FullMethodName         = "/trove.v1.CoreServices/SummarizeRange"
 	CoreServices_ListMCPTools_FullMethodName           = "/trove.v1.CoreServices/ListMCPTools"
 	CoreServices_CallMCPTool_FullMethodName            = "/trove.v1.CoreServices/CallMCPTool"
@@ -42,11 +45,14 @@ const (
 // through trovemodule.Core; see RunRequest.services_broker_id for the internal
 // plugin wire format.
 type CoreServicesClient interface {
-	Emit(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EmitResponse, error)
+	EmitRecord(ctx context.Context, in *EmitRecordRequest, opts ...grpc.CallOption) (*EmitRecordResponse, error)
 	BlobPut(ctx context.Context, in *BlobPutRequest, opts ...grpc.CallOption) (*BlobPutResponse, error)
 	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*Event, error)
 	SearchEvents(ctx context.Context, in *SearchEventsRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
 	GetEventsByType(ctx context.Context, in *GetEventsByTypeRequest, opts ...grpc.CallOption) (*SearchEventsResponse, error)
+	GetRecord(ctx context.Context, in *GetRecordRequest, opts ...grpc.CallOption) (*Record, error)
+	SearchRecords(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResponse, error)
+	ListIncompleteRecords(ctx context.Context, in *ListIncompleteRecordsRequest, opts ...grpc.CallOption) (*ListIncompleteRecordsResponse, error)
 	SummarizeRange(ctx context.Context, in *SummarizeRangeRequest, opts ...grpc.CallOption) (*Summary, error)
 	ListMCPTools(ctx context.Context, in *ListMCPToolsRequest, opts ...grpc.CallOption) (*ListMCPToolsResponse, error)
 	CallMCPTool(ctx context.Context, in *MCPToolCallRequest, opts ...grpc.CallOption) (*MCPToolCallResponse, error)
@@ -64,10 +70,10 @@ func NewCoreServicesClient(cc grpc.ClientConnInterface) CoreServicesClient {
 	return &coreServicesClient{cc}
 }
 
-func (c *coreServicesClient) Emit(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EmitResponse, error) {
+func (c *coreServicesClient) EmitRecord(ctx context.Context, in *EmitRecordRequest, opts ...grpc.CallOption) (*EmitRecordResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmitResponse)
-	err := c.cc.Invoke(ctx, CoreServices_Emit_FullMethodName, in, out, cOpts...)
+	out := new(EmitRecordResponse)
+	err := c.cc.Invoke(ctx, CoreServices_EmitRecord_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +114,36 @@ func (c *coreServicesClient) GetEventsByType(ctx context.Context, in *GetEventsB
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SearchEventsResponse)
 	err := c.cc.Invoke(ctx, CoreServices_GetEventsByType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) GetRecord(ctx context.Context, in *GetRecordRequest, opts ...grpc.CallOption) (*Record, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Record)
+	err := c.cc.Invoke(ctx, CoreServices_GetRecord_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) SearchRecords(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchRecordsResponse)
+	err := c.cc.Invoke(ctx, CoreServices_SearchRecords_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coreServicesClient) ListIncompleteRecords(ctx context.Context, in *ListIncompleteRecordsRequest, opts ...grpc.CallOption) (*ListIncompleteRecordsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIncompleteRecordsResponse)
+	err := c.cc.Invoke(ctx, CoreServices_ListIncompleteRecords_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -192,11 +228,14 @@ func (c *coreServicesClient) ValidateTypeDefinition(ctx context.Context, in *Val
 // through trovemodule.Core; see RunRequest.services_broker_id for the internal
 // plugin wire format.
 type CoreServicesServer interface {
-	Emit(context.Context, *Event) (*EmitResponse, error)
+	EmitRecord(context.Context, *EmitRecordRequest) (*EmitRecordResponse, error)
 	BlobPut(context.Context, *BlobPutRequest) (*BlobPutResponse, error)
 	GetEvent(context.Context, *GetEventRequest) (*Event, error)
 	SearchEvents(context.Context, *SearchEventsRequest) (*SearchEventsResponse, error)
 	GetEventsByType(context.Context, *GetEventsByTypeRequest) (*SearchEventsResponse, error)
+	GetRecord(context.Context, *GetRecordRequest) (*Record, error)
+	SearchRecords(context.Context, *SearchRecordsRequest) (*SearchRecordsResponse, error)
+	ListIncompleteRecords(context.Context, *ListIncompleteRecordsRequest) (*ListIncompleteRecordsResponse, error)
 	SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error)
 	ListMCPTools(context.Context, *ListMCPToolsRequest) (*ListMCPToolsResponse, error)
 	CallMCPTool(context.Context, *MCPToolCallRequest) (*MCPToolCallResponse, error)
@@ -214,8 +253,8 @@ type CoreServicesServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCoreServicesServer struct{}
 
-func (UnimplementedCoreServicesServer) Emit(context.Context, *Event) (*EmitResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Emit not implemented")
+func (UnimplementedCoreServicesServer) EmitRecord(context.Context, *EmitRecordRequest) (*EmitRecordResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EmitRecord not implemented")
 }
 func (UnimplementedCoreServicesServer) BlobPut(context.Context, *BlobPutRequest) (*BlobPutResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BlobPut not implemented")
@@ -228,6 +267,15 @@ func (UnimplementedCoreServicesServer) SearchEvents(context.Context, *SearchEven
 }
 func (UnimplementedCoreServicesServer) GetEventsByType(context.Context, *GetEventsByTypeRequest) (*SearchEventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetEventsByType not implemented")
+}
+func (UnimplementedCoreServicesServer) GetRecord(context.Context, *GetRecordRequest) (*Record, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRecord not implemented")
+}
+func (UnimplementedCoreServicesServer) SearchRecords(context.Context, *SearchRecordsRequest) (*SearchRecordsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchRecords not implemented")
+}
+func (UnimplementedCoreServicesServer) ListIncompleteRecords(context.Context, *ListIncompleteRecordsRequest) (*ListIncompleteRecordsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIncompleteRecords not implemented")
 }
 func (UnimplementedCoreServicesServer) SummarizeRange(context.Context, *SummarizeRangeRequest) (*Summary, error) {
 	return nil, status.Error(codes.Unimplemented, "method SummarizeRange not implemented")
@@ -271,20 +319,20 @@ func RegisterCoreServicesServer(s grpc.ServiceRegistrar, srv CoreServicesServer)
 	s.RegisterService(&CoreServices_ServiceDesc, srv)
 }
 
-func _CoreServices_Emit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Event)
+func _CoreServices_EmitRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmitRecordRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CoreServicesServer).Emit(ctx, in)
+		return srv.(CoreServicesServer).EmitRecord(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: CoreServices_Emit_FullMethodName,
+		FullMethod: CoreServices_EmitRecord_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CoreServicesServer).Emit(ctx, req.(*Event))
+		return srv.(CoreServicesServer).EmitRecord(ctx, req.(*EmitRecordRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -357,6 +405,60 @@ func _CoreServices_GetEventsByType_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CoreServicesServer).GetEventsByType(ctx, req.(*GetEventsByTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_GetRecord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRecordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).GetRecord(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_GetRecord_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).GetRecord(ctx, req.(*GetRecordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_SearchRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRecordsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).SearchRecords(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_SearchRecords_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).SearchRecords(ctx, req.(*SearchRecordsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoreServices_ListIncompleteRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIncompleteRecordsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoreServicesServer).ListIncompleteRecords(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoreServices_ListIncompleteRecords_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoreServicesServer).ListIncompleteRecords(ctx, req.(*ListIncompleteRecordsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -495,8 +597,8 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*CoreServicesServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Emit",
-			Handler:    _CoreServices_Emit_Handler,
+			MethodName: "EmitRecord",
+			Handler:    _CoreServices_EmitRecord_Handler,
 		},
 		{
 			MethodName: "BlobPut",
@@ -513,6 +615,18 @@ var CoreServices_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetEventsByType",
 			Handler:    _CoreServices_GetEventsByType_Handler,
+		},
+		{
+			MethodName: "GetRecord",
+			Handler:    _CoreServices_GetRecord_Handler,
+		},
+		{
+			MethodName: "SearchRecords",
+			Handler:    _CoreServices_SearchRecords_Handler,
+		},
+		{
+			MethodName: "ListIncompleteRecords",
+			Handler:    _CoreServices_ListIncompleteRecords_Handler,
 		},
 		{
 			MethodName: "SummarizeRange",

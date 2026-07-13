@@ -119,10 +119,10 @@ func StartSource(
 		mcpRegistry.Register(manifest.Name, moduleClient)
 	}
 	if hasProcessor && eventRegistry != nil {
-		eventRegistry.RegisterProcessor(manifest.Name, manifest.Consumes, policy, moduleClient)
+		eventRegistry.RegisterProcessor(manifest.Name, manifest.Consumes, manifest.ConsumesOperations, policy, moduleClient)
 	}
 	if hasSink && eventRegistry != nil {
-		eventRegistry.RegisterSink(manifest.Name, manifest.Consumes, moduleClient)
+		eventRegistry.RegisterSink(manifest.Name, manifest.Consumes, manifest.ConsumesOperations, moduleClient)
 	}
 
 	go func() {

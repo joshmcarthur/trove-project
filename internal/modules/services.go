@@ -3,6 +3,7 @@ package modules
 import (
 	"bytes"
 	"context"
+	"strings"
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/blob"
@@ -17,7 +18,9 @@ import (
 type coreServicesServer struct {
 	troverpc.UnimplementedCoreServicesServer
 	journal     journal.Journal
-	policy      EmitPolicy
+	store       *journal.Store
+	policy      WritePolicy
+	writer      *WriteService
 	blobs       blob.Store
 	catalog     *types.Catalog
 	query       *query.Service
@@ -26,21 +29,15 @@ type coreServicesServer struct {
 	mcpRegistry *MCPRegistry
 }
 
-func (s *coreServicesServer) Emit(ctx context.Context, e *troverpc.Event) (*troverpc.EmitResponse, error) {
-	if s.journal == nil {
-		return nil, status.Error(codes.Unavailable, "journal is not configured")
+func (s *coreServicesServer) EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+	if s.writer == nil {
+		return nil, status.Error(codes.Unavailable, "record emit is not configured")
 	}
-	event, err := rpcEventToJournal(e)
+	resp, err := s.writer.EmitRecordFromRPC(ctx, req, s.policy)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		return nil, writeGRPCError(err)
 	}
-	if err := s.policy.ValidateEvent(&event); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := s.journal.Append(ctx, event); err != nil {
-		return nil, status.Errorf(codes.Internal, "%v", err)
-	}
-	return &troverpc.EmitResponse{}, nil
+	return resp, nil
 }
 
 func (s *coreServicesServer) BlobPut(ctx context.Context, req *troverpc.BlobPutRequest) (*troverpc.BlobPutResponse, error) {
@@ -269,6 +266,20 @@ func typeSummaryFromEntry(entry types.Entry) *troverpc.TypeSummary {
 	}
 }
 
+func writeGRPCError(err error) error {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not allowed"),
+		strings.Contains(msg, "is required"),
+		strings.Contains(msg, "must be"),
+		strings.Contains(msg, "not allowed for delete"),
+		strings.Contains(msg, "payload"):
+		return status.Error(codes.InvalidArgument, msg)
+	default:
+		return status.Errorf(codes.Internal, "%v", err)
+	}
+}
+
 func queryGRPCError(err error) error {
 	switch err {
 	case query.ErrNotFound:
@@ -293,11 +304,16 @@ func parseOptionalProtoTime(s string) (*time.Time, error) {
 
 func queryEventToProto(e query.Event) *troverpc.Event {
 	out := &troverpc.Event{
-		Id:      e.ID,
-		Time:    e.Time.Format(time.RFC3339),
-		Type:    e.Type,
-		Source:  e.Source,
-		Payload: e.Payload,
+		Id:        e.ID,
+		Time:      e.Time.Format(time.RFC3339),
+		Type:      e.Type,
+		Source:    e.Source,
+		Payload:   e.Payload,
+		Operation: e.Operation,
+		RecordRef: e.RecordRef,
+	}
+	if len(e.Transforms) > 0 {
+		out.Transforms = e.Transforms
 	}
 	if e.BlobRef != nil {
 		out.BlobRef = *e.BlobRef

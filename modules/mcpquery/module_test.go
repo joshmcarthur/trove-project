@@ -33,6 +33,18 @@ func (s *stubQuerier) SummarizeRange(context.Context, *troverpc.SummarizeRangeRe
 	return &troverpc.Summary{}, nil
 }
 
+func (s *stubQuerier) GetRecord(context.Context, *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	return nil, query.ErrNotFound
+}
+
+func (s *stubQuerier) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+
+func (s *stubQuerier) ListIncompleteRecords(context.Context, *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+
 func TestHandleHTTPNotReady(t *testing.T) {
 	t.Parallel()
 

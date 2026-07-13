@@ -21,9 +21,10 @@ See [records concept](../concepts/records.md) for vocabulary.
 
 ## Interfaces
 
-### Write — `RecordWrite`
+### Write — `EmitRecord`
 
-Single code path for all mutations (RPC, HTTP, module `Core`).
+Appends a record-scoped journal event and materializes the record projection in
+one transaction (RPC, HTTP, module `Core`).
 
 ```
 POST /records
@@ -48,7 +49,7 @@ POST /records
 
 Response: `{ event_id, record_ref, version, completeness, operation }`
 
-gRPC: `RecordWrite(WriteRequest) returns (WriteResponse)` on `CoreServices`.
+gRPC: `EmitRecord(EmitRecordRequest) returns (EmitRecordResponse)` on `CoreServices`.
 
 ### Read — internal RPC / MCP
 
@@ -112,9 +113,9 @@ on merge (`feat!:`).
 
 ### Core
 
-- [ ] `RecordWrite` `apply` without `record_ref` creates record at version 1
-- [ ] `RecordWrite` `apply` with `record_ref` increments version
-- [ ] `RecordWrite` `delete` sets completeness `deleted` and retains body
+- [ ] `EmitRecord` `apply` without `record_ref` creates record at version 1
+- [ ] `EmitRecord` `apply` with `record_ref` increments version
+- [ ] `EmitRecord` `delete` sets completeness `deleted` and retains body
 - [ ] Fold order: merge payload → transforms → type/blob_ref → validate
 - [ ] Materialization in same txn as event append
 - [ ] `trove records rebuild` reproduces identical `record_heads`

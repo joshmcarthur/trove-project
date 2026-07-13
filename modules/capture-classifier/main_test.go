@@ -22,6 +22,26 @@ func (s *stubCore) Emit(ctx context.Context, event *troverpc.Event) error {
 	return s.journal.Emit(ctx, event)
 }
 
+func (s *stubCore) EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+	if req == nil {
+		req = &troverpc.EmitRecordRequest{}
+	}
+	err := s.Emit(ctx, &troverpc.Event{
+		Operation:  req.GetOperation(),
+		RecordRef:  req.GetRecordRef(),
+		Type:       req.GetType(),
+		Time:       req.GetTime(),
+		Source:     req.GetSource(),
+		Payload:    req.GetPayload(),
+		Transforms: req.GetTransforms(),
+		BlobRef:    req.GetBlobRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &troverpc.EmitRecordResponse{}, nil
+}
+
 func (s *stubCore) Put(context.Context, []byte) (string, error) {
 	return "", nil
 }
@@ -39,6 +59,18 @@ func (s *stubCore) GetEventsByType(ctx context.Context, req *troverpc.GetEventsB
 }
 
 func (s *stubCore) SummarizeRange(context.Context, *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
+	return nil, nil
+}
+
+func (s *stubCore) GetRecord(context.Context, *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	return nil, nil
+}
+
+func (s *stubCore) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+
+func (s *stubCore) ListIncompleteRecords(context.Context, *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
 	return nil, nil
 }
 
@@ -204,6 +236,9 @@ func TestJournalAdapterMapsGRPCNotFound(t *testing.T) {
 type notFoundCore struct{}
 
 func (notFoundCore) Emit(context.Context, *troverpc.Event) error { return nil }
+func (notFoundCore) EmitRecord(context.Context, *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+	return &troverpc.EmitRecordResponse{}, nil
+}
 func (notFoundCore) Put(context.Context, []byte) (string, error) { return "", nil }
 func (notFoundCore) GetEvent(context.Context, string) (*troverpc.Event, error) {
 	return nil, status.Error(codes.NotFound, "not found")
@@ -215,6 +250,15 @@ func (notFoundCore) GetEventsByType(context.Context, *troverpc.GetEventsByTypeRe
 	return nil, nil
 }
 func (notFoundCore) SummarizeRange(context.Context, *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
+	return nil, nil
+}
+func (notFoundCore) GetRecord(context.Context, *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+	return nil, status.Error(codes.NotFound, "not found")
+}
+func (notFoundCore) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+	return nil, nil
+}
+func (notFoundCore) ListIncompleteRecords(context.Context, *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
 	return nil, nil
 }
 func (notFoundCore) ListMCPTools(context.Context) ([]trovemodule.MCPToolDescriptor, error) {
