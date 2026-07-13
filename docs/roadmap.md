@@ -42,6 +42,7 @@ Build order from spec §11:
 | iOS Shortcuts capture recipes | Supported | §6 | [iOS Shortcuts](./getting-started/ios-shortcuts.md) | `examples/ios-shortcuts/` |
 | Blob store (filesystem) | Supported | §5 | [blobs](./planning/blobs.md) | `internal/blob` |
 | MCP tool registration | Supported | §8, §9 | [mcp-tools](./planning/mcp-tools.md) | `internal/modules` + `modules/mcp-query` |
+| Records layer (apply/delete) | Planned | §3, §4, §9 | [records](./planning/records.md) | `internal/records` |
 | Deferred capture / classify | Supported | §3, §6 | [deferred-capture](./planning/deferred-capture.md) | `modules/capture-classifier` |
 | Telegram source | Supported | §6 | [telegram-source](./planning/telegram-source.md) | `modules/telegram-source` |
 | Network auth (HTTP ingest + MCP) | Supported | §13 | [auth](./planning/auth.md) | `internal/gateway` + `modules/http-gateway` |
