@@ -56,6 +56,12 @@ Operational runbook — not a planning page:
 | [Embeddings](./embeddings.md) | Embedding model (local ONNX vs API) |
 | [Remote modules](./remote-modules.md) | Remote/edge RPC protocol shape |
 
+## Milestone 5a — Records layer
+
+| Page | Package |
+|------|---------|
+| [Records layer](./records.md) | `internal/records`, `internal/journal`, `internal/query` |
+
 ## Later
 
 | Page | Package |
