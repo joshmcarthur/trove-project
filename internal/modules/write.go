@@ -8,6 +8,7 @@ import (
 
 	"github.com/joshmcarthur/trove/internal/journal"
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
+	"github.com/joshmcarthur/trove/internal/query"
 	"github.com/joshmcarthur/trove/internal/records"
 )
 
@@ -165,4 +166,12 @@ func storeFromJournal(j journal.Journal) *journal.Store {
 		return nil
 	}
 	return store
+}
+
+func recordsFromJournal(j journal.Journal) *query.RecordService {
+	store, ok := j.(*journal.Store)
+	if !ok {
+		return nil
+	}
+	return &query.RecordService{DB: store.DB()}
 }
