@@ -15,17 +15,22 @@ import (
 	"github.com/mochi-mqtt/server/v2/listeners"
 )
 
-type channelEmitter struct {
+type channelWriter struct {
 	mu     sync.Mutex
 	events []*troverpc.Event
 	notify chan struct{}
 }
 
-func newChannelEmitter() *channelEmitter {
-	return &channelEmitter{notify: make(chan struct{}, 8)}
+func newChannelWriter() *channelWriter {
+	return &channelWriter{notify: make(chan struct{}, 8)}
 }
 
-func (e *channelEmitter) Emit(_ context.Context, event *troverpc.Event) error {
+func (e *channelWriter) RecordWrite(_ context.Context, req *troverpc.WriteRequest) (*troverpc.WriteResponse, error) {
+	event := &troverpc.Event{
+		Type:    req.GetType(),
+		Source:  req.GetSource(),
+		Payload: req.GetPayload(),
+	}
 	e.mu.Lock()
 	e.events = append(e.events, event)
 	e.mu.Unlock()
@@ -33,10 +38,10 @@ func (e *channelEmitter) Emit(_ context.Context, event *troverpc.Event) error {
 	case e.notify <- struct{}{}:
 	default:
 	}
-	return nil
+	return &troverpc.WriteResponse{EventId: "01JTEST", RecordRef: "01JREC", Version: 1, Operation: req.GetOperation()}, nil
 }
 
-func (e *channelEmitter) waitForEvents(t *testing.T, count int, timeout time.Duration) []*troverpc.Event {
+func (e *channelWriter) waitForEvents(t *testing.T, count int, timeout time.Duration) []*troverpc.Event {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
@@ -99,7 +104,7 @@ func startTestBroker(t *testing.T) string {
 
 func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 	broker := startTestBroker(t)
-	emit := newChannelEmitter()
+	writer := newChannelWriter()
 
 	cfg := config{
 		Broker:   broker,
@@ -112,7 +117,7 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 	errCh := make(chan error, 1)
 	state := newSubscriptionState(cfg.Topics)
 	go func() {
-		errCh <- runMQTT(ctx, emit, cfg, state)
+		errCh <- runMQTT(ctx, writer, cfg, state)
 	}()
 
 	publisher := pahomqtt.NewClient(pahomqtt.NewClientOptions().AddBroker(broker).SetClientID("publisher"))
@@ -135,7 +140,7 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 		t.Fatalf("publish: %v", err)
 	}
 
-	events := emit.waitForEvents(t, 1, 5*time.Second)
+	events := writer.waitForEvents(t, 1, 5*time.Second)
 	if events[0].Type != "trove://type/mqtt/message/received/1" {
 		t.Errorf("Type = %q, want trove://type/mqtt/message/received/1", events[0].Type)
 	}
@@ -157,4 +162,4 @@ func TestRunMQTTSubscribeAndEmit(t *testing.T) {
 	}
 }
 
-var _ trovemodule.Emitter = (*channelEmitter)(nil)
+var _ trovemodule.RecordWriter = (*channelWriter)(nil)
