@@ -10,10 +10,10 @@ func TestCollectMCPToolsRejectsDuplicates(t *testing.T) {
 			Name:     "one",
 			Version:  "1.0",
 			Kind:     KindSource,
-			Provides: []string{"classify.*"},
+			Provides: []string{"trove://type/example/*"},
 			MCP: manifestMCP{Tools: []MCPTool{{
-				Name:        "classify_event",
-				Description: "classify",
+				Name:        "example_tool",
+				Description: "first",
 			}}},
 		},
 	}, {
@@ -21,9 +21,9 @@ func TestCollectMCPToolsRejectsDuplicates(t *testing.T) {
 			Name:     "two",
 			Version:  "1.0",
 			Kind:     KindSource,
-			Provides: []string{"classify.*"},
+			Provides: []string{"trove://type/example/*"},
 			MCP: manifestMCP{Tools: []MCPTool{{
-				Name:        "classify_event",
+				Name:        "example_tool",
 				Description: "duplicate",
 			}}},
 		},
@@ -37,10 +37,10 @@ func TestCollectMCPToolsRejectsDuplicates(t *testing.T) {
 
 func TestMCPToolModuleIndex(t *testing.T) {
 	index := MCPToolModuleIndex([]MCPToolEntry{{
-		Tool:   MCPTool{Name: "classify_event"},
-		Module: "capture-classifier",
+		Tool:   MCPTool{Name: "example_tool"},
+		Module: "example-module",
 	}})
-	if index["classify_event"] != "capture-classifier" {
+	if index["example_tool"] != "example-module" {
 		t.Fatalf("index = %#v", index)
 	}
 }
