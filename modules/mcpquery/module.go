@@ -83,32 +83,6 @@ func (a *queryAdapter) GetEvent(ctx context.Context, id string) (query.Event, er
 	return protoToQueryEvent(event)
 }
 
-func (a *queryAdapter) SearchEvents(ctx context.Context, text string, params query.SearchParams) ([]query.Event, error) {
-	events, err := a.q.SearchEvents(ctx, &troverpc.SearchEventsRequest{
-		Query:      text,
-		TypePrefix: params.TypePrefix,
-		Source:     params.Source,
-		TimeFrom:   formatOptionalTime(params.TimeFrom),
-		TimeTo:     formatOptionalTime(params.TimeTo),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return protoToQueryEvents(events)
-}
-
-func (a *queryAdapter) GetEventsByType(ctx context.Context, eventType string, timeFrom, timeTo *time.Time) ([]query.Event, error) {
-	events, err := a.q.GetEventsByType(ctx, &troverpc.GetEventsByTypeRequest{
-		Type:     eventType,
-		TimeFrom: formatOptionalTime(timeFrom),
-		TimeTo:   formatOptionalTime(timeTo),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return protoToQueryEvents(events)
-}
-
 func (a *queryAdapter) SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (query.Summary, error) {
 	summary, err := a.q.SummarizeRange(ctx, &troverpc.SummarizeRangeRequest{
 		TimeFrom: timeFrom.Format(time.RFC3339),
@@ -120,6 +94,43 @@ func (a *queryAdapter) SummarizeRange(ctx context.Context, timeFrom, timeTo time
 	return protoToQuerySummary(summary)
 }
 
+func (a *queryAdapter) GetRecord(ctx context.Context, recordRef string, version int) (query.Record, error) {
+	record, err := a.q.GetRecord(ctx, &troverpc.GetRecordRequest{
+		RecordRef: recordRef,
+		Version:   int32(version), //nolint:gosec // G115: MCP tool version filter
+	})
+	if err != nil {
+		return query.Record{}, err
+	}
+	return protoToQueryRecord(record)
+}
+
+func (a *queryAdapter) SearchRecords(ctx context.Context, text string, params query.RecordSearchParams) ([]query.Record, error) {
+	records, err := a.q.SearchRecords(ctx, &troverpc.SearchRecordsRequest{
+		Query:          text,
+		TypePrefix:     params.TypePrefix,
+		Source:         params.Source,
+		TimeFrom:       formatOptionalTime(params.TimeFrom),
+		TimeTo:         formatOptionalTime(params.TimeTo),
+		IncludeDeleted: params.IncludeDeleted,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return protoToQueryRecords(records)
+}
+
+func (a *queryAdapter) ListIncompleteRecords(ctx context.Context, source string, limit int) ([]query.Record, error) {
+	records, err := a.q.ListIncompleteRecords(ctx, &troverpc.ListIncompleteRecordsRequest{
+		Source: source,
+		Limit:  int32(limit), //nolint:gosec // G115: MCP tool limit
+	})
+	if err != nil {
+		return nil, err
+	}
+	return protoToQueryRecords(records)
+}
+
 func protoToQueryEvent(event *troverpc.Event) (query.Event, error) {
 	if event == nil {
 		return query.Event{}, query.ErrNotFound
@@ -129,27 +140,18 @@ func protoToQueryEvent(event *troverpc.Event) (query.Event, error) {
 		return query.Event{}, err
 	}
 	out := query.Event{
-		ID:      event.Id,
-		Time:    t,
-		Type:    event.Type,
-		Source:  event.Source,
-		Payload: event.Payload,
+		ID:         event.Id,
+		Time:       t,
+		Operation:  event.Operation,
+		RecordRef:  event.RecordRef,
+		Type:       event.Type,
+		Source:     event.Source,
+		Payload:    event.Payload,
+		Transforms: event.Transforms,
 	}
 	if event.BlobRef != "" {
 		ref := event.BlobRef
 		out.BlobRef = &ref
-	}
-	return out, nil
-}
-
-func protoToQueryEvents(events []*troverpc.Event) ([]query.Event, error) {
-	out := make([]query.Event, 0, len(events))
-	for _, event := range events {
-		converted, err := protoToQueryEvent(event)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, converted)
 	}
 	return out, nil
 }
@@ -170,9 +172,13 @@ func protoToQuerySummary(summary *troverpc.Summary) (query.Summary, error) {
 	for k, v := range summary.ByType {
 		byType[k] = int(v)
 	}
-	notable, err := protoToQueryEvents(summary.Notable)
-	if err != nil {
-		return query.Summary{}, err
+	notable := make([]query.Event, 0, len(summary.Notable))
+	for _, event := range summary.Notable {
+		converted, err := protoToQueryEvent(event)
+		if err != nil {
+			return query.Summary{}, err
+		}
+		notable = append(notable, converted)
 	}
 	return query.Summary{
 		TimeFrom: timeFrom,
@@ -181,6 +187,42 @@ func protoToQuerySummary(summary *troverpc.Summary) (query.Summary, error) {
 		ByType:   byType,
 		Notable:  notable,
 	}, nil
+}
+
+func protoToQueryRecord(record *troverpc.Record) (query.Record, error) {
+	if record == nil {
+		return query.Record{}, query.ErrRecordNotFound
+	}
+	updatedAt, err := time.Parse(time.RFC3339, record.UpdatedAt)
+	if err != nil {
+		return query.Record{}, err
+	}
+	out := query.Record{
+		RecordRef:    record.RecordRef,
+		Version:      int(record.Version),
+		Completeness: record.Completeness,
+		Type:         record.Type,
+		Source:       record.Source,
+		Body:         record.Body,
+		UpdatedAt:    updatedAt,
+	}
+	if record.ContentRef != "" {
+		ref := record.ContentRef
+		out.ContentRef = &ref
+	}
+	return out, nil
+}
+
+func protoToQueryRecords(records []*troverpc.Record) ([]query.Record, error) {
+	out := make([]query.Record, 0, len(records))
+	for _, record := range records {
+		converted, err := protoToQueryRecord(record)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, converted)
+	}
+	return out, nil
 }
 
 func formatOptionalTime(t *time.Time) string {
