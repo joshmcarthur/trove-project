@@ -15,8 +15,8 @@ func TestSessionStoreActivePendingID(t *testing.T) {
 	}
 
 	store.set(chatID, &session{
-		Mode:           modeClassify,
-		PendingEventID: "01JPENDING",
+		Mode:             modeClassify,
+		PendingRecordRef: "01JPENDING",
 	})
 	if id, busy := store.activePendingID(chatID); !busy || id != "01JPENDING" {
 		t.Fatalf("classify session: id=%q busy=%v", id, busy)
@@ -34,7 +34,7 @@ func TestSessionStoreClear(t *testing.T) {
 
 	store := newSessionStore(30)
 	chatID := int64(456)
-	store.set(chatID, &session{Mode: modeClassify, PendingEventID: "01JTEST"})
+	store.set(chatID, &session{Mode: modeClassify, PendingRecordRef: "01JTEST"})
 	store.clear(chatID)
 	if _, ok := store.get(chatID); ok {
 		t.Fatal("session still present after clear")
