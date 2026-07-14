@@ -32,7 +32,7 @@ func (s *Store) QueryAfter(ctx context.Context, afterID string, limit int) ([]Re
 	}
 
 	query := `
-		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
+		SELECT ` + revisionSelectColumns + `
 		FROM revisions`
 	args := []any{}
 	if afterID != "" {

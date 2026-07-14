@@ -146,7 +146,7 @@ See [open-items](../open-items.md).
 - [ ] `link` / `unlink` operations validated at append boundary
 - [ ] `apply` with `references` field: omit = unchanged, `[]` = clear, list = replace
 - [ ] Host stamps `producer`; modules cannot override
-- [ ] `recorded_at` + per-record `sequence`; materializer replays by sequence
+- [x] `recorded_at` + per-record `sequence`; materializer replays by sequence
 - [ ] Projections rebuild identically after `trove records rebuild`
 - [ ] Blob refs in `references` participate in retention (no GC of pinned blobs)
 

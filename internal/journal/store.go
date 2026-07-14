@@ -14,24 +14,29 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const revisionSelectColumns = `id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence`
+
 const schemaDDL = `
 CREATE TABLE IF NOT EXISTS revisions (
-  id         TEXT PRIMARY KEY,
-  time       TEXT NOT NULL,
-  operation  TEXT NOT NULL,
-  record_ref TEXT NOT NULL,
-  type       TEXT,
-  schema_ref TEXT NOT NULL,
-  source     TEXT NOT NULL,
-  payload    TEXT NOT NULL,
-  transforms TEXT NOT NULL DEFAULT '[]',
-  blob_ref   TEXT
+  id          TEXT PRIMARY KEY,
+  time        TEXT NOT NULL,
+  operation   TEXT NOT NULL,
+  record_ref  TEXT NOT NULL,
+  type        TEXT,
+  schema_ref  TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  payload     TEXT NOT NULL,
+  transforms  TEXT NOT NULL DEFAULT '[]',
+  blob_ref    TEXT,
+  recorded_at TEXT NOT NULL DEFAULT '',
+  sequence    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_revisions_time ON revisions(time);
 CREATE INDEX IF NOT EXISTS idx_revisions_type ON revisions(type);
 CREATE INDEX IF NOT EXISTS idx_revisions_source ON revisions(source);
 CREATE INDEX IF NOT EXISTS idx_revisions_operation ON revisions(operation);
 CREATE INDEX IF NOT EXISTS idx_revisions_record_ref ON revisions(record_ref);
+CREATE INDEX IF NOT EXISTS idx_revisions_record_sequence ON revisions(record_ref, sequence);
 `
 
 var _ Journal = (*Store)(nil)
@@ -213,10 +218,23 @@ func prepareAppend(e *Revision) error {
 	if e.RecordRef == "" {
 		e.RecordRef = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
+	if e.RecordedAt.IsZero() {
+		e.RecordedAt = time.Now().UTC()
+	}
 	return nil
 }
 
 func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
+	if e.Sequence <= 0 {
+		var nextSeq int
+		if err := tx.QueryRowContext(ctx, `
+			SELECT COALESCE(MAX(sequence), 0) + 1 FROM revisions WHERE record_ref = ?`,
+			e.RecordRef,
+		).Scan(&nextSeq); err != nil {
+			return fmt.Errorf("journal: append: assign sequence: %w", err)
+		}
+		e.Sequence = nextSeq
+	}
 	var (
 		blobRef sql.NullString
 		typ     sql.NullString
@@ -229,8 +247,8 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 	}
 
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Operation,
@@ -241,6 +259,8 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 		string(e.Payload),
 		string(e.Transforms),
 		blobRef,
+		e.RecordedAt.UTC().Format(time.RFC3339),
+		e.Sequence,
 	)
 	if err != nil {
 		return fmt.Errorf("journal: append: %w", err)
@@ -275,14 +295,14 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Revision, error) {
 	ftsQuery := formatFTSQuery(f.Text)
 	if ftsQuery != "" {
 		query = `
-			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.payload, e.transforms, e.blob_ref
+			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.payload, e.transforms, e.blob_ref, e.recorded_at, e.sequence
 			FROM revisions e
 			INNER JOIN revisions_fts ON revisions_fts.revision_id = e.id`
 		predicates = append(predicates, "revisions_fts MATCH ?")
 		args = append(args, ftsQuery)
 	} else {
 		query = `
-			SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
+			SELECT ` + revisionSelectColumns + `
 			FROM revisions`
 	}
 
@@ -346,7 +366,7 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Revision, error) {
 // Get returns the revision with id.
 func (s *Store) Get(ctx context.Context, id string) (Revision, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
+		SELECT `+revisionSelectColumns+`
 		FROM revisions
 		WHERE id = ?`, id)
 
@@ -369,6 +389,7 @@ func scanRevision(row rowScanner) (Revision, error) {
 	var (
 		e          Revision
 		timeStr    string
+		recordedAt string
 		payload    string
 		transforms string
 		typ        sql.NullString
@@ -386,6 +407,8 @@ func scanRevision(row rowScanner) (Revision, error) {
 		&payload,
 		&transforms,
 		&blobRef,
+		&recordedAt,
+		&e.Sequence,
 	); err != nil {
 		return Revision{}, err
 	}
@@ -394,6 +417,12 @@ func scanRevision(row rowScanner) (Revision, error) {
 	e.Time, err = time.Parse(time.RFC3339, timeStr)
 	if err != nil {
 		return Revision{}, fmt.Errorf("parse time %q: %w", timeStr, err)
+	}
+	if recordedAt != "" {
+		e.RecordedAt, err = time.Parse(time.RFC3339, recordedAt)
+		if err != nil {
+			return Revision{}, fmt.Errorf("parse recorded_at %q: %w", recordedAt, err)
+		}
 	}
 
 	if typ.Valid {
