@@ -7,7 +7,8 @@ nav_order: 3
 # Blob storage
 
 Large content — photos, audio, raw sensor dumps — is never inlined in
-`payload`. It is stored separately and referenced by `blob_ref` on the event.
+`payload`. It is stored separately and referenced by `blob_ref` on the revision
+(or via `references` on the record head when planned).
 
 See [spec §5](../spec.md#5-blob-storage).
 
@@ -30,7 +31,7 @@ No sync/replication in v0; off-Pi backup is an external `rclone`/`restic` job.
 
 Primary use case: photo/attachment capture via iOS Shortcuts share sheet.
 Upload bytes with `PUT /blobs` on http-ingest, then reference the returned
-`blob_ref` on an ingest event.
+`blob_ref` on an ingest revision.
 
 ## Implementation
 

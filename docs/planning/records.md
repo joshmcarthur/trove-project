@@ -145,3 +145,4 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 - [Revisions concept](../concepts/revisions.md)
 - [Type catalog](../concepts/type-catalog.md)
 - [Revision rename](./revision-rename.md)
+- [References and URIs](./references.md) — planned link/unlink, attachments

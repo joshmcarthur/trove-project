@@ -5,9 +5,14 @@ nav_order: 3
 
 # Core Concepts
 
-Trove is built around a few ideas that work together: immutable revisions in an
-append-only journal, folded **records** for query, optional blob attachments,
-dynamically loaded source modules, and conversational retrieval via MCP.
+Trove is an append-only **personal content graph**: immutable **revisions** in a
+journal, folded **records** as queryable nodes, optional **references** between
+records and blobs (planned), dynamically loaded **modules** that enrich and connect
+captures, and conversational retrieval via MCP.
+
+> Capture broadly, store simply, converse to retrieve.
+
+Share anything with minimal typing; modules classify, link, and enrich later.
 
 ## Revisions
 
@@ -21,6 +26,8 @@ JTD contracts.
 ## Records
 
 Folded projections at `(record_ref, version)` — the primary MCP search surface.
+Records can link to other records, blobs, and external URLs via **references**
+(planned).
 
 [Records](./concepts/records.md)
 
@@ -39,7 +46,8 @@ Append-only SQLite store. Single source of truth for all captured revisions.
 
 ## Blobs
 
-Content-addressed storage for large attachments, referenced from revisions by hash.
+Content-addressed storage for large attachments, referenced from revisions by
+`blob_ref` / `content_ref` (and via `references` when planned).
 
 [Blobs](./concepts/blobs.md)
 
@@ -106,5 +114,8 @@ flowchart TB
 4. Large payloads go to the **blob store**; revisions hold a `blob_ref`.
 5. The **type catalog** validates payloads against JTD contracts at append time.
 6. **MCP record tools** search folded records for conversational use.
+
+For the content graph model (references, link/unlink, URIs), see
+[planning/references.md](./planning/references.md).
 
 For implementation order, see the [roadmap](./roadmap.md).

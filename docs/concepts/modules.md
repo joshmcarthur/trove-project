@@ -14,7 +14,7 @@ flowchart LR
   subgraph host [trove host process]
     core[Trove core]
     gateway[HTTP gateway]
-    router[Event router]
+    router[Revision router]
     core --> gateway
     core --> router
   end
@@ -27,8 +27,8 @@ flowchart LR
 
   gateway -->|"POST /ingest/*"| httpIngest
   gateway -->|"POST /mcp"| mcpQuery
-  httpIngest -->|Emit| core
-  mqtt -->|Emit| core
+  httpIngest -->|AppendRevision| core
+  mqtt -->|AppendRevision| core
   router -->|Process| subprocesses
 ```
 
@@ -81,36 +81,57 @@ provides = ["trove://type/mqtt/message/received/1"]
 
 ## Declaring subscriptions and emissions
 
-Modules declare journal event types in the manifest:
+Modules declare journal revision types in the manifest:
 
 | Field | Role |
 |-------|------|
-| `provides` | Event types the module may emit (sources and event-routing processors) |
-| `consumes` | Event types the module subscribes to (event-routing processors and sinks) |
+| `provides` | Revision types the module may emit (sources and revision-routing processors) |
+| `consumes` | Revision types the module subscribes to (revision-routing processors and sinks) |
 
 Both fields accept exact `trove://type/...` URIs or glob patterns
 (`trove://type/note/*`, `trove://type/mqtt/*/received/*`). Bare `*` is not allowed.
 
-Event-routing processors and sinks must declare `consumes`. Sources must declare
+Revision-routing processors and sinks must declare `consumes`. Sources must declare
 `provides`. HTTP-only processors (for example `mcp-query`) declare
 `[[http.routes]]` instead and do not participate in journal routing.
 
-## Event routing and loop prevention
+## Revision routing and loop prevention
 
-When an event is appended to the journal, the core dispatches it to every module
-whose `consumes` patterns match the event type. Processors may return derived
-events; the core validates those against `provides` and appends them.
+When a revision is appended to the journal, the core dispatches it to every module
+whose `consumes` patterns match the revision type. Processors may return derived
+revisions; the core validates those against `provides` and appends them.
 
-Routing metadata is **not** stored on journal events. The core passes a
+Routing metadata is **not** stored on journal revisions. The core passes a
 `DispatchContext` alongside each `Process` / `Handle` call:
 
-- `root_id` — journal ID of the event that started the processing chain
+- `root_id` — journal ID of the revision that started the processing chain
 - `seen` — module names that have already handled this chain
 
-If a module sees its own name in `seen`, it skips the event. Derived events
+If a module sees its own name in `seen`, it skips the revision. Derived revisions
 inherit the parent's `seen` list so cycles such as `A → B → A` terminate. This
 follows the same principle as Meshtastic packet deduplication: track what has
 already handled the chain and do not process it again.
+
+## Provenance: producer vs source
+
+| Field | Set by | Meaning |
+|-------|--------|---------|
+| `source` | Module / caller | External origin (MQTT topic, Telegram chat, device name) |
+| `producer` | **Host** (planned) | Authenticated module identity (e.g. `module.http-ingest`) |
+
+Modules supply `source` on every `AppendRevision`. The host will stamp `producer`
+at the RPC boundary; modules must not set it themselves. See
+[planning/references.md](../planning/references.md).
+
+## What to persist
+
+| Situation | Revision op |
+|-----------|-------------|
+| Enrich the same shared capture | `apply` or `link` on existing `record_ref` |
+| Create a distinct entity (person, derived doc) | `apply` (new record) + `link` from parent |
+| Rebuildable index (FTS, embeddings) | Projection only |
+
+Full rules: [planning/references.md](../planning/references.md).
 
 ## Local vs remote
 
@@ -125,17 +146,17 @@ and transport once given a binary path.
 ## RPC surface
 
 ```
-CoreServices : module calls Emit, BlobPut, query, and type-catalog RPCs on the parent
+CoreServices : module calls AppendRevision, BlobPut, query, and type-catalog RPCs on the parent
 SourceModule : parent calls Run to start a source subprocess
-ProcessorModule : parent calls Process(event, context) -> []event
-SinkModule     : parent calls Handle(event, context) -> ack
+ProcessorModule : parent calls Process(revision, context) -> []revision
+SinkModule     : parent calls Handle(revision, context) -> ack
 HTTPModule     : gateway calls HandleHTTP for declared routes
 CLIModule      : host calls RunCommand for one-shot CLI dispatch
 All kinds      : Healthcheck periodically
 ```
 
-At runtime, **source**, **HTTP**, **CLI/MCP**, and **event-routing** modules are started.
-The core runs an event router that subscribes to the journal and dispatches to
+At runtime, **source**, **HTTP**, **CLI/MCP**, and **revision-routing** modules are started.
+The core runs a revision router that subscribes to the journal and dispatches to
 matching processors and sinks.
 
 ## Implementation
@@ -143,6 +164,7 @@ matching processors and sinks.
 - [Module runtime](../planning/module-runtime.md) — milestone 1
 - [CLI commands](../planning/cli-commands.md) — module CLI registration
 - [Type introspection](../planning/type-introspection.md) — catalog list/export/validate
-- [Processors and sinks](../planning/processors-sinks.md) — event routing
+- [Processors and sinks](../planning/processors-sinks.md) — revision routing
+- [References](../planning/references.md) — links, attachments, producer
 - [Remote modules](../planning/remote-modules.md) — later
 - [Building modules](../building-modules.md) — author guide
