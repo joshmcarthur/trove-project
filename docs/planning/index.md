@@ -51,7 +51,7 @@ Operational runbook — not a planning page:
 | Page | Notes |
 |------|-------|
 | [Config loader](./config.md) | Default config file location (XDG vs `/etc/trove`) |
-| [MCP query server](./mcp-query.md) | `summarize_range` write-time vs query-time aggregation |
+| [MCP query server](./mcp-query.md) | Record-only MCP tools |
 | [Blob store](./blobs.md) | Backend priority after filesystem |
 | [Embeddings](./embeddings.md) | Embedding model (local ONNX vs API) |
 | [Remote modules](./remote-modules.md) | Remote/edge RPC protocol shape |

@@ -47,7 +47,7 @@ Each `[[types]]` entry points at a Trove Type Definition (TTD) JSON file relativ
 the module directory. The TTD envelope uses RFC 8927 JTD in `definition` and a
 `trove://type/...` `$id` that must match a `provides` pattern.
 
-Event-routing processor example:
+Revision-routing processor example:
 
 ```toml
 name     = "embedder"
@@ -71,7 +71,7 @@ consumes = ["trove://type/note/created/1"]
 | Kind | `provides` | `consumes` |
 |------|------------|------------|
 | `source` | **required** | forbidden |
-| `processor` (event-routing) | required when emitting derived events | **required** |
+| `processor` (revision-routing) | required when emitting derived revisions | **required** |
 | `processor` (HTTP-only) | forbidden | forbidden; use `[[http.routes]]` |
 | `processor` (CLI/MCP-only) | forbidden | forbidden; use `[[cli.commands]]` and/or `[[mcp.tools]]` |
 | `processor` (auth-only) | forbidden | forbidden; use `[[auth.validators]]` |
@@ -98,7 +98,8 @@ parent for journal writes, blob storage, and journal reads:
 
 ```go
 func (m *myModule) Run(ctx context.Context, core trovemodule.Core) error {
-    return core.Emit(ctx, &troverpc.Event{ ... })
+    _, err := core.AppendRevision(ctx, &troverpc.AppendRevisionRequest{ ... })
+    return err
 }
 ```
 
@@ -108,16 +109,16 @@ Use `trovemodule.Serve` to register the module. Optional interfaces:
 - **AuthHandler** — validate gateway requests for `[[auth.validators]]` entries
 - **MCPToolHandler** — handle MCP tools declared in `[[mcp.tools]]`
 - **CLIHandler** — handle CLI commands declared in `[[cli.commands]]`
-- **EventProcessor** — `Process(event, dispatch)` for event-routing processors
-- **EventSink** — `Handle(event, dispatch)` for sinks
+- **RevisionProcessor** — `Process(revision, dispatch)` for revision-routing processors
+- **RevisionSink** — `Handle(revision, dispatch)` for sinks
 - **HealthChecker** — report liveness to the parent
 
-Event-routing processors and sinks implement `Run` with `trovemodule.WaitCore`
+Revision-routing processors and sinks implement `Run` with `trovemodule.WaitCore`
 when they do not stream from `Run` themselves. The parent passes a `DispatchContext` with `root_id` and `seen` module names for
-loop prevention. Routed events include `operation` (`apply` or `delete`); return
+loop prevention. Routed revisions include `operation` (`apply` or `delete`); return
 early from `Process` / `Handle` when your module should ignore an operation.
 
-The parent enforces ingest policy on `core.Emit` and on derived events returned
+The parent enforces ingest policy on `core.AppendRevision` and on derived revisions returned
 from `Process`. Modules do not open `trove.db` or the blob directory directly.
 
 ## Module-specific config

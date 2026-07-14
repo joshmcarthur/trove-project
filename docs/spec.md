@@ -47,42 +47,53 @@ about them" actually work, for one user, on one Pi.
 
 ## 3. Core Concepts
 
-An **event** is an immutable fact: something that happened, captured once,
-never edited. If something changes, a new event is appended — nothing is
-mutated in place.
+A **revision** is an append-only journal row: a record-scoped change with an
+**operation** (`apply` or `delete`), optional **payload** and **transforms**, and
+stable **record_ref** identity. Revisions are never edited in place — each change
+appends a new row.
+
+A **record** is the folded projection at `(record_ref, version)` — the primary
+MCP query surface. **Completeness** (`incomplete`, `complete`, `deleted`) lives
+on the record head only.
 
 ```json
 {
-  "id": "01JXYZ...",
+  "id": "01JREV...",
   "time": "2026-07-10T10:00:00+12:00",
+  "operation": "apply",
+  "record_ref": "01JREC...",
   "type": "trove://type/mqtt/message/received/1",
   "schema_ref": "sha256-abc123...",
   "source": "radio-node-1",
   "payload": { "...": "..." },
+  "transforms": [],
   "blob_ref": null
 }
 ```
 
 Fields:
 
-| Field      | Type              | Notes                                             |
-|------------|-------------------|----------------------------------------------------|
-| `id`       | ULID              | sortable, unique, generated at ingest              |
-| `time`     | RFC3339 timestamp | event time, not ingest time (source may supply it)|
-| `type`     | string            | `trove://type/{path}/{version}` URI                |
-| `schema_ref` | string          | content hash of the TTD that validated `payload`   |
-| `source`   | string            | free-text origin identifier (topic, device, app)   |
-| `payload`  | JSON              | structured data; shape enforced by JTD in catalog  |
-| `blob_ref` | string \| null    | optional reference to an attachment (see §6)       |
+| Field        | Type              | Notes                                             |
+|--------------|-------------------|----------------------------------------------------|
+| `id`         | ULID              | sortable, unique, generated at ingest              |
+| `time`       | RFC3339 timestamp | event time, not ingest time (source may supply it) |
+| `operation`  | string            | `apply` or `delete`                                |
+| `record_ref` | string            | stable record identity                             |
+| `type`       | string            | `trove://type/{path}/{version}` URI when set       |
+| `schema_ref` | string            | content hash of the TTD that validated `payload`   |
+| `source`     | string            | free-text origin identifier (topic, device, app)   |
+| `payload`    | JSON              | structured data; shape enforced by JTD in catalog  |
+| `transforms` | JSON array        | RFC 6902 patches applied after payload merge       |
+| `blob_ref`   | string \| null    | optional reference to an attachment (see §6)       |
 
-There is **no central schema registry service**. Event `type` values are `trove://`
+There is **no central schema registry service**. Revision `type` values are `trove://`
 URIs registered in a **local type catalog** built at startup from builtins, module
 `[[types]]` entries, and optional user `[[types]]` in `trove.toml`. Each type has
 a Trove Type Definition (TTD) file with an RFC 8927 JTD `definition`; validated
-emits stamp `schema_ref` (a blob content hash) on the journal row. Source modules
+appends stamp `schema_ref` (a blob content hash) on the journal row. Source modules
 declare which types they may emit in `manifest.toml` (`provides`, including
 wildcard patterns such as `trove://type/note/*`). The core enforces that allowlist
-and catalog validation at the `Emit` RPC boundary. If a payload shape changes,
+and catalog validation at the `AppendRevision` RPC boundary. If a payload shape changes,
 bump the URI version segment (`/2`, `/3`, …) rather than in-place mutation.
 
 ---
@@ -92,41 +103,44 @@ bump the URI version segment (`/2`, `/3`, …) rather than in-place mutation.
 The journal is the single source of truth: an append-only table in SQLite.
 
 ```sql
-CREATE TABLE events (
+CREATE TABLE revisions (
   id         TEXT PRIMARY KEY,
   time       TEXT NOT NULL,
-  type       TEXT NOT NULL,
+  operation  TEXT NOT NULL,
+  record_ref TEXT NOT NULL,
+  type       TEXT,
   schema_ref TEXT NOT NULL,
   source     TEXT NOT NULL,
   payload    TEXT NOT NULL,   -- JSON
+  transforms TEXT NOT NULL,   -- JSON array
   blob_ref   TEXT
 );
-CREATE INDEX idx_events_time ON events(time);
-CREATE INDEX idx_events_type ON events(type);
-CREATE INDEX idx_events_source ON events(source);
+CREATE INDEX idx_revisions_time ON revisions(time);
+CREATE INDEX idx_revisions_type ON revisions(type);
+CREATE INDEX idx_revisions_source ON revisions(source);
 ```
 
 Interface (internal Go API, not exposed directly to modules):
 
 ```go
 type Journal interface {
-    Append(ctx context.Context, e Event) error
-    Query(ctx context.Context, f Filter) ([]Event, error)
-    Get(ctx context.Context, id string) (Event, error)
+    Append(ctx context.Context, r Revision) error
+    Query(ctx context.Context, f Filter) ([]Revision, error)
+    Get(ctx context.Context, id string) (Revision, error)
     Watch(ctx context.Context) (<-chan struct{}, error)
 }
 ```
 
 `Filter` supports type prefix, source, time range, and free-text match
 (via SQLite FTS5) at minimum. `Watch` signals coalesced wakeups after
-each append; consumers pull events via `Query` (the router uses a durable
+each append; consumers pull revisions via `Query` (the router uses a durable
 cursor via internal `QueryAfter` for guaranteed dispatch).
 
-**Retention:** optional `[journal].retention_days` prunes events older than
+**Retention:** optional `[journal].retention_days` prunes revisions older than
 N days at startup.
 
 **Semantic search** (optional, add once basic search proves insufficient):
-`sqlite-vec` as a virtual table alongside `events`, populated by an
+`sqlite-vec` as a virtual table alongside record projections, populated by an
 embedding processor on write. Keeps everything in one SQLite file — no
 separate vector database, no Postgres/pgvector dependency.
 
@@ -352,24 +366,24 @@ internal RPC API that the MCP tools call, so a future web dashboard or
 OpenClaw integration can hit the same RPC directly without depending on
 MCP.
 
-**RPC API (internal):**
+**RPC API (internal, records):**
 
 ```
-search_events(query string, type_prefix?, source?, time_range?) -> []Event
-get_events_by_type(type string, time_range) -> []Event
-get_event(id string) -> Event  // returns event metadata including blob_ref; does not inline blob bytes
-summarize_range(time_range) -> Summary  // pre-aggregated: counts by type, notable events
+get_record(record_ref, version?) -> Record
+search_records(query, type_prefix?, source?, time_range?, include_deleted?) -> []Record
+list_incomplete_records(source?, limit?) -> []Record
 ```
 
-**MCP tools** map 1:1 onto these, deliberately narrow and typed rather
-than one generic "run a query" tool — this gives the model structured,
-predictable results instead of raw SQL access, and keeps token usage
-sane (`summarize_range` exists specifically so "how was my week" doesn't
-dump thousands of raw rows into context).
+Revision audit RPCs (`GetRevision`, `SearchRevisions`, `SummarizeRange`) are
+available on module `Core` and host services — not exposed as MCP tools.
 
-`search_events` should support fuzzy/semantic matching via the
+**MCP tools** map onto the record RPC methods — deliberately narrow and typed
+rather than one generic "run a query" tool. This gives the model structured,
+predictable results instead of raw SQL access.
+
+`search_records` should support fuzzy/semantic matching via the
 `sqlite-vec` index (§4) once that exists — until then, FTS5 keyword
-search is a fine placeholder.
+search on folded record bodies is the default.
 
 **OpenClaw's role**: becomes a client of this MCP server (plus optionally
 its own Source registered against the generic HTTP ingest for
@@ -415,15 +429,15 @@ shouldn't need to know the shape of a module's settings.
 Don't build the full module ecosystem before knowing this is worth having.
 In order:
 
-1. **SQLite journal + a minimal module-loading core.** The `events` table,
+1. **SQLite journal + a minimal module-loading core.** The `revisions` table,
    go-plugin gRPC IPC, and one built-in-for-now module: generic HTTP ingest
-   (`POST /ingest/:source`). Even in v0, keep ingest behind the module socket
+   (`POST /records`). Even in v0, keep ingest behind the module socket
    rather than wiring it directly into the core — it's the cheapest way to prove
    the module boundary actually works before more modules depend on it.
 2. **One real hardware-adjacent source module** — MQTT is highest-leverage
    since Mosquitto and Meshtastic-to-MQTT already exist.
-3. **A minimal MCP server** wrapping `search_events` and `get_event`
-   against that SQLite file. This is the part that's historically been
+3. **A minimal MCP server** wrapping `search_records` and `get_record`
+   against the record projection. This is the part that's historically been
    the actual failure point for prior art (Perkeep, MyLifeBits) — capture
    was never the hard part, conversational retrieval was. Validate this
    specifically, not just the capture side.

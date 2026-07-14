@@ -89,7 +89,7 @@ Ensure `modules/` is in `[modules].paths` in `trove.toml`, then start Trove:
 5. Answer any field prompts, or `/skip` optional fields.
 6. Confirm with `Logged as trove://type/note/quick/1 (01J…)`.
 
-Query the journal via MCP `search_events` or the capture-classifier
+Query records via MCP `search_records` or the capture-classifier
 `GET /pending` endpoint.
 
 ## Power-user commands

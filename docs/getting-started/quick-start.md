@@ -62,10 +62,9 @@ listen = ":8080"
 ### Query the journal
 
 Connect Cursor (or another MCP client) to `http://<host>:8080/mcp` on the HTTP
-gateway — see [MCP client setup](./mcp-client.md). Four core tools are always
-available: `search_events`, `get_event`, `get_events_by_type`, and
-`summarize_range`. Additional tools (e.g. `classify_event`) appear when modules
-that register MCP tools are loaded.
+gateway — see [MCP client setup](./mcp-client.md). Three core record tools are always
+available: `search_records`, `get_record`, and `list_incomplete_records`. Additional
+tools appear when modules that register MCP tools are loaded.
 
 MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.toml`
 (default broker `tcp://localhost:1883`, topics `["home/#"]`). See
@@ -80,20 +79,20 @@ MQTT source subscribes to configured topics in `modules/mqtt-source/manifest.tom
 Photo attachments work today via `PUT /blobs` then ingest with `blob_ref` — see
 [iOS Shortcuts](./ios-shortcuts.md).
 
-## Capture events
+## Capture records
 
 1. Configure paths in TOML (see [configuration](./configuration.md)).
 2. Start `trove` — core loads modules from configured paths.
-3. POST JSON to `POST /ingest/:source` to append events.
+3. POST JSON to `POST /records` to append a revision and materialize a record.
 
 ### HTTP ingest responses
 
 | Status | Meaning |
 |--------|---------|
-| `204` | Event accepted (empty body) |
+| `201` | Record accepted (body includes `revision_id`, `record_ref`, `version`) |
 | `400` | Invalid JSON, missing body, or bad `type` / `time` / `blob_ref` |
-| `405` | Non-POST request to `/ingest/:source` |
-| `500` | Internal emit failure |
+| `405` | Non-POST request to `/records` |
+| `500` | Internal append failure |
 
 ## iOS Shortcuts
 
