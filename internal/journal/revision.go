@@ -29,6 +29,7 @@ type Revision struct {
 	Type       string // optional; empty means unset
 	SchemaRef  string
 	Source     string
+	Producer   string // host-stamped module identity; modules must not set
 	Payload    json.RawMessage
 	BlobRef    *string
 	Transforms json.RawMessage

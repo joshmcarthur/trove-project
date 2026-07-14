@@ -50,6 +50,17 @@ func TestCoreServicesAppendRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppendRevision() error = %v", err)
 	}
+
+	revisions, err := j.Query(context.Background(), journal.Filter{Type: "test.event"})
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if len(revisions) != 1 {
+		t.Fatalf("Query() returned %d revisions, want 1", len(revisions))
+	}
+	if revisions[0].Producer != "module.test" {
+		t.Fatalf("Producer = %q, want module.test", revisions[0].Producer)
+	}
 }
 
 func TestCoreServicesBlobPut(t *testing.T) {

@@ -57,6 +57,19 @@ func (p WritePolicy) ValidateApply(event *journal.Revision) error {
 	return nil
 }
 
+// ProducerForModule returns the host-stamped producer id for a module name.
+func ProducerForModule(moduleName string) string {
+	if moduleName == "" {
+		return "core"
+	}
+	return "module." + moduleName
+}
+
+// Producer returns the producer id stamped on revisions from this policy.
+func (p WritePolicy) Producer() string {
+	return ProducerForModule(p.moduleName)
+}
+
 // ValidateDelete performs delete-specific policy checks.
 func (p WritePolicy) ValidateDelete(event *journal.Revision) error {
 	if event == nil {

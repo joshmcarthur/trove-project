@@ -14,7 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const revisionSelectColumns = `id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence`
+const revisionSelectColumns = `id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence`
 
 const schemaDDL = `
 CREATE TABLE IF NOT EXISTS revisions (
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS revisions (
   type        TEXT,
   schema_ref  TEXT NOT NULL,
   source      TEXT NOT NULL,
+  producer    TEXT NOT NULL DEFAULT 'unknown',
   payload     TEXT NOT NULL,
   transforms  TEXT NOT NULL DEFAULT '[]',
   blob_ref    TEXT,
@@ -247,8 +248,8 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 	}
 
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Operation,
@@ -256,6 +257,7 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 		typ,
 		e.SchemaRef,
 		e.Source,
+		e.Producer,
 		string(e.Payload),
 		string(e.Transforms),
 		blobRef,
@@ -295,7 +297,7 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Revision, error) {
 	ftsQuery := formatFTSQuery(f.Text)
 	if ftsQuery != "" {
 		query = `
-			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.payload, e.transforms, e.blob_ref, e.recorded_at, e.sequence
+			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.producer, e.payload, e.transforms, e.blob_ref, e.recorded_at, e.sequence
 			FROM revisions e
 			INNER JOIN revisions_fts ON revisions_fts.revision_id = e.id`
 		predicates = append(predicates, "revisions_fts MATCH ?")
@@ -404,6 +406,7 @@ func scanRevision(row rowScanner) (Revision, error) {
 		&typ,
 		&e.SchemaRef,
 		&e.Source,
+		&e.Producer,
 		&payload,
 		&transforms,
 		&blobRef,
