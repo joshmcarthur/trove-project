@@ -16,7 +16,10 @@ func migrateSchema(db *sql.DB) error {
 	if err := migrateEventsToRevisions(db); err != nil {
 		return err
 	}
-	return migrateReplayOrdering(db)
+	if err := migrateReplayOrdering(db); err != nil {
+		return err
+	}
+	return migrateProducer(db)
 }
 
 // migratePreRecordsShape wipes pre-records databases without an operation column.
@@ -244,4 +247,34 @@ func recordedAtFromID(id string, fallback time.Time) time.Time {
 		return fallback.UTC()
 	}
 	return ulid.Time(parsed.Time()).UTC()
+}
+
+// migrateProducer adds the producer column and backfills existing rows.
+func migrateProducer(db *sql.DB) error {
+	if !tableExists(db, "revisions") {
+		return nil
+	}
+
+	hasProducer, err := tableHasColumn(db, "revisions", "producer")
+	if err != nil {
+		return err
+	}
+	if hasProducer {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("journal: migrate producer: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`ALTER TABLE revisions ADD COLUMN producer TEXT NOT NULL DEFAULT 'unknown'`); err != nil {
+		return fmt.Errorf("journal: migrate producer: add column: %w", err)
+	}
+	if _, err := tx.Exec(`UPDATE revisions SET producer = 'unknown' WHERE producer = '' OR producer IS NULL`); err != nil {
+		return fmt.Errorf("journal: migrate producer: backfill: %w", err)
+	}
+
+	return tx.Commit()
 }

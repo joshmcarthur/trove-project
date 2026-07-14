@@ -365,6 +365,7 @@ func queryRevisionToProto(e query.Revision) *troverpc.Revision {
 		Time:      e.Time.Format(time.RFC3339),
 		Type:      e.Type,
 		Source:    e.Source,
+		Producer:  e.Producer,
 		Payload:   e.Payload,
 		Operation: e.Operation,
 		RecordRef: e.RecordRef,

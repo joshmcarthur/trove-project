@@ -48,6 +48,13 @@ func (s *WriteService) Write(ctx context.Context, event journal.Revision, policy
 			return WriteResult{}, err
 		}
 	}
+	if event.Producer == "" {
+		if policy != nil {
+			event.Producer = policy.Producer()
+		} else {
+			event.Producer = "core"
+		}
+	}
 
 	var head records.Head
 	var written journal.Revision

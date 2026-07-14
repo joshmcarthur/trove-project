@@ -16,6 +16,7 @@ message Revision {
   string operation = 8;
   string record_ref = 9;
   bytes transforms = 10; // JSON Patch array
+  string producer = 11; // host-stamped module identity; read-only for modules
 }
 
 message AppendRevisionRequest {

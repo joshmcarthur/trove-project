@@ -154,6 +154,7 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 			if out.Operation == "" {
 				out.Operation = journal.OpApply
 			}
+			out.Producer = ProducerForModule(binding.name)
 			if err := binding.policy.ValidateApply(&out); err != nil {
 				return fmt.Errorf("processor %q derived event: %w", binding.name, err)
 			}

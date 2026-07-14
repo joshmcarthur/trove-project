@@ -21,6 +21,7 @@ CREATE TABLE revisions (
   type        TEXT NOT NULL DEFAULT '',
   schema_ref  TEXT NOT NULL DEFAULT '',
   source      TEXT NOT NULL,
+  producer    TEXT NOT NULL DEFAULT 'unknown',
   payload     TEXT NOT NULL,
   transforms  TEXT,
   blob_ref    TEXT,
@@ -72,8 +73,8 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 	}
 
 	_, err := db.Exec(`
-		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Operation,
@@ -81,6 +82,7 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 		e.Type,
 		e.SchemaRef,
 		e.Source,
+		producerOrDefault(e.Producer),
 		string(e.Payload),
 		transforms,
 		blobRef,
@@ -90,6 +92,13 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 	if err != nil {
 		t.Fatalf("insert event %q: %v", e.ID, err)
 	}
+}
+
+func producerOrDefault(producer string) string {
+	if producer == "" {
+		return "unknown"
+	}
+	return producer
 }
 
 func applyEvent(t *testing.T, db *sql.DB, e journal.Revision) bool {
