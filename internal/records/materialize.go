@@ -29,11 +29,11 @@ func NewMaterializer(tx *sql.Tx) *Materializer {
 	return &Materializer{tx: tx}
 }
 
-// Apply materializes e when it is an apply or delete revision.
+// Apply materializes e when it is an apply, delete, link, or unlink revision.
 // Returns true when the event was applied, false when skipped.
 func (m *Materializer) Apply(ctx context.Context, e journal.Revision) (bool, error) {
 	switch e.Operation {
-	case journal.OpApply, journal.OpDelete:
+	case journal.OpApply, journal.OpDelete, journal.OpLink, journal.OpUnlink:
 	default:
 		return false, nil
 	}
@@ -124,6 +124,16 @@ func foldHead(e journal.Revision, prev Head, found bool) (Head, error) {
 		}
 		prev.Version++
 		prev.Completeness = CompletenessDeleted
+		prev.References = refs
+		prev.UpdatedAt = e.Time.UTC()
+		return prev, nil
+	}
+
+	if e.Operation == journal.OpLink || e.Operation == journal.OpUnlink {
+		if !found {
+			return Head{}, fmt.Errorf("records: %s: record %q not found", e.Operation, e.RecordRef)
+		}
+		prev.Version++
 		prev.References = refs
 		prev.UpdatedAt = e.Time.UTC()
 		return prev, nil
@@ -280,10 +290,12 @@ func listRecordRevisions(ctx context.Context, q queryer) ([]journal.Revision, er
 	rows, err := q.QueryContext(ctx, `
 		SELECT id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence, "references"
 		FROM revisions
-		WHERE operation IN (?, ?)
+		WHERE operation IN (?, ?, ?, ?)
 		ORDER BY record_ref ASC, sequence ASC`,
 		journal.OpApply,
 		journal.OpDelete,
+		journal.OpLink,
+		journal.OpUnlink,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("records: list revisions: %w", err)

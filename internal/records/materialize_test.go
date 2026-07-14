@@ -630,3 +630,93 @@ func TestMaterializerDeleteRetainsReferences(t *testing.T) {
 		t.Fatalf("references = %+v, want retained", head.References)
 	}
 }
+
+func TestMaterializerLinkAndUnlink(t *testing.T) {
+	t.Parallel()
+
+	db := openTestDB(t)
+	ref := "01JREC00000000000000000010"
+	when := time.Date(2026, 7, 14, 17, 0, 0, 0, time.UTC)
+
+	create := journal.Revision{
+		ID:        "01JEVT00000000000000000046",
+		Time:      when,
+		Operation: journal.OpApply,
+		RecordRef: ref,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"text":"base"}`),
+	}
+	insertEvent(t, db, create)
+	applyEvent(t, db, create)
+
+	link := journal.Revision{
+		ID:         "01JEVT00000000000000000047",
+		Time:       when.Add(time.Minute),
+		Operation:  journal.OpLink,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/a"},{"ref":"https://example.com/b","rel":"source"}]`),
+	}
+	insertEvent(t, db, link)
+	applyEvent(t, db, link)
+
+	head := loadHead(t, db, ref)
+	if len(head.References) != 2 {
+		t.Fatalf("after link references = %+v", head.References)
+	}
+	if string(head.Body) != `{"text":"base"}` {
+		t.Fatalf("body changed on link: %s", head.Body)
+	}
+
+	dupLink := journal.Revision{
+		ID:         "01JEVT00000000000000000048",
+		Time:       when.Add(2 * time.Minute),
+		Operation:  journal.OpLink,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/a"},{"ref":"https://example.com/c"}]`),
+	}
+	insertEvent(t, db, dupLink)
+	applyEvent(t, db, dupLink)
+
+	head = loadHead(t, db, ref)
+	if len(head.References) != 3 {
+		t.Fatalf("after deduped link references = %+v", head.References)
+	}
+
+	unlink := journal.Revision{
+		ID:         "01JEVT00000000000000000049",
+		Time:       when.Add(3 * time.Minute),
+		Operation:  journal.OpUnlink,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/a"}]`),
+	}
+	insertEvent(t, db, unlink)
+	applyEvent(t, db, unlink)
+
+	head = loadHead(t, db, ref)
+	if len(head.References) != 2 {
+		t.Fatalf("after unlink all rels for ref references = %+v", head.References)
+	}
+
+	unlinkExact := journal.Revision{
+		ID:         "01JEVT00000000000000000050",
+		Time:       when.Add(4 * time.Minute),
+		Operation:  journal.OpUnlink,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/b","rel":"source"}]`),
+	}
+	insertEvent(t, db, unlinkExact)
+	applyEvent(t, db, unlinkExact)
+
+	head = loadHead(t, db, ref)
+	if len(head.References) != 1 || head.References[0].Ref != "https://example.com/c" {
+		t.Fatalf("after exact unlink references = %+v", head.References)
+	}
+}

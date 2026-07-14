@@ -190,14 +190,19 @@ func prepareAppend(e *Revision) error {
 	if e.Operation == "" {
 		e.Operation = OpApply
 	}
-	if e.Operation != OpApply && e.Operation != OpDelete {
-		return fmt.Errorf("journal: append: operation must be %q or %q", OpApply, OpDelete)
+	switch e.Operation {
+	case OpApply, OpDelete, OpLink, OpUnlink:
+	default:
+		return fmt.Errorf("journal: append: operation must be %q, %q, %q, or %q", OpApply, OpDelete, OpLink, OpUnlink)
 	}
 	if e.Source == "" {
 		return fmt.Errorf("journal: append: source is required")
 	}
 	if e.Operation == OpDelete && e.RecordRef == "" {
 		return fmt.Errorf("journal: append: record_ref is required for delete")
+	}
+	if (e.Operation == OpLink || e.Operation == OpUnlink) && e.RecordRef == "" {
+		return fmt.Errorf("journal: append: record_ref is required for %s", e.Operation)
 	}
 	if len(e.Payload) == 0 {
 		return fmt.Errorf("journal: append: payload is required")

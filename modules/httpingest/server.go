@@ -66,6 +66,12 @@ func handleRecords(ctx context.Context, writer trovemodule.RevisionAppender, cfg
 			return textResponse(http.StatusBadRequest, fmt.Sprintf("type not allowed: %s", writeReq.Type)), nil
 		}
 	}
+	if writeReq.Operation == "link" || writeReq.Operation == "unlink" {
+		if len(writeReq.References) == 0 {
+			return textResponse(http.StatusBadRequest, "references are required for link and unlink"), nil
+		}
+	}
+
 	resp, err := writer.AppendRevision(ctx, writeReq)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {

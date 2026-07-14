@@ -10,6 +10,8 @@ import (
 const (
 	OpApply  = "apply"
 	OpDelete = "delete"
+	OpLink   = "link"
+	OpUnlink = "unlink"
 )
 
 // ErrNotFound is returned when a revision id does not exist.
