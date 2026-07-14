@@ -5,6 +5,11 @@ package trove.v1;
 option go_package = "github.com/joshmcarthur/trove/internal/modules/rpc;troverpc";
 
 // Revision mirrors journal.Revision for RPC transport.
+message Reference {
+  string ref = 1;
+  string rel = 2;
+}
+
 message Revision {
   string id = 1;
   string time = 2; // RFC3339
@@ -17,6 +22,7 @@ message Revision {
   string record_ref = 9;
   bytes transforms = 10; // JSON Patch array
   string producer = 11; // host-stamped module identity; read-only for modules
+  bytes references = 12; // JSON array; omit on apply = unchanged
 }
 
 message AppendRevisionRequest {
@@ -28,6 +34,7 @@ message AppendRevisionRequest {
   bytes payload = 6;
   bytes transforms = 7;
   string blob_ref = 8;
+  bytes references = 9; // JSON array; omit on apply = unchanged
 }
 
 message AppendRevisionResponse {
@@ -99,6 +106,7 @@ message Record {
   bytes body = 6; // JSON
   string content_ref = 7;
   string updated_at = 8; // RFC3339
+  repeated Reference references = 9;
 }
 
 message GetRecordRequest {

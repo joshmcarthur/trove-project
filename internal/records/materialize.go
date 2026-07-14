@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/journal"
+	"github.com/joshmcarthur/trove/internal/references"
 )
 
 // EnsureSchema creates record projection tables when missing.
@@ -112,12 +113,18 @@ func RebuildAll(ctx context.Context, db *sql.DB) error {
 }
 
 func foldHead(e journal.Revision, prev Head, found bool) (Head, error) {
+	refs, err := foldReferences(e, prev.References, found)
+	if err != nil {
+		return Head{}, err
+	}
+
 	if e.Operation == journal.OpDelete {
 		if !found {
 			return Head{}, fmt.Errorf("records: delete: record %q not found", e.RecordRef)
 		}
 		prev.Version++
 		prev.Completeness = CompletenessDeleted
+		prev.References = refs
 		prev.UpdatedAt = e.Time.UTC()
 		return prev, nil
 	}
@@ -139,11 +146,12 @@ func foldHead(e journal.Revision, prev Head, found bool) (Head, error) {
 	}
 
 	head := Head{
-		RecordRef: e.RecordRef,
-		Version:   1,
-		Source:    e.Source,
-		Body:      body,
-		UpdatedAt: e.Time.UTC(),
+		RecordRef:  e.RecordRef,
+		Version:    1,
+		Source:     e.Source,
+		Body:       body,
+		References: refs,
+		UpdatedAt:  e.Time.UTC(),
 	}
 	if found {
 		head.Version = prev.Version + 1
@@ -182,7 +190,7 @@ func (m *Materializer) revisionApplied(ctx context.Context, eventID string) (boo
 
 func (m *Materializer) loadHead(ctx context.Context, recordRef string) (Head, bool, error) {
 	row := m.tx.QueryRowContext(ctx, `
-		SELECT record_ref, version, completeness, type, source, body, content_ref, updated_at
+		SELECT record_ref, version, completeness, type, source, body, content_ref, "references", updated_at
 		FROM record_heads
 		WHERE record_ref = ?`, recordRef)
 
@@ -202,9 +210,14 @@ func (m *Materializer) writeHead(ctx context.Context, head Head) error {
 		contentRef = sql.NullString{String: *head.ContentRef, Valid: true}
 	}
 
-	_, err := m.tx.ExecContext(ctx, `
-		INSERT INTO record_heads (record_ref, version, completeness, type, source, body, content_ref, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	refsJSON, err := references.Marshal(head.References)
+	if err != nil {
+		return fmt.Errorf("records: marshal references %q: %w", head.RecordRef, err)
+	}
+
+	_, err = m.tx.ExecContext(ctx, `
+		INSERT INTO record_heads (record_ref, version, completeness, type, source, body, content_ref, "references", updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(record_ref) DO UPDATE SET
 			version = excluded.version,
 			completeness = excluded.completeness,
@@ -212,6 +225,7 @@ func (m *Materializer) writeHead(ctx context.Context, head Head) error {
 			source = excluded.source,
 			body = excluded.body,
 			content_ref = excluded.content_ref,
+			"references" = excluded."references",
 			updated_at = excluded.updated_at`,
 		head.RecordRef,
 		head.Version,
@@ -220,6 +234,7 @@ func (m *Materializer) writeHead(ctx context.Context, head Head) error {
 		head.Source,
 		string(head.Body),
 		contentRef,
+		string(refsJSON),
 		head.UpdatedAt.Format(time.RFC3339),
 	)
 	if err != nil {
@@ -263,7 +278,7 @@ func (m *Materializer) syncFTS(ctx context.Context, head Head) error {
 
 func listRecordRevisions(ctx context.Context, q queryer) ([]journal.Revision, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence
+		SELECT id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence, "references"
 		FROM revisions
 		WHERE operation IN (?, ?)
 		ORDER BY record_ref ASC, sequence ASC`,
@@ -303,6 +318,7 @@ func scanHead(row rowScanner) (Head, error) {
 		body       string
 		updatedAt  string
 		contentRef sql.NullString
+		refsJSON   string
 	)
 	if err := row.Scan(
 		&head.RecordRef,
@@ -312,6 +328,7 @@ func scanHead(row rowScanner) (Head, error) {
 		&head.Source,
 		&body,
 		&contentRef,
+		&refsJSON,
 		&updatedAt,
 	); err != nil {
 		return Head{}, err
@@ -327,6 +344,11 @@ func scanHead(row rowScanner) (Head, error) {
 		ref := contentRef.String
 		head.ContentRef = &ref
 	}
+	refs, err := references.Unmarshal(json.RawMessage(refsJSON))
+	if err != nil {
+		return Head{}, fmt.Errorf("parse references: %w", err)
+	}
+	head.References = refs
 	return head, nil
 }
 
@@ -339,6 +361,7 @@ func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 		payload    string
 		transforms sql.NullString
 		blobRef    sql.NullString
+		references sql.NullString
 	)
 	if err := row.Scan(
 		&e.ID,
@@ -348,11 +371,13 @@ func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 		&e.Type,
 		&e.SchemaRef,
 		&e.Source,
+		&e.Producer,
 		&payload,
 		&transforms,
 		&blobRef,
 		&recordedAt,
 		&e.Sequence,
+		&references,
 	); err != nil {
 		return journal.Revision{}, err
 	}
@@ -376,6 +401,9 @@ func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 	if blobRef.Valid {
 		ref := blobRef.String
 		e.BlobRef = &ref
+	}
+	if references.Valid {
+		e.References = json.RawMessage(references.String)
 	}
 	return e, nil
 }

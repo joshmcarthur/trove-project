@@ -66,7 +66,6 @@ func handleRecords(ctx context.Context, writer trovemodule.RevisionAppender, cfg
 			return textResponse(http.StatusBadRequest, fmt.Sprintf("type not allowed: %s", writeReq.Type)), nil
 		}
 	}
-
 	resp, err := writer.AppendRevision(ctx, writeReq)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
@@ -194,6 +193,13 @@ func buildAppendRevisionRequest(body []byte) (*troverpc.AppendRevisionRequest, e
 		}
 		req.Transforms = v
 		delete(raw, "transforms")
+	}
+	if v, ok := raw["references"]; ok {
+		if !json.Valid(v) {
+			return nil, fmt.Errorf("invalid references field")
+		}
+		req.References = v
+		delete(raw, "references")
 	}
 
 	payload, err := json.Marshal(raw)

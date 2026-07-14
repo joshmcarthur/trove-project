@@ -33,6 +33,7 @@ type Revision struct {
 	Payload    json.RawMessage
 	BlobRef    *string
 	Transforms json.RawMessage
+	References json.RawMessage // nil = unchanged on apply; [] = clear; list = replace
 }
 
 // Filter constrains journal reads. Text performs FTS5 keyword search when set.

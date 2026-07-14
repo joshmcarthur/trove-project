@@ -408,6 +408,12 @@ func queryRecordToProto(r query.Record) *troverpc.Record {
 	if r.ContentRef != nil {
 		out.ContentRef = *r.ContentRef
 	}
+	for _, ref := range r.References {
+		out.References = append(out.References, &troverpc.Reference{
+			Ref: ref.Ref,
+			Rel: ref.Rel,
+		})
+	}
 	return out
 }
 

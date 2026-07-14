@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS record_heads (
   source       TEXT NOT NULL,
   body         TEXT NOT NULL,
   content_ref  TEXT,
+  "references" TEXT NOT NULL DEFAULT '[]',
   completeness TEXT NOT NULL,
   updated_at   TEXT NOT NULL
 );

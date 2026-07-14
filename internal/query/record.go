@@ -9,20 +9,22 @@ import (
 	"time"
 
 	"github.com/joshmcarthur/trove/internal/records"
+	"github.com/joshmcarthur/trove/internal/references"
 )
 
 const defaultRecordLimit = 100
 
 // Record is a JSON-serializable folded record returned by the query API.
 type Record struct {
-	RecordRef    string          `json:"record_ref"`
-	Version      int             `json:"version"`
-	Completeness string          `json:"completeness"`
-	Type         string          `json:"type,omitempty"`
-	Source       string          `json:"source"`
-	Body         json.RawMessage `json:"body"`
-	ContentRef   *string         `json:"content_ref,omitempty"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	RecordRef    string                 `json:"record_ref"`
+	Version      int                    `json:"version"`
+	Completeness string                 `json:"completeness"`
+	Type         string                 `json:"type,omitempty"`
+	Source       string                 `json:"source"`
+	Body         json.RawMessage        `json:"body"`
+	ContentRef   *string                `json:"content_ref,omitempty"`
+	References   []references.Reference `json:"references,omitempty"`
+	UpdatedAt    time.Time              `json:"updated_at"`
 }
 
 // RecordSearchParams optionally narrows a record FTS search.
@@ -61,7 +63,7 @@ func (s *RecordService) GetRecord(ctx context.Context, recordRef string, version
 	}
 
 	row := s.DB.QueryRowContext(ctx, `
-		SELECT record_ref, version, completeness, type, source, body, content_ref, updated_at
+		SELECT record_ref, version, completeness, type, source, body, content_ref, "references", updated_at
 		FROM record_heads
 		WHERE record_ref = ?`, recordRef)
 
@@ -102,7 +104,7 @@ func (s *RecordService) SearchRecords(ctx context.Context, text string, params R
 
 	if params.IncludeDeleted {
 		query = `
-			SELECT h.record_ref, h.version, h.completeness, h.type, h.source, h.body, h.content_ref, h.updated_at
+			SELECT h.record_ref, h.version, h.completeness, h.type, h.source, h.body, h.content_ref, h."references", h.updated_at
 			FROM record_heads h
 			WHERE h.record_ref IN (
 				SELECT record_ref FROM records_fts WHERE records_fts MATCH ?
@@ -110,7 +112,7 @@ func (s *RecordService) SearchRecords(ctx context.Context, text string, params R
 		args = append(args, ftsQuery)
 	} else {
 		query = `
-			SELECT h.record_ref, h.version, h.completeness, h.type, h.source, h.body, h.content_ref, h.updated_at
+			SELECT h.record_ref, h.version, h.completeness, h.type, h.source, h.body, h.content_ref, h."references", h.updated_at
 			FROM record_heads h
 			INNER JOIN records_fts ON records_fts.record_ref = h.record_ref
 			WHERE records_fts MATCH ?
@@ -152,7 +154,7 @@ func (s *RecordService) ListIncompleteRecords(ctx context.Context, source string
 	}
 
 	query := `
-		SELECT record_ref, version, completeness, type, source, body, content_ref, updated_at
+		SELECT record_ref, version, completeness, type, source, body, content_ref, "references", updated_at
 		FROM record_heads
 		WHERE completeness = ?`
 	args := []any{records.CompletenessIncomplete}
@@ -204,7 +206,7 @@ func (s *RecordService) ListRecords(ctx context.Context, params ListRecordsParam
 	}
 
 	query := `
-		SELECT record_ref, version, completeness, type, source, body, content_ref, updated_at
+		SELECT record_ref, version, completeness, type, source, body, content_ref, "references", updated_at
 		FROM record_heads`
 	if len(predicates) > 0 {
 		query += " WHERE " + strings.Join(predicates, " AND ")
@@ -246,6 +248,7 @@ func scanRecord(row rowScanner) (Record, error) {
 		body       string
 		updatedAt  string
 		contentRef sql.NullString
+		refsJSON   string
 	)
 	if err := row.Scan(
 		&rec.RecordRef,
@@ -255,6 +258,7 @@ func scanRecord(row rowScanner) (Record, error) {
 		&rec.Source,
 		&body,
 		&contentRef,
+		&refsJSON,
 		&updatedAt,
 	); err != nil {
 		return Record{}, err
@@ -270,6 +274,11 @@ func scanRecord(row rowScanner) (Record, error) {
 		ref := contentRef.String
 		rec.ContentRef = &ref
 	}
+	refs, err := references.Unmarshal(json.RawMessage(refsJSON))
+	if err != nil {
+		return Record{}, fmt.Errorf("parse references: %w", err)
+	}
+	rec.References = refs
 	return rec, nil
 }
 

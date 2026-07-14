@@ -10,6 +10,7 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 	"github.com/joshmcarthur/trove/internal/query"
 	"github.com/joshmcarthur/trove/internal/records"
+	"github.com/joshmcarthur/trove/internal/references"
 )
 
 // WriteResult is returned after a successful record write.
@@ -122,6 +123,11 @@ func validateWriteEvent(event *journal.Revision) error {
 		if len(event.Transforms) > 0 && !json.Valid(event.Transforms) {
 			return fmt.Errorf("modules: write: transforms must be valid JSON")
 		}
+		if event.References != nil {
+			if _, err := references.ParseList(event.References); err != nil {
+				return fmt.Errorf("modules: write: %w", err)
+			}
+		}
 	case journal.OpDelete:
 		if event.RecordRef == "" {
 			return fmt.Errorf("modules: write: record_ref is required for delete")
@@ -142,6 +148,9 @@ func validateWriteEvent(event *journal.Revision) error {
 		}
 		if event.BlobRef != nil {
 			return fmt.Errorf("modules: write: blob_ref is not allowed for delete")
+		}
+		if event.References != nil {
+			return fmt.Errorf("modules: write: references are not allowed for delete")
 		}
 	default:
 		return fmt.Errorf("modules: write: operation must be %q or %q", journal.OpApply, journal.OpDelete)
