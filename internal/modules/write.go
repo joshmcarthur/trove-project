@@ -41,12 +41,17 @@ func (s *WriteService) Write(ctx context.Context, event journal.Revision, policy
 		return WriteResult{}, err
 	}
 	if policy != nil {
-		if event.Operation == journal.OpDelete {
+		switch event.Operation {
+		case journal.OpDelete:
 			if err := policy.ValidateDelete(&event); err != nil {
 				return WriteResult{}, err
 			}
-		} else if err := policy.ValidateApply(&event); err != nil {
-			return WriteResult{}, err
+		case journal.OpLink, journal.OpUnlink:
+			// graph ops skip type catalog validation
+		default:
+			if err := policy.ValidateApply(&event); err != nil {
+				return WriteResult{}, err
+			}
 		}
 	}
 	if event.Producer == "" {
@@ -152,8 +157,35 @@ func validateWriteEvent(event *journal.Revision) error {
 		if event.References != nil {
 			return fmt.Errorf("modules: write: references are not allowed for delete")
 		}
+	case journal.OpLink, journal.OpUnlink:
+		if event.RecordRef == "" {
+			return fmt.Errorf("modules: write: record_ref is required for %s", event.Operation)
+		}
+		if event.Source == "" {
+			return fmt.Errorf("modules: write: source is required")
+		}
+		if len(event.Payload) == 0 {
+			event.Payload = json.RawMessage(`{}`)
+		} else if string(event.Payload) != "{}" {
+			return fmt.Errorf("modules: write: %s payload must be {}", event.Operation)
+		}
+		if len(event.Transforms) > 0 && string(event.Transforms) != "[]" {
+			return fmt.Errorf("modules: write: transforms are not allowed for %s", event.Operation)
+		}
+		if event.Type != "" {
+			return fmt.Errorf("modules: write: type is not allowed for %s", event.Operation)
+		}
+		if event.BlobRef != nil {
+			return fmt.Errorf("modules: write: blob_ref is not allowed for %s", event.Operation)
+		}
+		if event.References == nil {
+			return fmt.Errorf("modules: write: references are required for %s", event.Operation)
+		}
+		if _, err := references.ParseList(event.References); err != nil {
+			return fmt.Errorf("modules: write: %w", err)
+		}
 	default:
-		return fmt.Errorf("modules: write: operation must be %q or %q", journal.OpApply, journal.OpDelete)
+		return fmt.Errorf("modules: write: operation must be %q, %q, %q, or %q", journal.OpApply, journal.OpDelete, journal.OpLink, journal.OpUnlink)
 	}
 	return nil
 }

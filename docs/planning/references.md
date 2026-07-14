@@ -6,7 +6,7 @@ nav_order: 16
 
 # References and URIs
 
-**Status:** In progress\
+**Status:** Supported\
 **Spec:** [Core concepts §3](../spec.md#3-core-concepts), [Records concept](../concepts/records.md)\
 **Packages:** `internal/journal`, `internal/records`, `internal/modules`
 
@@ -143,7 +143,7 @@ See [open-items](../open-items.md).
 ## Acceptance criteria
 
 - [x] `references` JSON column on revisions; folded `references` on `record_heads`
-- [ ] `link` / `unlink` operations validated at append boundary
+- [x] `link` / `unlink` operations validated at append boundary
 - [x] `apply` with `references` field: omit = unchanged, `[]` = clear, list = replace
 - [x] Host stamps `producer`; modules cannot override
 - [x] `recorded_at` + per-record `sequence`; materializer replays by sequence
