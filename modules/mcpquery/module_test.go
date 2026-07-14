@@ -10,38 +10,17 @@ import (
 	"github.com/joshmcarthur/trove/pkg/trovemodule"
 )
 
-type stubQuerier struct {
-	getEvent func(context.Context, string) (*troverpc.Event, error)
-}
+type stubRecords struct{}
 
-func (s *stubQuerier) GetEvent(ctx context.Context, id string) (*troverpc.Event, error) {
-	if s.getEvent != nil {
-		return s.getEvent(ctx, id)
-	}
-	return nil, query.ErrNotFound
-}
-
-func (s *stubQuerier) SearchEvents(context.Context, *troverpc.SearchEventsRequest) ([]*troverpc.Event, error) {
-	return nil, nil
-}
-
-func (s *stubQuerier) GetEventsByType(context.Context, *troverpc.GetEventsByTypeRequest) ([]*troverpc.Event, error) {
-	return nil, nil
-}
-
-func (s *stubQuerier) SummarizeRange(context.Context, *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
-	return &troverpc.Summary{}, nil
-}
-
-func (s *stubQuerier) GetRecord(context.Context, *troverpc.GetRecordRequest) (*troverpc.Record, error) {
+func (s *stubRecords) GetRecord(context.Context, *troverpc.GetRecordRequest) (*troverpc.Record, error) {
 	return nil, query.ErrRecordNotFound
 }
 
-func (s *stubQuerier) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
+func (s *stubRecords) SearchRecords(context.Context, *troverpc.SearchRecordsRequest) ([]*troverpc.Record, error) {
 	return nil, nil
 }
 
-func (s *stubQuerier) ListIncompleteRecords(context.Context, *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
+func (s *stubRecords) ListIncompleteRecords(context.Context, *troverpc.ListIncompleteRecordsRequest) ([]*troverpc.Record, error) {
 	return nil, nil
 }
 
@@ -66,7 +45,7 @@ func TestHandleHTTPDispatchesMCP(t *testing.T) {
 	t.Parallel()
 
 	mod := &Module{}
-	mod.handler = query.MCPHandler(query.MCPDeps{Querier: &queryAdapter{q: &stubQuerier{}}})
+	mod.handler = query.MCPHandler(query.MCPDeps{Records: &recordAdapter{records: &stubRecords{}}})
 	mod.ready.Store(true)
 
 	resp, err := mod.HandleHTTP(context.Background(), &troverpc.HTTPRequest{

@@ -52,7 +52,7 @@ func TestValidateEmitSuccess(t *testing.T) {
 	c := types.NewCatalog()
 	registerNoteCreated(t, c)
 
-	ref, err := c.ValidateEmit(journal.Event{
+	ref, err := c.ValidateEmit(journal.Revision{
 		Type:    testNoteCreatedURI,
 		Payload: json.RawMessage(`{"title":"ok"}`),
 	}, []string{"trove://type/note/*"})
@@ -70,7 +70,7 @@ func TestValidateEmitUnknownType(t *testing.T) {
 	c := types.NewCatalog()
 	registerNoteCreated(t, c)
 
-	_, err := c.ValidateEmit(journal.Event{
+	_, err := c.ValidateEmit(journal.Revision{
 		Type:    "trove://type/mqtt/foo/1",
 		Payload: json.RawMessage(`{}`),
 	}, []string{"trove://type/mqtt/*"})
@@ -85,7 +85,7 @@ func TestValidateEmitNotAllowed(t *testing.T) {
 	c := types.NewCatalog()
 	registerNoteCreated(t, c)
 
-	_, err := c.ValidateEmit(journal.Event{
+	_, err := c.ValidateEmit(journal.Revision{
 		Type:    testNoteCreatedURI,
 		Payload: json.RawMessage(`{"title":"ok"}`),
 	}, []string{"trove://type/mqtt/*"})
@@ -100,7 +100,7 @@ func TestValidateEmitPayloadFailure(t *testing.T) {
 	c := types.NewCatalog()
 	registerNoteCreated(t, c)
 
-	_, err := c.ValidateEmit(journal.Event{
+	_, err := c.ValidateEmit(journal.Revision{
 		Type:    testNoteCreatedURI,
 		Payload: json.RawMessage(`{}`),
 	}, []string{"trove://type/note/*"})
@@ -116,7 +116,7 @@ func TestValidateEmitDottedPatterns(t *testing.T) {
 	c := types.NewCatalog()
 	registerPermissiveType(t, c, eventType)
 
-	ref, err := c.ValidateEmit(journal.Event{
+	ref, err := c.ValidateEmit(journal.Revision{
 		Type:    eventType,
 		Payload: json.RawMessage(`{"any":"value"}`),
 	}, []string{"trove://type/http/ingest/received/1"})

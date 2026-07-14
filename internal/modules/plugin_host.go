@@ -153,20 +153,20 @@ func (c *moduleClient) RunCommand(ctx context.Context, req *troverpc.CLICommandR
 	return c.cliClient.RunCommand(ctx, req)
 }
 
-func (c *moduleClient) Process(ctx context.Context, event journal.Event, dispatch DispatchContext) ([]journal.Event, error) {
+func (c *moduleClient) Process(ctx context.Context, event journal.Revision, dispatch DispatchContext) ([]journal.Revision, error) {
 	if !c.caps.hasProcessor {
 		return nil, errors.New("modules: module does not support Process")
 	}
 	resp, err := c.processorClient.Process(ctx, &troverpc.ProcessRequest{
-		Event:   journalEventToRPC(event),
-		Context: dispatchContextToProto(dispatch),
+		Revision: journalRevisionToRPC(event),
+		Context:  dispatchContextToProto(dispatch),
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]journal.Event, 0, len(resp.GetEvents()))
-	for _, e := range resp.GetEvents() {
-		converted, err := rpcEventToJournal(e)
+	out := make([]journal.Revision, 0, len(resp.GetRevisions()))
+	for _, e := range resp.GetRevisions() {
+		converted, err := rpcRevisionToJournal(e)
 		if err != nil {
 			return nil, err
 		}
@@ -175,13 +175,13 @@ func (c *moduleClient) Process(ctx context.Context, event journal.Event, dispatc
 	return out, nil
 }
 
-func (c *moduleClient) Handle(ctx context.Context, event journal.Event, dispatch DispatchContext) error {
+func (c *moduleClient) Handle(ctx context.Context, event journal.Revision, dispatch DispatchContext) error {
 	if !c.caps.hasSink {
 		return errors.New("modules: module does not support Handle")
 	}
 	_, err := c.sinkClient.Handle(ctx, &troverpc.HandleRequest{
-		Event:   journalEventToRPC(event),
-		Context: dispatchContextToProto(dispatch),
+		Revision: journalRevisionToRPC(event),
+		Context:  dispatchContextToProto(dispatch),
 	})
 	return err
 }

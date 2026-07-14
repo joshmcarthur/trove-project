@@ -11,7 +11,7 @@ import (
 
 // Serve starts a Trove module plugin subprocess. mod must implement Module and
 // may also implement HTTPHandler, AuthHandler, MCPToolHandler, CLIHandler,
-// EventProcessor, EventSink, and HealthChecker.
+// RevisionProcessor, RevisionSink, and HealthChecker.
 func Serve(mod Module) {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
@@ -48,10 +48,10 @@ func (p *sourceGRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server)
 	if _, ok := p.mod.(CLIHandler); ok {
 		troverpc.RegisterCLIModuleServer(s, &cliModuleServer{mod: p.mod})
 	}
-	if _, ok := p.mod.(EventProcessor); ok {
+	if _, ok := p.mod.(RevisionProcessor); ok {
 		troverpc.RegisterProcessorModuleServer(s, &processorModuleServer{mod: p.mod})
 	}
-	if _, ok := p.mod.(EventSink); ok {
+	if _, ok := p.mod.(RevisionSink); ok {
 		troverpc.RegisterSinkModuleServer(s, &sinkModuleServer{mod: p.mod})
 	}
 	return nil
@@ -150,15 +150,15 @@ type processorModuleServer struct {
 }
 
 func (s *processorModuleServer) Process(ctx context.Context, req *troverpc.ProcessRequest) (*troverpc.ProcessResponse, error) {
-	p, ok := s.mod.(EventProcessor)
+	p, ok := s.mod.(RevisionProcessor)
 	if !ok {
-		return nil, fmt.Errorf("trovemodule: module does not implement EventProcessor")
+		return nil, fmt.Errorf("trovemodule: module does not implement RevisionProcessor")
 	}
-	events, err := p.Process(ctx, req.GetEvent(), req.GetContext())
+	events, err := p.Process(ctx, req.GetRevision(), req.GetContext())
 	if err != nil {
 		return nil, err
 	}
-	return &troverpc.ProcessResponse{Events: events}, nil
+	return &troverpc.ProcessResponse{Revisions: events}, nil
 }
 
 func (s *processorModuleServer) Healthcheck(ctx context.Context, _ *troverpc.HealthcheckRequest) (*troverpc.HealthcheckResponse, error) {
@@ -174,11 +174,11 @@ type sinkModuleServer struct {
 }
 
 func (s *sinkModuleServer) Handle(ctx context.Context, req *troverpc.HandleRequest) (*troverpc.HandleResponse, error) {
-	h, ok := s.mod.(EventSink)
+	h, ok := s.mod.(RevisionSink)
 	if !ok {
-		return nil, fmt.Errorf("trovemodule: module does not implement EventSink")
+		return nil, fmt.Errorf("trovemodule: module does not implement RevisionSink")
 	}
-	if err := h.Handle(ctx, req.GetEvent(), req.GetContext()); err != nil {
+	if err := h.Handle(ctx, req.GetRevision(), req.GetContext()); err != nil {
 		return nil, err
 	}
 	return &troverpc.HandleResponse{}, nil

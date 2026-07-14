@@ -105,7 +105,7 @@ func TestStartSourceReceivesEmit(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = handle.Close() })
 
-	var events []journal.Event
+	var events []journal.Revision
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		events, err = store.Query(context.Background(), journal.Filter{TypePrefix: "test.emit.once"})

@@ -15,7 +15,7 @@ func TestRPCEventRoundTripSchemaRef(t *testing.T) {
 	ref := "sha256-" + strings.Repeat("b", 64)
 	when := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
 	blobRef := "sha256:abc"
-	in := journal.Event{
+	in := journal.Revision{
 		ID:        "01JTEST",
 		Time:      when,
 		Type:      "trove://type/note/created/1",
@@ -25,9 +25,9 @@ func TestRPCEventRoundTripSchemaRef(t *testing.T) {
 		BlobRef:   &blobRef,
 	}
 
-	out, err := rpcEventToJournal(journalEventToRPC(in))
+	out, err := rpcRevisionToJournal(journalRevisionToRPC(in))
 	if err != nil {
-		t.Fatalf("rpcEventToJournal() error = %v", err)
+		t.Fatalf("rpcRevisionToJournal() error = %v", err)
 	}
 	if out.SchemaRef != ref {
 		t.Fatalf("SchemaRef = %q, want %q", out.SchemaRef, ref)

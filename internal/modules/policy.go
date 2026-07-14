@@ -39,7 +39,7 @@ func (p WritePolicy) AllowsType(eventType string) bool {
 }
 
 // ValidateApply checks type allowlist and catalog payload validation when type is set.
-func (p WritePolicy) ValidateApply(event *journal.Event) error {
+func (p WritePolicy) ValidateApply(event *journal.Revision) error {
 	if event == nil {
 		return fmt.Errorf("modules: policy: event is nil")
 	}
@@ -58,7 +58,7 @@ func (p WritePolicy) ValidateApply(event *journal.Event) error {
 }
 
 // ValidateDelete performs delete-specific policy checks.
-func (p WritePolicy) ValidateDelete(event *journal.Event) error {
+func (p WritePolicy) ValidateDelete(event *journal.Revision) error {
 	if event == nil {
 		return fmt.Errorf("modules: policy: event is nil")
 	}
@@ -79,6 +79,6 @@ func LoadIngestPolicy(m Manifest, catalog *types.Catalog, bundled bool) (EmitPol
 }
 
 // ValidateEvent validates an apply event. Prefer ValidateApply for new code.
-func (p WritePolicy) ValidateEvent(event *journal.Event) error {
+func (p WritePolicy) ValidateEvent(event *journal.Revision) error {
 	return p.ValidateApply(event)
 }

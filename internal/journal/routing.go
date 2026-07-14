@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS router_state (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS event_dispatch (
-  event_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS revision_dispatch (
+  revision_id TEXT PRIMARY KEY,
   root_id  TEXT NOT NULL,
   seen     TEXT NOT NULL
 );
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS event_dispatch (
 
 // QueryAfter returns up to limit events with id strictly greater than afterID,
 // ordered by id ascending. An empty afterID returns from the beginning.
-func (s *Store) QueryAfter(ctx context.Context, afterID string, limit int) ([]Event, error) {
+func (s *Store) QueryAfter(ctx context.Context, afterID string, limit int) ([]Revision, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("journal: query after: store is closed")
 	}
@@ -33,7 +33,7 @@ func (s *Store) QueryAfter(ctx context.Context, afterID string, limit int) ([]Ev
 
 	query := `
 		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
-		FROM events`
+		FROM revisions`
 	args := []any{}
 	if afterID != "" {
 		query += ` WHERE id > ?`
@@ -48,22 +48,22 @@ func (s *Store) QueryAfter(ctx context.Context, afterID string, limit int) ([]Ev
 	}
 	defer rows.Close()
 
-	var events []Event
+	var revisions []Revision
 	for rows.Next() {
-		e, err := scanEvent(rows)
+		e, err := scanRevision(rows)
 		if err != nil {
 			return nil, fmt.Errorf("journal: query after: %w", err)
 		}
-		events = append(events, e)
+		revisions = append(revisions, e)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("journal: query after: %w", err)
 	}
 
-	return events, nil
+	return revisions, nil
 }
 
-// LoadRouterWatermark returns the last successfully dispatched event id, or "" if unset.
+// LoadRouterWatermark returns the last successfully dispatched revision id, or "" if unset.
 func (s *Store) LoadRouterWatermark(ctx context.Context) (string, error) {
 	if s.db == nil {
 		return "", fmt.Errorf("journal: load router watermark: store is closed")
@@ -81,7 +81,7 @@ func (s *Store) LoadRouterWatermark(ctx context.Context) (string, error) {
 	return value, nil
 }
 
-// SaveRouterWatermark persists the last successfully dispatched event id.
+// SaveRouterWatermark persists the last successfully dispatched revision id.
 func (s *Store) SaveRouterWatermark(ctx context.Context, id string) error {
 	if s.db == nil {
 		return fmt.Errorf("journal: save router watermark: store is closed")
@@ -97,13 +97,13 @@ func (s *Store) SaveRouterWatermark(ctx context.Context, id string) error {
 	return nil
 }
 
-// SaveEventDispatch stores routing metadata for a derived event awaiting dispatch.
-func (s *Store) SaveEventDispatch(ctx context.Context, eventID, rootID string, seen []string) error {
+// SaveRevisionDispatch stores routing metadata for a derived revision awaiting dispatch.
+func (s *Store) SaveRevisionDispatch(ctx context.Context, revisionID, rootID string, seen []string) error {
 	if s.db == nil {
 		return fmt.Errorf("journal: save event dispatch: store is closed")
 	}
-	if eventID == "" {
-		return fmt.Errorf("journal: save event dispatch: event id is required")
+	if revisionID == "" {
+		return fmt.Errorf("journal: save event dispatch: revision id is required")
 	}
 	if rootID == "" {
 		return fmt.Errorf("journal: save event dispatch: root id is required")
@@ -115,24 +115,24 @@ func (s *Store) SaveEventDispatch(ctx context.Context, eventID, rootID string, s
 	}
 
 	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO event_dispatch (event_id, root_id, seen) VALUES (?, ?, ?)
-		ON CONFLICT(event_id) DO UPDATE SET root_id = excluded.root_id, seen = excluded.seen`,
-		eventID, rootID, string(seenJSON))
+		INSERT INTO revision_dispatch (revision_id, root_id, seen) VALUES (?, ?, ?)
+		ON CONFLICT(revision_id) DO UPDATE SET root_id = excluded.root_id, seen = excluded.seen`,
+		revisionID, rootID, string(seenJSON))
 	if err != nil {
 		return fmt.Errorf("journal: save event dispatch: %w", err)
 	}
 	return nil
 }
 
-// LoadEventDispatch returns persisted routing metadata for a derived event.
-func (s *Store) LoadEventDispatch(ctx context.Context, eventID string) (rootID string, seen []string, ok bool, err error) {
+// LoadRevisionDispatch returns persisted routing metadata for a derived revision.
+func (s *Store) LoadRevisionDispatch(ctx context.Context, revisionID string) (rootID string, seen []string, ok bool, err error) {
 	if s.db == nil {
 		return "", nil, false, fmt.Errorf("journal: load event dispatch: store is closed")
 	}
 
 	var seenJSON string
 	err = s.db.QueryRowContext(ctx, `
-		SELECT root_id, seen FROM event_dispatch WHERE event_id = ?`, eventID).Scan(&rootID, &seenJSON)
+		SELECT root_id, seen FROM revision_dispatch WHERE revision_id = ?`, revisionID).Scan(&rootID, &seenJSON)
 	if err == sql.ErrNoRows {
 		return "", nil, false, nil
 	}
@@ -145,13 +145,13 @@ func (s *Store) LoadEventDispatch(ctx context.Context, eventID string) (rootID s
 	return rootID, seen, true, nil
 }
 
-// DeleteEventDispatch removes persisted routing metadata after successful dispatch.
-func (s *Store) DeleteEventDispatch(ctx context.Context, eventID string) error {
+// DeleteRevisionDispatch removes persisted routing metadata after successful dispatch.
+func (s *Store) DeleteRevisionDispatch(ctx context.Context, revisionID string) error {
 	if s.db == nil {
 		return fmt.Errorf("journal: delete event dispatch: store is closed")
 	}
 
-	_, err := s.db.ExecContext(ctx, `DELETE FROM event_dispatch WHERE event_id = ?`, eventID)
+	_, err := s.db.ExecContext(ctx, `DELETE FROM revision_dispatch WHERE revision_id = ?`, revisionID)
 	if err != nil {
 		return fmt.Errorf("journal: delete event dispatch: %w", err)
 	}

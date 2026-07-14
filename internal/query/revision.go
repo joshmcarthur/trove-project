@@ -7,8 +7,8 @@ import (
 	"github.com/joshmcarthur/trove/internal/journal"
 )
 
-// Event is a JSON-serializable journal event returned by the query API.
-type Event struct {
+// Revision is a JSON-serializable journal revision returned by the query API.
+type Revision struct {
 	ID         string          `json:"id"`
 	Time       time.Time       `json:"time"`
 	Operation  string          `json:"operation,omitempty"`
@@ -21,17 +21,17 @@ type Event struct {
 	Transforms json.RawMessage `json:"transforms,omitempty"`
 }
 
-func eventFromJournal(e journal.Event) Event {
-	return Event{
-		ID:         e.ID,
-		Time:       e.Time,
-		Operation:  e.Operation,
-		RecordRef:  e.RecordRef,
-		Type:       e.Type,
-		SchemaRef:  e.SchemaRef,
-		Source:     e.Source,
-		Payload:    e.Payload,
-		BlobRef:    e.BlobRef,
-		Transforms: e.Transforms,
+func revisionFromJournal(r journal.Revision) Revision {
+	return Revision{
+		ID:         r.ID,
+		Time:       r.Time,
+		Operation:  r.Operation,
+		RecordRef:  r.RecordRef,
+		Type:       r.Type,
+		SchemaRef:  r.SchemaRef,
+		Source:     r.Source,
+		Payload:    r.Payload,
+		BlobRef:    r.BlobRef,
+		Transforms: r.Transforms,
 	}
 }

@@ -17,17 +17,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type mockEmitter struct {
-	emits []*troverpc.EmitRecordRequest
+type mockAppender struct {
+	emits []*troverpc.AppendRevisionRequest
 	err   error
 }
 
-func (m *mockEmitter) EmitRecord(_ context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+func (m *mockAppender) AppendRevision(_ context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	m.emits = append(m.emits, req)
-	return &troverpc.EmitRecordResponse{EventId: "01JTEST", RecordRef: "01JREC", Version: 1, Operation: req.GetOperation()}, nil
+	return &troverpc.AppendRevisionResponse{RevisionId: "01JTEST", RecordRef: "01JREC", Version: 1, Operation: req.GetOperation()}, nil
 }
 
 type mockBlobPutter struct {
@@ -186,7 +186,7 @@ func TestPutBlobIngestRoundTrip(t *testing.T) {
 
 	blobs := &mockBlobPutter{}
 	cfg := defaultTestConfig()
-	emit := &mockEmitter{}
+	emit := &mockAppender{}
 	blobData := []byte("round-trip-bytes")
 
 	putResp, err := handlePutBlob(context.Background(), blobs, cfg, putBlobRequest(string(blobData)))
@@ -232,7 +232,7 @@ func TestHandleRecords(t *testing.T) {
 		emitErr    error
 		wantStatus int
 		wantEmit   bool
-		checkEmit  func(t *testing.T, req *troverpc.EmitRecordRequest)
+		checkEmit  func(t *testing.T, req *troverpc.AppendRevisionRequest)
 	}{
 		{
 			name:       "valid object",
@@ -240,7 +240,7 @@ func TestHandleRecords(t *testing.T) {
 			body:       `{"title":"test"}`,
 			wantStatus: http.StatusCreated,
 			wantEmit:   true,
-			checkEmit: func(t *testing.T, req *troverpc.EmitRecordRequest) {
+			checkEmit: func(t *testing.T, req *troverpc.AppendRevisionRequest) {
 				t.Helper()
 				if req.Source != "shortcuts" {
 					t.Errorf("Source = %q, want shortcuts", req.Source)
@@ -259,7 +259,7 @@ func TestHandleRecords(t *testing.T) {
 			body:       `{"type":"trove://type/note/created/1","time":"2026-07-10T12:00:00Z","title":"test"}`,
 			wantStatus: http.StatusCreated,
 			wantEmit:   true,
-			checkEmit: func(t *testing.T, req *troverpc.EmitRecordRequest) {
+			checkEmit: func(t *testing.T, req *troverpc.AppendRevisionRequest) {
 				t.Helper()
 				if req.Type != "trove://type/note/created/1" {
 					t.Errorf("Type = %q, want trove://type/note/created/1", req.Type)
@@ -284,7 +284,7 @@ func TestHandleRecords(t *testing.T) {
 			body:       `{"blob_ref":"sha256-deadbeef","title":"photo note"}`,
 			wantStatus: http.StatusCreated,
 			wantEmit:   true,
-			checkEmit: func(t *testing.T, req *troverpc.EmitRecordRequest) {
+			checkEmit: func(t *testing.T, req *troverpc.AppendRevisionRequest) {
 				t.Helper()
 				if req.BlobRef != "sha256-deadbeef" {
 					t.Errorf("BlobRef = %q, want sha256-deadbeef", req.BlobRef)
@@ -350,7 +350,7 @@ func TestHandleRecords(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			emit := &mockEmitter{err: tt.emitErr}
+			emit := &mockAppender{err: tt.emitErr}
 			var req *troverpc.HTTPRequest
 			if tt.wantStatus == http.StatusCreated {
 				req = ingestRequest(tt.source, tt.body)
@@ -416,5 +416,5 @@ func TestLoadConfigCustomMaxBody(t *testing.T) {
 	}
 }
 
-var _ trovemodule.RecordEmitter = (*mockEmitter)(nil)
+var _ trovemodule.RevisionAppender = (*mockAppender)(nil)
 var _ trovemodule.BlobPutter = (*mockBlobPutter)(nil)

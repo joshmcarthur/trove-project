@@ -12,7 +12,7 @@ import (
 	"github.com/joshmcarthur/trove/internal/types"
 )
 
-func TestCoreServicesEmitRecord(t *testing.T) {
+func TestCoreServicesAppendRevision(t *testing.T) {
 	t.Parallel()
 
 	store, err := blob.OpenFilesystem(t.TempDir())
@@ -41,14 +41,14 @@ func TestCoreServicesEmitRecord(t *testing.T) {
 		writer:  NewWriteService(j),
 		blobs:   store,
 	}
-	_, err = srv.EmitRecord(context.Background(), &troverpc.EmitRecordRequest{
+	_, err = srv.AppendRevision(context.Background(), &troverpc.AppendRevisionRequest{
 		Operation: "apply",
 		Type:      "test.event",
 		Source:    "src",
 		Payload:   []byte(`{"ok":true}`),
 	})
 	if err != nil {
-		t.Fatalf("EmitRecord() error = %v", err)
+		t.Fatalf("AppendRevision() error = %v", err)
 	}
 }
 
@@ -99,7 +99,7 @@ func TestCoreServicesBlobPutEmpty(t *testing.T) {
 	}
 }
 
-func TestCoreServicesGetEvent(t *testing.T) {
+func TestCoreServicesGetRevision(t *testing.T) {
 	t.Parallel()
 
 	path := t.TempDir() + "/journal.db"
@@ -110,7 +110,7 @@ func TestCoreServicesGetEvent(t *testing.T) {
 	t.Cleanup(func() { _ = j.Close() })
 
 	now := time.Now().UTC().Truncate(time.Second)
-	if err := j.Append(context.Background(), journal.Event{
+	if err := j.Append(context.Background(), journal.Revision{
 		Type:    "trove://type/note/created/1",
 		Source:  "test",
 		Time:    now,
@@ -124,9 +124,9 @@ func TestCoreServicesGetEvent(t *testing.T) {
 	}
 
 	srv := &coreServicesServer{query: &query.Service{Journal: j}}
-	resp, err := srv.GetEvent(context.Background(), &troverpc.GetEventRequest{Id: events[0].ID})
+	resp, err := srv.GetRevision(context.Background(), &troverpc.GetRevisionRequest{Id: events[0].ID})
 	if err != nil {
-		t.Fatalf("GetEvent() error = %v", err)
+		t.Fatalf("GetRevision() error = %v", err)
 	}
 	if resp.Id != events[0].ID {
 		t.Errorf("Id = %q, want %q", resp.Id, events[0].ID)

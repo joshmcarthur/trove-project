@@ -87,12 +87,12 @@ func TestEmitPolicyValidateEvent(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		event   journal.Event
+		event   journal.Revision
 		wantErr string
 	}{
 		{
 			name: "allowed without schema requirement on pattern only type",
-			event: journal.Event{
+			event: journal.Revision{
 				Type:    testHTTPIngestReceivedURI,
 				Source:  "shortcuts",
 				Payload: json.RawMessage(`{"title":"ok"}`),
@@ -100,7 +100,7 @@ func TestEmitPolicyValidateEvent(t *testing.T) {
 		},
 		{
 			name: "allowed with valid schema",
-			event: journal.Event{
+			event: journal.Revision{
 				Type:    testNoteCreatedURI,
 				Source:  "shortcuts",
 				Payload: json.RawMessage(`{"title":"ok"}`),
@@ -108,7 +108,7 @@ func TestEmitPolicyValidateEvent(t *testing.T) {
 		},
 		{
 			name: "disallowed type",
-			event: journal.Event{
+			event: journal.Revision{
 				Type:    "trove://type/mqtt/foo/1",
 				Source:  "shortcuts",
 				Payload: json.RawMessage(`{"title":"ok"}`),
@@ -117,7 +117,7 @@ func TestEmitPolicyValidateEvent(t *testing.T) {
 		},
 		{
 			name: "schema validation failure",
-			event: journal.Event{
+			event: journal.Revision{
 				Type:    testNoteCreatedURI,
 				Source:  "shortcuts",
 				Payload: json.RawMessage(`{}`),
@@ -168,21 +168,21 @@ func TestCoreServicesEmitRecordEnforcesPolicy(t *testing.T) {
 		writer:  NewWriteService(store),
 	}
 
-	_, err = server.EmitRecord(context.Background(), &troverpc.EmitRecordRequest{
+	_, err = server.AppendRevision(context.Background(), &troverpc.AppendRevisionRequest{
 		Operation: "apply",
 		Type:      "trove://type/denied/event/1",
 		Source:    "src",
 		Payload:   []byte(`{"ok":true}`),
 	})
 	if err == nil {
-		t.Fatal("EmitRecord() error = nil, want InvalidArgument")
+		t.Fatal("AppendRevision() error = nil, want InvalidArgument")
 	}
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.InvalidArgument {
-		t.Fatalf("EmitRecord() code = %v, want InvalidArgument", err)
+		t.Fatalf("AppendRevision() code = %v, want InvalidArgument", err)
 	}
 	if !strings.Contains(st.Message(), `type "trove://type/denied/event/1" not allowed`) {
-		t.Fatalf("EmitRecord() message = %q, want type not allowed", st.Message())
+		t.Fatalf("AppendRevision() message = %q, want type not allowed", st.Message())
 	}
 }
 

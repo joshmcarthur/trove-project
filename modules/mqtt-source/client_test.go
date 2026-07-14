@@ -63,9 +63,9 @@ func TestBuildEvent(t *testing.T) {
 
 	const wantType = "trove://type/mqtt/message/received/1"
 
-	event, err := buildEvent("home/sensor/temp", []byte(`{"v":21.5}`))
+	event, err := buildRevision("home/sensor/temp", []byte(`{"v":21.5}`))
 	if err != nil {
-		t.Fatalf("buildEvent() error = %v", err)
+		t.Fatalf("buildRevision() error = %v", err)
 	}
 	if event.Type != wantType {
 		t.Errorf("Type = %q, want %s", event.Type, wantType)

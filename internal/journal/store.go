@@ -15,7 +15,7 @@ import (
 )
 
 const schemaDDL = `
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE IF NOT EXISTS revisions (
   id         TEXT PRIMARY KEY,
   time       TEXT NOT NULL,
   operation  TEXT NOT NULL,
@@ -27,11 +27,11 @@ CREATE TABLE IF NOT EXISTS events (
   transforms TEXT NOT NULL DEFAULT '[]',
   blob_ref   TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_events_time ON events(time);
-CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
-CREATE INDEX IF NOT EXISTS idx_events_source ON events(source);
-CREATE INDEX IF NOT EXISTS idx_events_operation ON events(operation);
-CREATE INDEX IF NOT EXISTS idx_events_record_ref ON events(record_ref);
+CREATE INDEX IF NOT EXISTS idx_revisions_time ON revisions(time);
+CREATE INDEX IF NOT EXISTS idx_revisions_type ON revisions(type);
+CREATE INDEX IF NOT EXISTS idx_revisions_source ON revisions(source);
+CREATE INDEX IF NOT EXISTS idx_revisions_operation ON revisions(operation);
+CREATE INDEX IF NOT EXISTS idx_revisions_record_ref ON revisions(record_ref);
 `
 
 var _ Journal = (*Store)(nil)
@@ -120,8 +120,8 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// PruneBefore deletes events with time strictly before cutoff and their FTS rows.
-// Returns the number of events deleted.
+// PruneBefore deletes revisions with time strictly before cutoff and their FTS rows.
+// Returns the number of revisions deleted.
 func (s *Store) PruneBefore(ctx context.Context, cutoff time.Time) (int64, error) {
 	if s.db == nil {
 		return 0, fmt.Errorf("journal: prune: store is closed")
@@ -138,29 +138,29 @@ func (s *Store) PruneBefore(ctx context.Context, cutoff time.Time) (int64, error
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM records_fts
 		WHERE record_ref IN (
-			SELECT DISTINCT record_ref FROM record_events
-			WHERE event_id IN (SELECT id FROM events WHERE time < ?)
+			SELECT DISTINCT record_ref FROM record_revisions
+			WHERE revision_id IN (SELECT id FROM revisions WHERE time < ?)
 		)`, cutoffStr); err != nil {
 		return 0, fmt.Errorf("journal: prune records fts: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM record_events
-		WHERE event_id IN (SELECT id FROM events WHERE time < ?)`, cutoffStr); err != nil {
-		return 0, fmt.Errorf("journal: prune record_events: %w", err)
+		DELETE FROM record_revisions
+		WHERE revision_id IN (SELECT id FROM revisions WHERE time < ?)`, cutoffStr); err != nil {
+		return 0, fmt.Errorf("journal: prune record_revisions: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM record_heads
-		WHERE record_ref NOT IN (SELECT DISTINCT record_ref FROM record_events)`); err != nil {
+		WHERE record_ref NOT IN (SELECT DISTINCT record_ref FROM record_revisions)`); err != nil {
 		return 0, fmt.Errorf("journal: prune record_heads: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM events_fts
-		WHERE event_id IN (SELECT id FROM events WHERE time < ?)`, cutoffStr); err != nil {
+		DELETE FROM revisions_fts
+		WHERE revision_id IN (SELECT id FROM revisions WHERE time < ?)`, cutoffStr); err != nil {
 		return 0, fmt.Errorf("journal: prune fts: %w", err)
 	}
 
-	res, err := tx.ExecContext(ctx, `DELETE FROM events WHERE time < ?`, cutoffStr)
+	res, err := tx.ExecContext(ctx, `DELETE FROM revisions WHERE time < ?`, cutoffStr)
 	if err != nil {
 		return 0, fmt.Errorf("journal: prune events: %w", err)
 	}
@@ -175,11 +175,11 @@ func (s *Store) PruneBefore(ctx context.Context, cutoff time.Time) (int64, error
 }
 
 // Append persists e, generating ID and Time when unset.
-func (s *Store) Append(ctx context.Context, e Event) error {
+func (s *Store) Append(ctx context.Context, e Revision) error {
 	return s.AppendTransactional(ctx, e, nil)
 }
 
-func prepareAppend(e *Event) error {
+func prepareAppend(e *Revision) error {
 	if e.Operation == "" {
 		e.Operation = OpApply
 	}
@@ -216,7 +216,7 @@ func prepareAppend(e *Event) error {
 	return nil
 }
 
-func appendEventInTx(ctx context.Context, tx *sql.Tx, e Event) error {
+func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 	var (
 		blobRef sql.NullString
 		typ     sql.NullString
@@ -229,7 +229,7 @@ func appendEventInTx(ctx context.Context, tx *sql.Tx, e Event) error {
 	}
 
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO events (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
@@ -247,7 +247,7 @@ func appendEventInTx(ctx context.Context, tx *sql.Tx, e Event) error {
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO events_fts (event_id, type, source, payload)
+		INSERT INTO revisions_fts (revision_id, type, source, payload)
 		VALUES (?, ?, ?, ?)`,
 		e.ID,
 		e.Type,
@@ -260,8 +260,8 @@ func appendEventInTx(ctx context.Context, tx *sql.Tx, e Event) error {
 	return nil
 }
 
-// Query returns events matching f, ordered by time ascending.
-func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
+// Query returns revisions matching f, ordered by time ascending.
+func (s *Store) Query(ctx context.Context, f Filter) ([]Revision, error) {
 	if f.Type != "" && f.TypePrefix != "" {
 		return nil, ErrConflictingFilter
 	}
@@ -276,14 +276,14 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 	if ftsQuery != "" {
 		query = `
 			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.payload, e.transforms, e.blob_ref
-			FROM events e
-			INNER JOIN events_fts ON events_fts.event_id = e.id`
-		predicates = append(predicates, "events_fts MATCH ?")
+			FROM revisions e
+			INNER JOIN revisions_fts ON revisions_fts.revision_id = e.id`
+		predicates = append(predicates, "revisions_fts MATCH ?")
 		args = append(args, ftsQuery)
 	} else {
 		query = `
 			SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
-			FROM events`
+			FROM revisions`
 	}
 
 	tablePrefix := ""
@@ -328,34 +328,34 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Event, error) {
 	}
 	defer rows.Close()
 
-	var events []Event
+	var revisions []Revision
 	for rows.Next() {
-		e, err := scanEvent(rows)
+		e, err := scanRevision(rows)
 		if err != nil {
 			return nil, fmt.Errorf("journal: query: %w", err)
 		}
-		events = append(events, e)
+		revisions = append(revisions, e)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("journal: query: %w", err)
 	}
 
-	return events, nil
+	return revisions, nil
 }
 
-// Get returns the event with id.
-func (s *Store) Get(ctx context.Context, id string) (Event, error) {
+// Get returns the revision with id.
+func (s *Store) Get(ctx context.Context, id string) (Revision, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
-		FROM events
+		FROM revisions
 		WHERE id = ?`, id)
 
-	e, err := scanEvent(row)
+	e, err := scanRevision(row)
 	if err == sql.ErrNoRows {
-		return Event{}, ErrNotFound
+		return Revision{}, ErrNotFound
 	}
 	if err != nil {
-		return Event{}, fmt.Errorf("journal: get %q: %w", id, err)
+		return Revision{}, fmt.Errorf("journal: get %q: %w", id, err)
 	}
 
 	return e, nil
@@ -365,9 +365,9 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanEvent(row rowScanner) (Event, error) {
+func scanRevision(row rowScanner) (Revision, error) {
 	var (
-		e          Event
+		e          Revision
 		timeStr    string
 		payload    string
 		transforms string
@@ -387,13 +387,13 @@ func scanEvent(row rowScanner) (Event, error) {
 		&transforms,
 		&blobRef,
 	); err != nil {
-		return Event{}, err
+		return Revision{}, err
 	}
 
 	var err error
 	e.Time, err = time.Parse(time.RFC3339, timeStr)
 	if err != nil {
-		return Event{}, fmt.Errorf("parse time %q: %w", timeStr, err)
+		return Revision{}, fmt.Errorf("parse time %q: %w", timeStr, err)
 	}
 
 	if typ.Valid {

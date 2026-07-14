@@ -12,8 +12,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const testEventsDDL = `
-CREATE TABLE events (
+const testRevisionsDDL = `
+CREATE TABLE revisions (
   id          TEXT PRIMARY KEY,
   time        TEXT NOT NULL,
   operation   TEXT NOT NULL DEFAULT '',
@@ -36,8 +36,8 @@ func openTestDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	if _, err := db.Exec(testEventsDDL); err != nil {
-		t.Fatalf("create events table: %v", err)
+	if _, err := db.Exec(testRevisionsDDL); err != nil {
+		t.Fatalf("create revisions table: %v", err)
 	}
 	if err := records.EnsureSchema(db); err != nil {
 		t.Fatalf("EnsureSchema() error = %v", err)
@@ -45,7 +45,7 @@ func openTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func insertEvent(t *testing.T, db *sql.DB, e journal.Event) {
+func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 	t.Helper()
 
 	var transforms sql.NullString
@@ -58,7 +58,7 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Event) {
 	}
 
 	_, err := db.Exec(`
-		INSERT INTO events (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
@@ -76,7 +76,7 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Event) {
 	}
 }
 
-func applyEvent(t *testing.T, db *sql.DB, e journal.Event) bool {
+func applyEvent(t *testing.T, db *sql.DB, e journal.Revision) bool {
 	t.Helper()
 
 	ctx := context.Background()
@@ -150,7 +150,7 @@ func TestMaterializerApplyCreatesRecord(t *testing.T) {
 
 	db := openTestDB(t)
 	ref := "01JREC00000000000000000001"
-	e := journal.Event{
+	e := journal.Revision{
 		ID:        "01JEVT00000000000000000001",
 		Time:      time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC),
 		Operation: journal.OpApply,
@@ -185,7 +185,7 @@ func TestMaterializerApplyIncrementsVersion(t *testing.T) {
 	ref := "01JREC00000000000000000002"
 	base := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
 
-	insertEvent(t, db, journal.Event{
+	insertEvent(t, db, journal.Revision{
 		ID:        "01JEVT00000000000000000002",
 		Time:      base,
 		Operation: journal.OpApply,
@@ -193,7 +193,7 @@ func TestMaterializerApplyIncrementsVersion(t *testing.T) {
 		Source:    "test",
 		Payload:   json.RawMessage(`{"text":"one"}`),
 	})
-	if !applyEvent(t, db, journal.Event{
+	if !applyEvent(t, db, journal.Revision{
 		ID:        "01JEVT00000000000000000002",
 		Time:      base,
 		Operation: journal.OpApply,
@@ -204,7 +204,7 @@ func TestMaterializerApplyIncrementsVersion(t *testing.T) {
 		t.Fatal("first Apply() skipped")
 	}
 
-	second := journal.Event{
+	second := journal.Revision{
 		ID:        "01JEVT00000000000000000003",
 		Time:      base.Add(time.Minute),
 		Operation: journal.OpApply,
@@ -240,7 +240,7 @@ func TestMaterializerApplyFoldsTransforms(t *testing.T) {
 	ref := "01JREC00000000000000000003"
 	when := time.Date(2026, 7, 13, 11, 0, 0, 0, time.UTC)
 
-	first := journal.Event{
+	first := journal.Revision{
 		ID:        "01JEVT00000000000000000004",
 		Time:      when,
 		Operation: journal.OpApply,
@@ -251,7 +251,7 @@ func TestMaterializerApplyFoldsTransforms(t *testing.T) {
 	insertEvent(t, db, first)
 	applyEvent(t, db, first)
 
-	second := journal.Event{
+	second := journal.Revision{
 		ID:         "01JEVT00000000000000000005",
 		Time:       when.Add(time.Minute),
 		Operation:  journal.OpApply,
@@ -276,7 +276,7 @@ func TestMaterializerDeleteRetainsBodyAndRemovesFTS(t *testing.T) {
 	ref := "01JREC00000000000000000004"
 	when := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
 
-	create := journal.Event{
+	create := journal.Revision{
 		ID:        "01JEVT00000000000000000006",
 		Time:      when,
 		Operation: journal.OpApply,
@@ -291,7 +291,7 @@ func TestMaterializerDeleteRetainsBodyAndRemovesFTS(t *testing.T) {
 		t.Fatal("expected fts row before delete")
 	}
 
-	del := journal.Event{
+	del := journal.Revision{
 		ID:        "01JEVT00000000000000000007",
 		Time:      when.Add(time.Minute),
 		Operation: journal.OpDelete,
@@ -322,7 +322,7 @@ func TestMaterializerSkipsDuplicateEventID(t *testing.T) {
 
 	db := openTestDB(t)
 	ref := "01JREC00000000000000000005"
-	e := journal.Event{
+	e := journal.Revision{
 		ID:        "01JEVT00000000000000000008",
 		Time:      time.Date(2026, 7, 13, 13, 0, 0, 0, time.UTC),
 		Operation: journal.OpApply,
@@ -352,7 +352,7 @@ func TestRebuildAllReplaysEvents(t *testing.T) {
 	ref := "01JREC00000000000000000006"
 	when := time.Date(2026, 7, 13, 14, 0, 0, 0, time.UTC)
 
-	events := []journal.Event{
+	events := []journal.Revision{
 		{
 			ID:        "01JEVT00000000000000000009",
 			Time:      when,
@@ -389,8 +389,8 @@ func TestRebuildAllReplaysEvents(t *testing.T) {
 	if _, err := db.Exec(`DELETE FROM records_fts`); err != nil {
 		t.Fatalf("clear fts: %v", err)
 	}
-	if _, err := db.Exec(`DELETE FROM record_events`); err != nil {
-		t.Fatalf("clear record_events: %v", err)
+	if _, err := db.Exec(`DELETE FROM record_revisions`); err != nil {
+		t.Fatalf("clear record_revisions: %v", err)
 	}
 	if _, err := db.Exec(`DELETE FROM record_heads`); err != nil {
 		t.Fatalf("clear record_heads: %v", err)
@@ -412,10 +412,10 @@ func TestRebuildAllReplaysEvents(t *testing.T) {
 	}
 
 	var eventLinks int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM record_events WHERE record_ref = ?`, ref).Scan(&eventLinks); err != nil {
-		t.Fatalf("count record_events: %v", err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM record_revisions WHERE record_ref = ?`, ref).Scan(&eventLinks); err != nil {
+		t.Fatalf("count record_revisions: %v", err)
 	}
 	if eventLinks != 3 {
-		t.Fatalf("record_events = %d, want 3", eventLinks)
+		t.Fatalf("record_revisions = %d, want 3", eventLinks)
 	}
 }

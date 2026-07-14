@@ -7,8 +7,8 @@ import (
 )
 
 const ftsSchemaDDL = `
-CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
-  event_id UNINDEXED,
+CREATE VIRTUAL TABLE IF NOT EXISTS revisions_fts USING fts5(
+  revision_id UNINDEXED,
   type,
   source,
   payload,
@@ -18,24 +18,24 @@ CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
 
 func migrateFTS(db *sql.DB) error {
 	var ftsCount int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM events_fts`).Scan(&ftsCount); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM revisions_fts`).Scan(&ftsCount); err != nil {
 		return fmt.Errorf("journal: count fts rows: %w", err)
 	}
 	if ftsCount > 0 {
 		return nil
 	}
 
-	var eventCount int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&eventCount); err != nil {
-		return fmt.Errorf("journal: count events: %w", err)
+	var revisionCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM revisions`).Scan(&revisionCount); err != nil {
+		return fmt.Errorf("journal: count revisions: %w", err)
 	}
-	if eventCount == 0 {
+	if revisionCount == 0 {
 		return nil
 	}
 
 	if _, err := db.Exec(`
-		INSERT INTO events_fts (event_id, type, source, payload)
-		SELECT id, type, source, payload FROM events`); err != nil {
+		INSERT INTO revisions_fts (revision_id, type, source, payload)
+		SELECT id, type, source, payload FROM revisions`); err != nil {
 		return fmt.Errorf("journal: backfill fts: %w", err)
 	}
 

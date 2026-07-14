@@ -17,25 +17,25 @@ const routerPollInterval = 500 * time.Millisecond
 // routingJournal extends Journal with cursor-based dispatch support.
 type routingJournal interface {
 	journal.Journal
-	QueryAfter(ctx context.Context, afterID string, limit int) ([]journal.Event, error)
+	QueryAfter(ctx context.Context, afterID string, limit int) ([]journal.Revision, error)
 	LoadRouterWatermark(ctx context.Context) (string, error)
 	SaveRouterWatermark(ctx context.Context, id string) error
-	SaveEventDispatch(ctx context.Context, eventID, rootID string, seen []string) error
-	LoadEventDispatch(ctx context.Context, eventID string) (rootID string, seen []string, ok bool, err error)
-	DeleteEventDispatch(ctx context.Context, eventID string) error
+	SaveRevisionDispatch(ctx context.Context, eventID, rootID string, seen []string) error
+	LoadRevisionDispatch(ctx context.Context, eventID string) (rootID string, seen []string, ok bool, err error)
+	DeleteRevisionDispatch(ctx context.Context, eventID string) error
 }
 
 // Router dispatches journal events to event-routing processors and sinks.
 type Router struct {
 	journal  journal.Journal
-	registry *EventRegistry
+	registry *RevisionRegistry
 	writer   *WriteService
 	claims   sync.Map
 	pending  sync.Map
 }
 
 // NewRouter returns a router for the given journal and event registry.
-func NewRouter(j journal.Journal, registry *EventRegistry, writer *WriteService) *Router {
+func NewRouter(j journal.Journal, registry *RevisionRegistry, writer *WriteService) *Router {
 	return &Router{
 		journal:  j,
 		registry: registry,
@@ -97,7 +97,7 @@ func (r *Router) Run(ctx context.Context) error {
 	}
 }
 
-func (r *Router) deliver(ctx context.Context, routeStore routingJournal, event journal.Event) error {
+func (r *Router) deliver(ctx context.Context, routeStore routingJournal, event journal.Revision) error {
 	if _, loaded := r.claims.LoadOrStore(event.ID, struct{}{}); loaded {
 		return nil
 	}
@@ -109,7 +109,7 @@ func (r *Router) deliver(ctx context.Context, routeStore routingJournal, event j
 		dctx = pending.(DispatchContext)
 		persistedDispatch = true
 	} else {
-		rootID, seen, ok, err := routeStore.LoadEventDispatch(ctx, event.ID)
+		rootID, seen, ok, err := routeStore.LoadRevisionDispatch(ctx, event.ID)
 		if err != nil {
 			return err
 		}
@@ -124,14 +124,14 @@ func (r *Router) deliver(ctx context.Context, routeStore routingJournal, event j
 	}
 
 	if persistedDispatch {
-		if err := routeStore.DeleteEventDispatch(ctx, event.ID); err != nil {
+		if err := routeStore.DeleteRevisionDispatch(ctx, event.ID); err != nil {
 			return fmt.Errorf("delete event dispatch %q: %w", event.ID, err)
 		}
 	}
 	return nil
 }
 
-func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event journal.Event, dctx DispatchContext) error {
+func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event journal.Revision, dctx DispatchContext) error {
 	if dctx.RootID == "" {
 		dctx.RootID = event.ID
 	}
@@ -182,7 +182,7 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 	return nil
 }
 
-func (r *Router) appendDerived(ctx context.Context, routeStore routingJournal, event journal.Event, dctx DispatchContext) error {
+func (r *Router) appendDerived(ctx context.Context, routeStore routingJournal, event journal.Revision, dctx DispatchContext) error {
 	if event.ID == "" {
 		event.ID = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
@@ -193,7 +193,7 @@ func (r *Router) appendDerived(ctx context.Context, routeStore routingJournal, e
 		dctx.RootID = event.ID
 	}
 	r.pending.Store(event.ID, dctx)
-	if err := routeStore.SaveEventDispatch(ctx, event.ID, dctx.RootID, dctx.Seen); err != nil {
+	if err := routeStore.SaveRevisionDispatch(ctx, event.ID, dctx.RootID, dctx.Seen); err != nil {
 		r.pending.Delete(event.ID)
 		return fmt.Errorf("save event dispatch: %w", err)
 	}
@@ -202,7 +202,7 @@ func (r *Router) appendDerived(ctx context.Context, routeStore routingJournal, e
 	}
 	if _, err := r.writer.Write(ctx, event, nil); err != nil {
 		r.pending.Delete(event.ID)
-		_ = routeStore.DeleteEventDispatch(ctx, event.ID)
+		_ = routeStore.DeleteRevisionDispatch(ctx, event.ID)
 		return fmt.Errorf("append derived event: %w", err)
 	}
 	return nil

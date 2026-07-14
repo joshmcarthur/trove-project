@@ -30,11 +30,11 @@ type coreServicesServer struct {
 	mcpRegistry *MCPRegistry
 }
 
-func (s *coreServicesServer) EmitRecord(ctx context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+func (s *coreServicesServer) AppendRevision(ctx context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
 	if s.writer == nil {
 		return nil, status.Error(codes.Unavailable, "record emit is not configured")
 	}
-	resp, err := s.writer.EmitRecordFromRPC(ctx, req, s.policy)
+	resp, err := s.writer.AppendRevisionFromRPC(ctx, req, s.policy)
 	if err != nil {
 		return nil, writeGRPCError(err)
 	}
@@ -55,21 +55,21 @@ func (s *coreServicesServer) BlobPut(ctx context.Context, req *troverpc.BlobPutR
 	return &troverpc.BlobPutResponse{BlobRef: ref}, nil
 }
 
-func (s *coreServicesServer) GetEvent(ctx context.Context, req *troverpc.GetEventRequest) (*troverpc.Event, error) {
+func (s *coreServicesServer) GetRevision(ctx context.Context, req *troverpc.GetRevisionRequest) (*troverpc.Revision, error) {
 	if s.query == nil {
 		return nil, status.Error(codes.Unavailable, "query is not configured")
 	}
 	if req == nil || req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
-	event, err := s.query.GetEvent(ctx, req.Id)
+	event, err := s.query.GetRevision(ctx, req.Id)
 	if err != nil {
 		return nil, queryGRPCError(err)
 	}
-	return queryEventToProto(event), nil
+	return queryRevisionToProto(event), nil
 }
 
-func (s *coreServicesServer) SearchEvents(ctx context.Context, req *troverpc.SearchEventsRequest) (*troverpc.SearchEventsResponse, error) {
+func (s *coreServicesServer) SearchRevisions(ctx context.Context, req *troverpc.SearchRevisionsRequest) (*troverpc.SearchRevisionsResponse, error) {
 	if s.query == nil {
 		return nil, status.Error(codes.Unavailable, "query is not configured")
 	}
@@ -84,7 +84,7 @@ func (s *coreServicesServer) SearchEvents(ctx context.Context, req *troverpc.Sea
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	events, err := s.query.SearchEvents(ctx, req.Query, query.SearchParams{
+	events, err := s.query.SearchRevisions(ctx, req.Query, query.SearchParams{
 		TypePrefix: req.TypePrefix,
 		Source:     req.Source,
 		TimeFrom:   timeFrom,
@@ -93,7 +93,7 @@ func (s *coreServicesServer) SearchEvents(ctx context.Context, req *troverpc.Sea
 	if err != nil {
 		return nil, queryGRPCError(err)
 	}
-	return &troverpc.SearchEventsResponse{Events: queryEventsToProto(events)}, nil
+	return &troverpc.SearchRevisionsResponse{Revisions: queryRevisionsToProto(events)}, nil
 }
 
 func (s *coreServicesServer) GetRecord(ctx context.Context, req *troverpc.GetRecordRequest) (*troverpc.Record, error) {
@@ -152,7 +152,7 @@ func (s *coreServicesServer) ListIncompleteRecords(ctx context.Context, req *tro
 	return &troverpc.ListIncompleteRecordsResponse{Records: queryRecordsToProto(records)}, nil
 }
 
-func (s *coreServicesServer) GetEventsByType(ctx context.Context, req *troverpc.GetEventsByTypeRequest) (*troverpc.SearchEventsResponse, error) {
+func (s *coreServicesServer) GetRevisionsByType(ctx context.Context, req *troverpc.GetRevisionsByTypeRequest) (*troverpc.SearchRevisionsResponse, error) {
 	if s.query == nil {
 		return nil, status.Error(codes.Unavailable, "query is not configured")
 	}
@@ -167,11 +167,11 @@ func (s *coreServicesServer) GetEventsByType(ctx context.Context, req *troverpc.
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	events, err := s.query.GetEventsByType(ctx, req.Type, timeFrom, timeTo)
+	events, err := s.query.GetRevisionsByType(ctx, req.Type, timeFrom, timeTo)
 	if err != nil {
 		return nil, queryGRPCError(err)
 	}
-	return &troverpc.SearchEventsResponse{Events: queryEventsToProto(events)}, nil
+	return &troverpc.SearchRevisionsResponse{Revisions: queryRevisionsToProto(events)}, nil
 }
 
 func (s *coreServicesServer) SummarizeRange(ctx context.Context, req *troverpc.SummarizeRangeRequest) (*troverpc.Summary, error) {
@@ -359,8 +359,8 @@ func parseOptionalProtoTime(s string) (*time.Time, error) {
 	return &t, nil
 }
 
-func queryEventToProto(e query.Event) *troverpc.Event {
-	out := &troverpc.Event{
+func queryRevisionToProto(e query.Revision) *troverpc.Revision {
+	out := &troverpc.Revision{
 		Id:        e.ID,
 		Time:      e.Time.Format(time.RFC3339),
 		Type:      e.Type,
@@ -378,10 +378,10 @@ func queryEventToProto(e query.Event) *troverpc.Event {
 	return out
 }
 
-func queryEventsToProto(events []query.Event) []*troverpc.Event {
-	out := make([]*troverpc.Event, len(events))
+func queryRevisionsToProto(events []query.Revision) []*troverpc.Revision {
+	out := make([]*troverpc.Revision, len(events))
 	for i, e := range events {
-		out[i] = queryEventToProto(e)
+		out[i] = queryRevisionToProto(e)
 	}
 	return out
 }
@@ -420,6 +420,6 @@ func summaryToProto(s query.Summary) *troverpc.Summary {
 		TimeTo:   s.TimeTo.Format(time.RFC3339),
 		Total:    int32(s.Total), //nolint:gosec // G115: event count from journal query
 		ByType:   byType,
-		Notable:  queryEventsToProto(s.Notable),
+		Notable:  queryRevisionsToProto(s.Notable),
 	}
 }

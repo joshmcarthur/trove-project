@@ -203,7 +203,7 @@ func runDaemon(cfg config.Config, mods []modules.Module) {
 
 	httpRegistry := modules.NewHTTPRegistry()
 	mcpRegistry := modules.NewMCPRegistry()
-	eventRegistry := modules.NewEventRegistry()
+	eventRegistry := modules.NewRevisionRegistry()
 
 	settingsStore, err := modules.NewSettingsStore(cfg.Modules)
 	if err != nil {

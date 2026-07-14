@@ -9,26 +9,26 @@ import (
 	troverpc "github.com/joshmcarthur/trove/internal/modules/rpc/trove/v1"
 )
 
-func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
+func rpcRevisionToJournal(e *troverpc.Revision) (journal.Revision, error) {
 	if e == nil {
-		return journal.Event{}, fmt.Errorf("modules: event is nil")
+		return journal.Revision{}, fmt.Errorf("modules: event is nil")
 	}
 	if e.Type == "" {
-		return journal.Event{}, fmt.Errorf("modules: type is required")
+		return journal.Revision{}, fmt.Errorf("modules: type is required")
 	}
 	if e.Source == "" {
-		return journal.Event{}, fmt.Errorf("modules: source is required")
+		return journal.Revision{}, fmt.Errorf("modules: source is required")
 	}
 	if len(e.Payload) == 0 {
-		return journal.Event{}, fmt.Errorf("modules: payload is required")
+		return journal.Revision{}, fmt.Errorf("modules: payload is required")
 	}
 	if !json.Valid(e.Payload) {
-		return journal.Event{}, fmt.Errorf("modules: payload must be valid JSON")
+		return journal.Revision{}, fmt.Errorf("modules: payload must be valid JSON")
 	}
 
 	eventTime, err := parseProtoTime(e.Time)
 	if err != nil {
-		return journal.Event{}, fmt.Errorf("modules: time: %w", err)
+		return journal.Revision{}, fmt.Errorf("modules: time: %w", err)
 	}
 
 	var blobRef *string
@@ -42,7 +42,7 @@ func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
 		operation = journal.OpApply
 	}
 
-	return journal.Event{
+	return journal.Revision{
 		ID:         e.Id,
 		Time:       eventTime,
 		Operation:  operation,
@@ -56,14 +56,14 @@ func rpcEventToJournal(e *troverpc.Event) (journal.Event, error) {
 	}, nil
 }
 
-func rpcEmitRecordRequestToJournal(req *troverpc.EmitRecordRequest) (journal.Event, error) {
+func rpcAppendRevisionRequestToJournal(req *troverpc.AppendRevisionRequest) (journal.Revision, error) {
 	if req == nil {
-		return journal.Event{}, fmt.Errorf("modules: emit record request is nil")
+		return journal.Revision{}, fmt.Errorf("modules: emit record request is nil")
 	}
 
 	eventTime, err := parseProtoTime(req.Time)
 	if err != nil {
-		return journal.Event{}, fmt.Errorf("modules: time: %w", err)
+		return journal.Revision{}, fmt.Errorf("modules: time: %w", err)
 	}
 
 	var blobRef *string
@@ -77,7 +77,7 @@ func rpcEmitRecordRequestToJournal(req *troverpc.EmitRecordRequest) (journal.Eve
 		operation = journal.OpApply
 	}
 
-	return journal.Event{
+	return journal.Revision{
 		Time:       eventTime,
 		Operation:  operation,
 		RecordRef:  req.RecordRef,
@@ -100,8 +100,8 @@ func parseProtoTime(value string) (time.Time, error) {
 	return parsed.UTC(), nil
 }
 
-func journalEventToRPC(e journal.Event) *troverpc.Event {
-	out := &troverpc.Event{
+func journalRevisionToRPC(e journal.Revision) *troverpc.Revision {
+	out := &troverpc.Revision{
 		Id:         e.ID,
 		Type:       e.Type,
 		SchemaRef:  e.SchemaRef,

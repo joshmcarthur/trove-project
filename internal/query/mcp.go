@@ -12,10 +12,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Querier is the journal query API used by MCP handlers.
-type Querier interface {
-	GetEvent(ctx context.Context, id string) (Event, error)
-	SummarizeRange(ctx context.Context, timeFrom, timeTo time.Time) (Summary, error)
+// RecordQuerier is the record projection API used by MCP handlers.
+type RecordQuerier interface {
 	GetRecord(ctx context.Context, recordRef string, version int) (Record, error)
 	SearchRecords(ctx context.Context, query string, params RecordSearchParams) ([]Record, error)
 	ListIncompleteRecords(ctx context.Context, source string, limit int) ([]Record, error)
@@ -23,7 +21,7 @@ type Querier interface {
 
 // MCPDeps bundles dependencies for the MCP HTTP handler.
 type MCPDeps struct {
-	Querier Querier
+	Records RecordQuerier
 	Tools   []trovemodule.MCPToolDescriptor
 	Caller  trovemodule.MCPToolCaller
 }
@@ -46,8 +44,8 @@ func newMCPServer(deps MCPDeps) *mcp.Server {
 		Version: "0.1.0",
 	}, nil)
 
-	if deps.Querier != nil {
-		registerQueryTools(server, deps.Querier)
+	if deps.Records != nil {
+		registerRecordTools(server, deps.Records)
 	}
 	if deps.Caller != nil {
 		registerModuleTools(server, deps.Tools, deps.Caller)
@@ -56,22 +54,7 @@ func newMCPServer(deps MCPDeps) *mcp.Server {
 	return server
 }
 
-func registerQueryTools(server *mcp.Server, q Querier) {
-	type getEventParams struct {
-		ID string `json:"id" jsonschema:"ULID of the event to retrieve"`
-	}
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "get_event",
-		Description: "Return a journal event by ULID for audit",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, params getEventParams) (*mcp.CallToolResult, any, error) {
-		event, err := q.GetEvent(ctx, params.ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		return textToolResult(event)
-	})
-
+func registerRecordTools(server *mcp.Server, q RecordQuerier) {
 	type getRecordParams struct {
 		RecordRef string `json:"record_ref" jsonschema:"required,Record reference to retrieve"`
 		Version   int    `json:"version,omitempty" jsonschema:"Optional version; omit for latest"`
@@ -126,26 +109,6 @@ func registerQueryTools(server *mcp.Server, q Querier) {
 			return nil, nil, err
 		}
 		return textToolResult(records)
-	})
-
-	type summarizeRangeParams struct {
-		TimeFrom string `json:"time_from" jsonschema:"required,RFC3339 start of time range"`
-		TimeTo   string `json:"time_to" jsonschema:"required,RFC3339 end of time range"`
-	}
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "summarize_range",
-		Description: "Return aggregated event counts by type and notable events for a time window",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, params summarizeRangeParams) (*mcp.CallToolResult, any, error) {
-		timeFrom, timeTo, err := parseRequiredTimeRange(params.TimeFrom, params.TimeTo)
-		if err != nil {
-			return nil, nil, err
-		}
-		summary, err := q.SummarizeRange(ctx, timeFrom, timeTo)
-		if err != nil {
-			return nil, nil, err
-		}
-		return textToolResult(summary)
 	})
 }
 
@@ -217,28 +180,4 @@ func parseOptionalRFC3339(s string) (*time.Time, error) {
 		return nil, fmt.Errorf("query: parse time %q: %w", s, err)
 	}
 	return &t, nil
-}
-
-func parseRequiredRFC3339(s string) (time.Time, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return time.Time{}, fmt.Errorf("query: time is required")
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("query: parse time %q: %w", s, err)
-	}
-	return t, nil
-}
-
-func parseRequiredTimeRange(timeFrom, timeTo string) (time.Time, time.Time, error) {
-	from, err := parseRequiredRFC3339(timeFrom)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	to, err := parseRequiredRFC3339(timeTo)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	return from, to, nil
 }

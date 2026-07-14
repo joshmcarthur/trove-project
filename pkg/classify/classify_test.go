@@ -11,7 +11,7 @@ import (
 
 type fakeStore struct {
 	records map[string]*troverpc.Record
-	writes  []*troverpc.EmitRecordRequest
+	writes  []*troverpc.AppendRevisionRequest
 	nextID  int
 }
 
@@ -37,7 +37,7 @@ func (f *fakeStore) ListIncompleteRecords(_ context.Context, req *troverpc.ListI
 	return out, nil
 }
 
-func (f *fakeStore) EmitRecord(_ context.Context, req *troverpc.EmitRecordRequest) (*troverpc.EmitRecordResponse, error) {
+func (f *fakeStore) AppendRevision(_ context.Context, req *troverpc.AppendRevisionRequest) (*troverpc.AppendRevisionResponse, error) {
 	f.writes = append(f.writes, req)
 	f.nextID++
 	ref := req.RecordRef
@@ -60,8 +60,8 @@ func (f *fakeStore) EmitRecord(_ context.Context, req *troverpc.EmitRecordReques
 		Source:       req.Source,
 		Body:         req.Payload,
 	}
-	return &troverpc.EmitRecordResponse{
-		EventId:      "01EVT" + string(rune('0'+f.nextID)),
+	return &troverpc.AppendRevisionResponse{
+		RevisionId:   "01EVT" + string(rune('0'+f.nextID)),
 		RecordRef:    ref,
 		Version:      version,
 		Completeness: completeness,

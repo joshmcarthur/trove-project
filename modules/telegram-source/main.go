@@ -44,7 +44,10 @@ func main() {
 }
 
 func runTelegram(ctx context.Context, core trovemodule.Core, cfg config) error {
-	svc := newBotService(cfg, core)
+	svc, err := newBotService(cfg, core)
+	if err != nil {
+		return err
+	}
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(svc.handleUpdate),
