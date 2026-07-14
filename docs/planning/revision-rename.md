@@ -65,3 +65,7 @@ Legacy databases with `events` tables are migrated on `journal.Open`.
 - [x] MCP records-only
 - [x] SQLite `revisions` schema on fresh + migrated DBs
 - [x] `make check` green
+
+## See also
+
+- [References and URIs](./references.md) — content graph, link/unlink, producer (planned)

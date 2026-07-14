@@ -61,6 +61,7 @@ Operational runbook — not a planning page:
 | Page | Package |
 |------|---------|
 | [Records layer](./records.md) | `internal/records`, `internal/journal`, `internal/query` |
+| [References and URIs](./references.md) | `internal/journal`, `internal/records`, `internal/modules` |
 
 ## Later
 

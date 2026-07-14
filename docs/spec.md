@@ -47,10 +47,21 @@ about them" actually work, for one user, on one Pi.
 
 ## 3. Core Concepts
 
+Trove is an append-only **personal content graph**, not a pure event logger.
+Stable **records** are nodes; **revisions** are immutable claims that change them;
+**references** (planned) are directed edges; **blobs** are immutable bytes.
+
+| Concept | Role |
+|---------|------|
+| **Revision** | Append-only journal row — audit log, replay source |
+| **Record** | Folded projection at `(record_ref, version)` — primary query surface |
+| **Reference** | `{ ref, rel? }` edge to an absolute URI (planned) |
+| **Blob** | Content-addressed attachment at `trove://blob/sha256-...` |
+
 A **revision** is an append-only journal row: a record-scoped change with an
-**operation** (`apply` or `delete`), optional **payload** and **transforms**, and
-stable **record_ref** identity. Revisions are never edited in place — each change
-appends a new row.
+**operation** (`apply` or `delete` today; `link` / `unlink` planned), optional
+**payload** and **transforms**, and stable **record_ref** identity. Revisions are
+never edited in place — each change appends a new row.
 
 A **record** is the folded projection at `(record_ref, version)` — the primary
 MCP query surface. **Completeness** (`incomplete`, `complete`, `deleted`) lives
@@ -84,7 +95,34 @@ Fields:
 | `source`     | string            | free-text origin identifier (topic, device, app)   |
 | `payload`    | JSON              | structured data; shape enforced by JTD in catalog  |
 | `transforms` | JSON array        | RFC 6902 patches applied after payload merge       |
-| `blob_ref`   | string \| null    | optional reference to an attachment (see §6)       |
+| `blob_ref`   | string \| null    | optional primary attachment (see §6); prefer `references` when planned |
+
+**Provenance** (today: `source` only; `producer` planned):
+
+| Field | Set by | Notes |
+|-------|--------|-------|
+| `source` | Caller / module | External origin (topic, device, app) — required |
+| `producer` | Host (planned) | Module identity (e.g. `module.http-ingest`); modules must not set |
+
+### References (planned)
+
+Directed edges on the record head, carried on revisions:
+
+```json
+{ "ref": "trove://record/01JREC...", "rel": "mentions" }
+{ "ref": "trove://blob/sha256-abc...", "rel": "cover" }
+{ "ref": "https://example.com/article" }
+```
+
+| URI | Meaning |
+|-----|---------|
+| `trove://record/{ulid}` | Record identity |
+| `trove://revision/{ulid}` | Audit / provenance pointer |
+| `trove://blob/sha256-...` | Attachment |
+| `https://...` etc. | External refs |
+
+Operations: `link` / `unlink` add or remove edges; `apply` may replace the full
+reference list. Full semantics: [planning/references.md](./planning/references.md).
 
 There is **no central schema registry service**. Revision `type` values are `trove://`
 URIs registered in a **local type catalog** built at startup from builtins, module
@@ -497,6 +535,10 @@ incomplete — these need a decision but aren't blocking §11's build order:
 - **Whether `summarize_range` pre-aggregates at write time or query
   time** — the AI-non-determinism concern in §7 applies here too if
   summaries get cached/stored rather than generated fresh per query.
+- **References on delete** — retain or clear `references` on record head when
+  tombstoning; see [planning/references.md](./planning/references.md).
+- **Enricher idempotency** — parallel processors on one capture need dedupe keys;
+  see [planning/references.md](./planning/references.md).
 
 **Resolved** (see [open-items.md](./open-items.md)):
 
