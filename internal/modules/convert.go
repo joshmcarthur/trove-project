@@ -54,6 +54,7 @@ func rpcRevisionToJournal(e *troverpc.Revision) (journal.Revision, error) {
 		Payload:    json.RawMessage(e.Payload),
 		BlobRef:    blobRef,
 		Transforms: json.RawMessage(e.Transforms),
+		References: json.RawMessage(e.References),
 	}, nil
 }
 
@@ -87,6 +88,7 @@ func rpcAppendRevisionRequestToJournal(req *troverpc.AppendRevisionRequest) (jou
 		Payload:    json.RawMessage(req.Payload),
 		BlobRef:    blobRef,
 		Transforms: json.RawMessage(req.Transforms),
+		References: json.RawMessage(req.References),
 	}, nil
 }
 
@@ -118,6 +120,9 @@ func journalRevisionToRPC(e journal.Revision) *troverpc.Revision {
 	}
 	if e.BlobRef != nil {
 		out.BlobRef = *e.BlobRef
+	}
+	if len(e.References) > 0 {
+		out.References = e.References
 	}
 	return out
 }

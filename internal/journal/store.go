@@ -14,7 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const revisionSelectColumns = `id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence`
+const revisionSelectColumns = `id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence, "references"`
 
 const schemaDDL = `
 CREATE TABLE IF NOT EXISTS revisions (
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS revisions (
   transforms  TEXT NOT NULL DEFAULT '[]',
   blob_ref    TEXT,
   recorded_at TEXT NOT NULL DEFAULT '',
-  sequence    INTEGER NOT NULL DEFAULT 0
+  sequence    INTEGER NOT NULL DEFAULT 0,
+  "references" TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_revisions_time ON revisions(time);
 CREATE INDEX IF NOT EXISTS idx_revisions_type ON revisions(type);
@@ -209,6 +210,9 @@ func prepareAppend(e *Revision) error {
 	} else if !json.Valid(e.Transforms) {
 		return fmt.Errorf("journal: append: transforms must be valid JSON")
 	}
+	if e.References != nil && !json.Valid(e.References) {
+		return fmt.Errorf("journal: append: references must be valid JSON")
+	}
 
 	if e.ID == "" {
 		e.ID = ulid.MustNew(ulid.Now(), rand.Reader).String()
@@ -237,8 +241,9 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 		e.Sequence = nextSeq
 	}
 	var (
-		blobRef sql.NullString
-		typ     sql.NullString
+		blobRef    sql.NullString
+		typ        sql.NullString
+		references sql.NullString
 	)
 	if e.BlobRef != nil {
 		blobRef = sql.NullString{String: *e.BlobRef, Valid: true}
@@ -246,10 +251,13 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 	if e.Type != "" {
 		typ = sql.NullString{String: e.Type, Valid: true}
 	}
+	if e.References != nil {
+		references = sql.NullString{String: string(e.References), Valid: true}
+	}
 
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence, "references")
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Operation,
@@ -263,6 +271,7 @@ func appendRevisionInTx(ctx context.Context, tx *sql.Tx, e Revision) error {
 		blobRef,
 		e.RecordedAt.UTC().Format(time.RFC3339),
 		e.Sequence,
+		references,
 	)
 	if err != nil {
 		return fmt.Errorf("journal: append: %w", err)
@@ -297,7 +306,7 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Revision, error) {
 	ftsQuery := formatFTSQuery(f.Text)
 	if ftsQuery != "" {
 		query = `
-			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.producer, e.payload, e.transforms, e.blob_ref, e.recorded_at, e.sequence
+			SELECT e.id, e.time, e.operation, e.record_ref, e.type, e.schema_ref, e.source, e.producer, e.payload, e.transforms, e.blob_ref, e.recorded_at, e.sequence, e."references"
 			FROM revisions e
 			INNER JOIN revisions_fts ON revisions_fts.revision_id = e.id`
 		predicates = append(predicates, "revisions_fts MATCH ?")
@@ -396,6 +405,7 @@ func scanRevision(row rowScanner) (Revision, error) {
 		transforms string
 		typ        sql.NullString
 		blobRef    sql.NullString
+		references sql.NullString
 	)
 
 	if err := row.Scan(
@@ -412,6 +422,7 @@ func scanRevision(row rowScanner) (Revision, error) {
 		&blobRef,
 		&recordedAt,
 		&e.Sequence,
+		&references,
 	); err != nil {
 		return Revision{}, err
 	}
@@ -436,6 +447,9 @@ func scanRevision(row rowScanner) (Revision, error) {
 	if blobRef.Valid {
 		ref := blobRef.String
 		e.BlobRef = &ref
+	}
+	if references.Valid {
+		e.References = json.RawMessage(references.String)
 	}
 
 	return e, nil

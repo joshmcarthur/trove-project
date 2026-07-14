@@ -9,6 +9,7 @@ import (
 
 	"github.com/joshmcarthur/trove/internal/journal"
 	"github.com/joshmcarthur/trove/internal/records"
+	"github.com/joshmcarthur/trove/internal/references"
 	_ "modernc.org/sqlite"
 )
 
@@ -26,7 +27,8 @@ CREATE TABLE revisions (
   transforms  TEXT,
   blob_ref    TEXT,
   recorded_at TEXT NOT NULL DEFAULT '',
-  sequence    INTEGER NOT NULL DEFAULT 0
+  sequence    INTEGER NOT NULL DEFAULT 0,
+  "references" TEXT
 );
 CREATE INDEX idx_revisions_record_sequence ON revisions(record_ref, sequence);
 `
@@ -71,10 +73,14 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 	if e.BlobRef != nil {
 		blobRef = sql.NullString{String: *e.BlobRef, Valid: true}
 	}
+	var refs sql.NullString
+	if e.References != nil {
+		refs = sql.NullString{String: string(e.References), Valid: true}
+	}
 
 	_, err := db.Exec(`
-		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, producer, payload, transforms, blob_ref, recorded_at, sequence, "references")
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Operation,
@@ -88,6 +94,7 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 		blobRef,
 		e.RecordedAt.UTC().Format(time.RFC3339),
 		e.Sequence,
+		refs,
 	)
 	if err != nil {
 		t.Fatalf("insert event %q: %v", e.ID, err)
@@ -130,9 +137,10 @@ func loadHead(t *testing.T, db *sql.DB, recordRef string) records.Head {
 		body       string
 		updatedAt  string
 		contentRef sql.NullString
+		refsJSON   string
 	)
 	err := db.QueryRow(`
-		SELECT record_ref, version, completeness, type, source, body, content_ref, updated_at
+		SELECT record_ref, version, completeness, type, source, body, content_ref, "references", updated_at
 		FROM record_heads
 		WHERE record_ref = ?`, recordRef).Scan(
 		&head.RecordRef,
@@ -142,6 +150,7 @@ func loadHead(t *testing.T, db *sql.DB, recordRef string) records.Head {
 		&head.Source,
 		&body,
 		&contentRef,
+		&refsJSON,
 		&updatedAt,
 	)
 	if err != nil {
@@ -152,6 +161,11 @@ func loadHead(t *testing.T, db *sql.DB, recordRef string) records.Head {
 		ref := contentRef.String
 		head.ContentRef = &ref
 	}
+	refs, err := references.Unmarshal(json.RawMessage(refsJSON))
+	if err != nil {
+		t.Fatalf("parse references: %v", err)
+	}
+	head.References = refs
 	head.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 	if err != nil {
 		t.Fatalf("parse updated_at: %v", err)
@@ -499,5 +513,120 @@ func TestMaterializerReplayBySequenceNotTime(t *testing.T) {
 	got := loadHead(t, db, ref)
 	if string(got.Body) != string(want.Body) {
 		t.Fatalf("rebuilt body = %s, want %s (sequence order, not event time)", got.Body, want.Body)
+	}
+}
+
+func TestMaterializerApplyReferencesReplaceAndClear(t *testing.T) {
+	t.Parallel()
+
+	db := openTestDB(t)
+	ref := "01JREC00000000000000000008"
+	when := time.Date(2026, 7, 14, 15, 0, 0, 0, time.UTC)
+
+	create := journal.Revision{
+		ID:         "01JEVT00000000000000000040",
+		Time:       when,
+		Operation:  journal.OpApply,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{"text":"hello"}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/a"}]`),
+	}
+	insertEvent(t, db, create)
+	applyEvent(t, db, create)
+
+	head := loadHead(t, db, ref)
+	if len(head.References) != 1 || head.References[0].Ref != "https://example.com/a" {
+		t.Fatalf("initial references = %+v", head.References)
+	}
+
+	replace := journal.Revision{
+		ID:         "01JEVT00000000000000000041",
+		Time:       when.Add(time.Minute),
+		Operation:  journal.OpApply,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/b","rel":"source"}]`),
+	}
+	insertEvent(t, db, replace)
+	applyEvent(t, db, replace)
+
+	head = loadHead(t, db, ref)
+	if len(head.References) != 1 || head.References[0].Ref != "https://example.com/b" {
+		t.Fatalf("replaced references = %+v", head.References)
+	}
+
+	unchanged := journal.Revision{
+		ID:        "01JEVT00000000000000000042",
+		Time:      when.Add(2 * time.Minute),
+		Operation: journal.OpApply,
+		RecordRef: ref,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"text":"more"}`),
+	}
+	insertEvent(t, db, unchanged)
+	applyEvent(t, db, unchanged)
+
+	head = loadHead(t, db, ref)
+	if len(head.References) != 1 || head.References[0].Ref != "https://example.com/b" {
+		t.Fatalf("unchanged references = %+v", head.References)
+	}
+
+	clear := journal.Revision{
+		ID:         "01JEVT00000000000000000043",
+		Time:       when.Add(3 * time.Minute),
+		Operation:  journal.OpApply,
+		RecordRef:  ref,
+		Source:     "test",
+		Payload:    json.RawMessage(`{}`),
+		References: json.RawMessage(`[]`),
+	}
+	insertEvent(t, db, clear)
+	applyEvent(t, db, clear)
+
+	head = loadHead(t, db, ref)
+	if len(head.References) != 0 {
+		t.Fatalf("cleared references = %+v, want empty", head.References)
+	}
+}
+
+func TestMaterializerDeleteRetainsReferences(t *testing.T) {
+	t.Parallel()
+
+	db := openTestDB(t)
+	ref := "01JREC00000000000000000009"
+	when := time.Date(2026, 7, 14, 16, 0, 0, 0, time.UTC)
+
+	create := journal.Revision{
+		ID:         "01JEVT00000000000000000044",
+		Time:       when,
+		Operation:  journal.OpApply,
+		RecordRef:  ref,
+		Type:       "trove://type/note/quick/1",
+		Source:     "test",
+		Payload:    json.RawMessage(`{"text":"keep"}`),
+		References: json.RawMessage(`[{"ref":"https://example.com/x"}]`),
+	}
+	insertEvent(t, db, create)
+	applyEvent(t, db, create)
+
+	del := journal.Revision{
+		ID:        "01JEVT00000000000000000045",
+		Time:      when.Add(time.Minute),
+		Operation: journal.OpDelete,
+		RecordRef: ref,
+		Source:    "test",
+		Payload:   json.RawMessage(`{}`),
+	}
+	insertEvent(t, db, del)
+	applyEvent(t, db, del)
+
+	head := loadHead(t, db, ref)
+	if head.Completeness != records.CompletenessDeleted {
+		t.Fatalf("completeness = %q", head.Completeness)
+	}
+	if len(head.References) != 1 || head.References[0].Ref != "https://example.com/x" {
+		t.Fatalf("references = %+v, want retained", head.References)
 	}
 }

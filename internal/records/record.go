@@ -3,6 +3,8 @@ package records
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/joshmcarthur/trove/internal/references"
 )
 
 // Completeness values for record_heads.
@@ -21,5 +23,6 @@ type Head struct {
 	Source       string
 	Body         json.RawMessage
 	ContentRef   *string
+	References   []references.Reference
 	UpdatedAt    time.Time
 }

@@ -19,7 +19,10 @@ func migrateSchema(db *sql.DB) error {
 	if err := migrateReplayOrdering(db); err != nil {
 		return err
 	}
-	return migrateProducer(db)
+	if err := migrateProducer(db); err != nil {
+		return err
+	}
+	return migrateReferences(db)
 }
 
 // migratePreRecordsShape wipes pre-records databases without an operation column.
@@ -274,6 +277,42 @@ func migrateProducer(db *sql.DB) error {
 	}
 	if _, err := tx.Exec(`UPDATE revisions SET producer = 'unknown' WHERE producer = '' OR producer IS NULL`); err != nil {
 		return fmt.Errorf("journal: migrate producer: backfill: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+// migrateReferences adds references columns on revisions and record_heads.
+func migrateReferences(db *sql.DB) error {
+	if !tableExists(db, "revisions") {
+		return nil
+	}
+
+	hasReferences, err := tableHasColumn(db, "revisions", "references")
+	if err != nil {
+		return err
+	}
+	if hasReferences {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("journal: migrate references: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`ALTER TABLE revisions ADD COLUMN "references" TEXT`); err != nil {
+		return fmt.Errorf("journal: migrate references: add revisions column: %w", err)
+	}
+
+	if tableExistsTx(tx, "record_heads") {
+		if _, err := tx.Exec(`ALTER TABLE record_heads ADD COLUMN "references" TEXT NOT NULL DEFAULT '[]'`); err != nil {
+			return fmt.Errorf("journal: migrate references: add record_heads column: %w", err)
+		}
+		if _, err := tx.Exec(`UPDATE record_heads SET "references" = '[]' WHERE "references" IS NULL OR "references" = ''`); err != nil {
+			return fmt.Errorf("journal: migrate references: backfill record_heads: %w", err)
+		}
 	}
 
 	return tx.Commit()
