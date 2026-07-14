@@ -23,8 +23,11 @@ CREATE TABLE revisions (
   source      TEXT NOT NULL,
   payload     TEXT NOT NULL,
   transforms  TEXT,
-  blob_ref    TEXT
+  blob_ref    TEXT,
+  recorded_at TEXT NOT NULL DEFAULT '',
+  sequence    INTEGER NOT NULL DEFAULT 0
 );
+CREATE INDEX idx_revisions_record_sequence ON revisions(record_ref, sequence);
 `
 
 func openTestDB(t *testing.T) *sql.DB {
@@ -48,6 +51,17 @@ func openTestDB(t *testing.T) *sql.DB {
 func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 	t.Helper()
 
+	if e.Sequence <= 0 {
+		var nextSeq int
+		if err := db.QueryRow(`SELECT COALESCE(MAX(sequence), 0) + 1 FROM revisions WHERE record_ref = ?`, e.RecordRef).Scan(&nextSeq); err != nil {
+			t.Fatalf("assign sequence for %q: %v", e.RecordRef, err)
+		}
+		e.Sequence = nextSeq
+	}
+	if e.RecordedAt.IsZero() {
+		e.RecordedAt = e.Time
+	}
+
 	var transforms sql.NullString
 	if len(e.Transforms) > 0 {
 		transforms = sql.NullString{String: string(e.Transforms), Valid: true}
@@ -58,8 +72,8 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 	}
 
 	_, err := db.Exec(`
-		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID,
 		e.Time.UTC().Format(time.RFC3339),
 		e.Operation,
@@ -70,6 +84,8 @@ func insertEvent(t *testing.T, db *sql.DB, e journal.Revision) {
 		string(e.Payload),
 		transforms,
 		blobRef,
+		e.RecordedAt.UTC().Format(time.RFC3339),
+		e.Sequence,
 	)
 	if err != nil {
 		t.Fatalf("insert event %q: %v", e.ID, err)
@@ -417,5 +433,62 @@ func TestRebuildAllReplaysEvents(t *testing.T) {
 	}
 	if eventLinks != 3 {
 		t.Fatalf("record_revisions = %d, want 3", eventLinks)
+	}
+}
+
+func TestMaterializerReplayBySequenceNotTime(t *testing.T) {
+	t.Parallel()
+
+	db := openTestDB(t)
+	ref := "01JREC00000000000000000007"
+	later := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	earlier := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+
+	first := journal.Revision{
+		ID:        "01JEVT00000000000000000020",
+		Time:      later,
+		Sequence:  1,
+		Operation: journal.OpApply,
+		RecordRef: ref,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"text":"first-by-sequence"}`),
+	}
+	second := journal.Revision{
+		ID:        "01JEVT00000000000000000021",
+		Time:      earlier,
+		Sequence:  2,
+		Operation: journal.OpApply,
+		RecordRef: ref,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"text":"second-by-sequence"}`),
+	}
+
+	insertEvent(t, db, first)
+	insertEvent(t, db, second)
+	applyEvent(t, db, first)
+	applyEvent(t, db, second)
+
+	want := loadHead(t, db, ref)
+	if string(want.Body) != `{"text":"second-by-sequence"}` {
+		t.Fatalf("incremental body = %s, want replay by sequence", want.Body)
+	}
+
+	if _, err := db.Exec(`DELETE FROM records_fts`); err != nil {
+		t.Fatalf("clear fts: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM record_revisions`); err != nil {
+		t.Fatalf("clear record_revisions: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM record_heads`); err != nil {
+		t.Fatalf("clear record_heads: %v", err)
+	}
+
+	if err := records.RebuildAll(context.Background(), db); err != nil {
+		t.Fatalf("RebuildAll() error = %v", err)
+	}
+
+	got := loadHead(t, db, ref)
+	if string(got.Body) != string(want.Body) {
+		t.Fatalf("rebuilt body = %s, want %s (sequence order, not event time)", got.Body, want.Body)
 	}
 }

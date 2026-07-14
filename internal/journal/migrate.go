@@ -3,6 +3,9 @@ package journal
 import (
 	"database/sql"
 	"fmt"
+	"time"
+
+	"github.com/oklog/ulid"
 )
 
 // migrateSchema upgrades legacy journal databases.
@@ -10,7 +13,10 @@ func migrateSchema(db *sql.DB) error {
 	if err := migratePreRecordsShape(db); err != nil {
 		return err
 	}
-	return migrateEventsToRevisions(db)
+	if err := migrateEventsToRevisions(db); err != nil {
+		return err
+	}
+	return migrateReplayOrdering(db)
 }
 
 // migratePreRecordsShape wipes pre-records databases without an operation column.
@@ -151,4 +157,91 @@ func tableHasColumn(db *sql.DB, table, column string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// migrateReplayOrdering adds recorded_at and sequence columns and backfills existing rows.
+func migrateReplayOrdering(db *sql.DB) error {
+	if !tableExists(db, "revisions") {
+		return nil
+	}
+
+	hasSequence, err := tableHasColumn(db, "revisions", "sequence")
+	if err != nil {
+		return err
+	}
+	if hasSequence {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("journal: migrate replay ordering: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmts := []string{
+		`ALTER TABLE revisions ADD COLUMN recorded_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE revisions ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_record_sequence ON revisions(record_ref, sequence)`,
+	}
+	for _, stmt := range stmts {
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("journal: migrate replay ordering: %s: %w", stmt, err)
+		}
+	}
+
+	rows, err := tx.Query(`
+		SELECT id, time, record_ref
+		FROM revisions
+		ORDER BY record_ref ASC, time ASC, id ASC`)
+	if err != nil {
+		return fmt.Errorf("journal: migrate replay ordering: list revisions: %w", err)
+	}
+	defer rows.Close()
+
+	type row struct {
+		id        string
+		timeStr   string
+		recordRef string
+	}
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.timeStr, &r.recordRef); err != nil {
+			return fmt.Errorf("journal: migrate replay ordering: scan: %w", err)
+		}
+		all = append(all, r)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("journal: migrate replay ordering: list revisions: %w", err)
+	}
+
+	seqByRecord := make(map[string]int)
+	for _, r := range all {
+		seqByRecord[r.recordRef]++
+		seq := seqByRecord[r.recordRef]
+
+		eventTime, err := time.Parse(time.RFC3339, r.timeStr)
+		if err != nil {
+			return fmt.Errorf("journal: migrate replay ordering: parse time %q: %w", r.timeStr, err)
+		}
+		recordedAt := recordedAtFromID(r.id, eventTime)
+
+		if _, err := tx.Exec(`
+			UPDATE revisions
+			SET sequence = ?, recorded_at = ?
+			WHERE id = ?`, seq, recordedAt.UTC().Format(time.RFC3339), r.id); err != nil {
+			return fmt.Errorf("journal: migrate replay ordering: update %q: %w", r.id, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func recordedAtFromID(id string, fallback time.Time) time.Time {
+	parsed, err := ulid.Parse(id)
+	if err != nil {
+		return fallback.UTC()
+	}
+	return ulid.Time(parsed.Time()).UTC()
 }

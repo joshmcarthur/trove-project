@@ -839,3 +839,125 @@ func TestWatch(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 }
+
+func TestAppendAssignsSequenceAndRecordedAt(t *testing.T) {
+	t.Parallel()
+
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	recordRef := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	firstID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	secondID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	before := time.Now().UTC()
+	if err := store.Append(ctx, Revision{
+		ID:        firstID,
+		RecordRef: recordRef,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"n":1}`),
+	}); err != nil {
+		t.Fatalf("first Append() error = %v", err)
+	}
+	if err := store.Append(ctx, Revision{
+		ID:        secondID,
+		RecordRef: recordRef,
+		Source:    "test",
+		Payload:   json.RawMessage(`{"n":2}`),
+	}); err != nil {
+		t.Fatalf("second Append() error = %v", err)
+	}
+
+	first, err := store.Get(ctx, firstID)
+	if err != nil {
+		t.Fatalf("Get(first) error = %v", err)
+	}
+	second, err := store.Get(ctx, secondID)
+	if err != nil {
+		t.Fatalf("Get(second) error = %v", err)
+	}
+
+	if first.Sequence != 1 {
+		t.Fatalf("first.Sequence = %d, want 1", first.Sequence)
+	}
+	if second.Sequence != 2 {
+		t.Fatalf("second.Sequence = %d, want 2", second.Sequence)
+	}
+	if first.RecordedAt.Before(before.Add(-time.Second)) {
+		t.Fatalf("first.RecordedAt = %v, want near now", first.RecordedAt)
+	}
+	if second.RecordedAt.Before(first.RecordedAt) {
+		t.Fatalf("second.RecordedAt = %v before first.RecordedAt = %v", second.RecordedAt, first.RecordedAt)
+	}
+}
+
+func TestMigrateReplayOrderingBackfills(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pre-sequence.db")
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+
+	if _, err := db.Exec(`
+CREATE TABLE revisions (
+  id         TEXT PRIMARY KEY,
+  time       TEXT NOT NULL,
+  operation  TEXT NOT NULL,
+  record_ref TEXT NOT NULL,
+  type       TEXT,
+  schema_ref TEXT NOT NULL,
+  source     TEXT NOT NULL,
+  payload    TEXT NOT NULL,
+  transforms TEXT NOT NULL DEFAULT '[]',
+  blob_ref   TEXT
+);`); err != nil {
+		t.Fatalf("create pre-migration schema: %v", err)
+	}
+
+	ref := "01JREC00000000000000000099"
+	when := time.Date(2026, 7, 14, 9, 0, 0, 0, time.UTC)
+	rows := []struct {
+		id   string
+		time time.Time
+	}{
+		{"01JEVT00000000000000000030", when},
+		{"01JEVT00000000000000000031", when.Add(time.Minute)},
+	}
+	for _, row := range rows {
+		_, err := db.Exec(`
+			INSERT INTO revisions (id, time, operation, record_ref, type, schema_ref, source, payload, transforms)
+			VALUES (?, ?, 'apply', ?, '', '', 'test', '{}', '[]')`,
+			row.id, row.time.UTC().Format(time.RFC3339), ref,
+		)
+		if err != nil {
+			t.Fatalf("seed revision %q: %v", row.id, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close seeded db: %v", err)
+	}
+
+	store, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	for i, id := range []string{rows[0].id, rows[1].id} {
+		got, err := store.Get(context.Background(), id)
+		if err != nil {
+			t.Fatalf("Get(%q) error = %v", id, err)
+		}
+		wantSeq := i + 1
+		if got.Sequence != wantSeq {
+			t.Fatalf("revision %q sequence = %d, want %d", id, got.Sequence, wantSeq)
+		}
+		if got.RecordedAt.IsZero() {
+			t.Fatalf("revision %q recorded_at is zero", id)
+		}
+	}
+}

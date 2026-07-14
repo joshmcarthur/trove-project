@@ -22,6 +22,8 @@ var ErrConflictingFilter = errors.New("journal: type and type_prefix are mutuall
 type Revision struct {
 	ID         string
 	Time       time.Time
+	RecordedAt time.Time // host commit time; distinct from source event time
+	Sequence   int       // monotonic per record_ref for deterministic replay
 	Operation  string
 	RecordRef  string
 	Type       string // optional; empty means unset

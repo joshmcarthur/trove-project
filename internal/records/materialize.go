@@ -263,10 +263,10 @@ func (m *Materializer) syncFTS(ctx context.Context, head Head) error {
 
 func listRecordRevisions(ctx context.Context, q queryer) ([]journal.Revision, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref
+		SELECT id, time, operation, record_ref, type, schema_ref, source, payload, transforms, blob_ref, recorded_at, sequence
 		FROM revisions
 		WHERE operation IN (?, ?)
-		ORDER BY time ASC`,
+		ORDER BY record_ref ASC, sequence ASC`,
 		journal.OpApply,
 		journal.OpDelete,
 	)
@@ -334,6 +334,7 @@ func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 	var (
 		e          journal.Revision
 		timeStr    string
+		recordedAt string
 		operation  string
 		payload    string
 		transforms sql.NullString
@@ -350,6 +351,8 @@ func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 		&payload,
 		&transforms,
 		&blobRef,
+		&recordedAt,
+		&e.Sequence,
 	); err != nil {
 		return journal.Revision{}, err
 	}
@@ -358,6 +361,12 @@ func scanRecordEvent(row rowScanner) (journal.Revision, error) {
 	e.Time, err = time.Parse(time.RFC3339, timeStr)
 	if err != nil {
 		return journal.Revision{}, fmt.Errorf("parse time %q: %w", timeStr, err)
+	}
+	if recordedAt != "" {
+		e.RecordedAt, err = time.Parse(time.RFC3339, recordedAt)
+		if err != nil {
+			return journal.Revision{}, fmt.Errorf("parse recorded_at %q: %w", recordedAt, err)
+		}
 	}
 	e.Operation = operation
 	e.Payload = json.RawMessage(payload)
