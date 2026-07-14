@@ -11,6 +11,45 @@
 * HTTP ingest endpoint is `POST /records`; response field is `revision_id` (was `event_id`).
 * Legacy databases with `events` tables migrate to `revisions` on `journal.Open`.
 
+## [2.0.0](https://github.com/joshmcarthur/trove-project/compare/v1.0.1...v2.0.0) (2026-07-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* revision rename ([#116](https://github.com/joshmcarthur/trove-project/issues/116))
+* rename journal Event to Revision (code) ([#118](https://github.com/joshmcarthur/trove-project/issues/118))
+* drop consumes_operations manifest routing ([#115](https://github.com/joshmcarthur/trove-project/issues/115))
+* update spec and supersede deferred-capture ([#112](https://github.com/joshmcarthur/trove-project/issues/112))
+* migrate telegram-source and remove capture-classifier ([#110](https://github.com/joshmcarthur/trove-project/issues/110))
+* migrate mqtt-source to RecordWrite ([#105](https://github.com/joshmcarthur/trove-project/issues/105))
+* replace HTTP ingest with POST /records ([#106](https://github.com/joshmcarthur/trove-project/issues/106))
+* add record query RPC and MCP tools ([#108](https://github.com/joshmcarthur/trove-project/issues/108))
+* add EmitRecord RPC and remove Emit ([#107](https://github.com/joshmcarthur/trove-project/issues/107))
+* reshape journal event schema for apply/delete ([#103](https://github.com/joshmcarthur/trove-project/issues/103))
+
+### Features
+
+* add EmitRecord RPC and remove Emit ([#107](https://github.com/joshmcarthur/trove-project/issues/107)) ([2b15c1b](https://github.com/joshmcarthur/trove-project/commit/2b15c1b2e4d447f5d0f6bf038823aa006e7871ad))
+* add record fold primitives ([#104](https://github.com/joshmcarthur/trove-project/issues/104)) ([38dd299](https://github.com/joshmcarthur/trove-project/commit/38dd299ef288d13e19a47f40cc485d65469da034))
+* add record query RPC and MCP tools ([#108](https://github.com/joshmcarthur/trove-project/issues/108)) ([22563c2](https://github.com/joshmcarthur/trove-project/commit/22563c243e84f9d883a973b6836d5b901805cf3a))
+* add trove init CLI subcommand ([#98](https://github.com/joshmcarthur/trove-project/issues/98)) ([e4f9f0b](https://github.com/joshmcarthur/trove-project/commit/e4f9f0ba572967a7e63e73a33bcbb5f674620a98))
+* migrate mqtt-source to RecordWrite ([#105](https://github.com/joshmcarthur/trove-project/issues/105)) ([deef397](https://github.com/joshmcarthur/trove-project/commit/deef397b967f49cc014df30faf3be84bafafa70b))
+* migrate telegram-source and remove capture-classifier ([#110](https://github.com/joshmcarthur/trove-project/issues/110)) ([10c1f2e](https://github.com/joshmcarthur/trove-project/commit/10c1f2e11271d5fed7834072c068ce9f9914bd9f))
+* rename journal Event to Revision (code) ([#118](https://github.com/joshmcarthur/trove-project/issues/118)) ([2355627](https://github.com/joshmcarthur/trove-project/commit/2355627ca1358174a52e85d08fe14abb8917f1e6))
+* replace HTTP ingest with POST /records ([#106](https://github.com/joshmcarthur/trove-project/issues/106)) ([417da45](https://github.com/joshmcarthur/trove-project/commit/417da456f27c6b5985de015aa1921b3b5f63c0df))
+* reshape journal event schema for apply/delete ([#103](https://github.com/joshmcarthur/trove-project/issues/103)) ([ebe8229](https://github.com/joshmcarthur/trove-project/commit/ebe822950dcc38e44e0d178f02663421e43548a1))
+
+
+### Documentation
+
+* revision rename ([#116](https://github.com/joshmcarthur/trove-project/issues/116)) ([65332ed](https://github.com/joshmcarthur/trove-project/commit/65332ed1cbe7e92fda076a029acb8eed64caf76b))
+* update spec and supersede deferred-capture ([#112](https://github.com/joshmcarthur/trove-project/issues/112)) ([0e7fe7d](https://github.com/joshmcarthur/trove-project/commit/0e7fe7d09deceea50b2a7933b1c00bff58e339b5))
+
+
+### Refactors
+
+* drop consumes_operations manifest routing ([#115](https://github.com/joshmcarthur/trove-project/issues/115)) ([3b8cdfa](https://github.com/joshmcarthur/trove-project/commit/3b8cdfad681a89e0a28554596e3cc4dfcc46c216))
+
 ## [1.0.1](https://github.com/joshmcarthur/trove-project/compare/v1.0.0...v1.0.1) (2026-07-12)
 
 
