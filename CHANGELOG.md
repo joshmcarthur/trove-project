@@ -11,6 +11,14 @@
 * HTTP ingest endpoint is `POST /records`; response field is `revision_id` (was `event_id`).
 * Legacy databases with `events` tables migrate to `revisions` on `journal.Open`.
 
+## [2.1.0](https://github.com/joshmcarthur/trove-project/compare/v2.0.0...v2.1.0) (2026-07-14)
+
+
+### Features
+
+* add recorded_at and per-record sequence ([#119](https://github.com/joshmcarthur/trove-project/issues/119)) ([c865284](https://github.com/joshmcarthur/trove-project/commit/c8652841ad568a7ad3a229f5f6f63f01397b1b0f))
+* stamp producer on revisions ([#120](https://github.com/joshmcarthur/trove-project/issues/120)) ([97c6d8a](https://github.com/joshmcarthur/trove-project/commit/97c6d8a799237ea4789f4d39392624f1af28e4ba))
+
 ## [2.0.0](https://github.com/joshmcarthur/trove-project/compare/v1.0.1...v2.0.0) (2026-07-14)
 
 
