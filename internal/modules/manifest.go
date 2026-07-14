@@ -69,18 +69,17 @@ type ManifestTypeDecl struct {
 
 // Manifest describes a Trove module from manifest.toml.
 type Manifest struct {
-	Name               string             `toml:"name"`
-	Version            string             `toml:"version"`
-	Kind               Kind               `toml:"kind"`
-	Provides           []string           `toml:"provides"`
-	Consumes           []string           `toml:"consumes"`
-	ConsumesOperations []string           `toml:"consumes_operations"`
-	Types              []ManifestTypeDecl `toml:"types"`
-	HTTP               manifestHTTP       `toml:"http"`
-	MCP                manifestMCP        `toml:"mcp"`
-	CLI                manifestCLI        `toml:"cli"`
-	Auth               manifestAuth       `toml:"auth"`
-	Listen             string             `toml:"listen"`
+	Name     string             `toml:"name"`
+	Version  string             `toml:"version"`
+	Kind     Kind               `toml:"kind"`
+	Provides []string           `toml:"provides"`
+	Consumes []string           `toml:"consumes"`
+	Types    []ManifestTypeDecl `toml:"types"`
+	HTTP     manifestHTTP       `toml:"http"`
+	MCP      manifestMCP        `toml:"mcp"`
+	CLI      manifestCLI        `toml:"cli"`
+	Auth     manifestAuth       `toml:"auth"`
+	Listen   string             `toml:"listen"`
 }
 
 // EventRoutes reports whether the module participates in journal event routing.

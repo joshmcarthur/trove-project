@@ -137,9 +137,6 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 	}
 
 	for _, binding := range r.registry.processorsSnapshot() {
-		if !matchOperation(binding.consumesOperations, event.Operation) {
-			continue
-		}
 		if !MatchType(binding.consumes, event.Type) {
 			continue
 		}
@@ -171,9 +168,6 @@ func (r *Router) dispatch(ctx context.Context, routeStore routingJournal, event 
 	}
 
 	for _, binding := range r.registry.sinksSnapshot() {
-		if !matchOperation(binding.consumesOperations, event.Operation) {
-			continue
-		}
 		if !MatchType(binding.consumes, event.Type) {
 			continue
 		}

@@ -28,18 +28,16 @@ type EventRegistry struct {
 }
 
 type eventProcessorBinding struct {
-	name               string
-	consumes           []string
-	consumesOperations []string
-	policy             EmitPolicy
-	client             EventProcessorClient
+	name     string
+	consumes []string
+	policy   EmitPolicy
+	client   EventProcessorClient
 }
 
 type eventSinkBinding struct {
-	name               string
-	consumes           []string
-	consumesOperations []string
-	client             EventSinkClient
+	name     string
+	consumes []string
+	client   EventSinkClient
 }
 
 // NewEventRegistry returns an empty event module registry.
@@ -51,35 +49,26 @@ func NewEventRegistry() *EventRegistry {
 }
 
 // RegisterProcessor adds a processor module to the registry.
-func (r *EventRegistry) RegisterProcessor(name string, consumes, consumesOperations []string, policy EmitPolicy, client EventProcessorClient) {
+func (r *EventRegistry) RegisterProcessor(name string, consumes []string, policy EmitPolicy, client EventProcessorClient) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.processors[name] = eventProcessorBinding{
-		name:               name,
-		consumes:           append([]string(nil), consumes...),
-		consumesOperations: defaultConsumesOperations(consumesOperations),
-		policy:             policy,
-		client:             client,
+		name:     name,
+		consumes: append([]string(nil), consumes...),
+		policy:   policy,
+		client:   client,
 	}
 }
 
 // RegisterSink adds a sink module to the registry.
-func (r *EventRegistry) RegisterSink(name string, consumes, consumesOperations []string, client EventSinkClient) {
+func (r *EventRegistry) RegisterSink(name string, consumes []string, client EventSinkClient) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.sinks[name] = eventSinkBinding{
-		name:               name,
-		consumes:           append([]string(nil), consumes...),
-		consumesOperations: defaultConsumesOperations(consumesOperations),
-		client:             client,
+		name:     name,
+		consumes: append([]string(nil), consumes...),
+		client:   client,
 	}
-}
-
-func defaultConsumesOperations(ops []string) []string {
-	if len(ops) == 0 {
-		return []string{journal.OpApply}
-	}
-	return append([]string(nil), ops...)
 }
 
 // UnregisterProcessor removes a processor module from the registry.
