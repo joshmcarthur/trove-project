@@ -17,7 +17,7 @@ to retrieve.
 | Topic | Doc |
 |-------|-----|
 | Full specification | [docs/spec.md](docs/spec.md) |
-| Events & types | [docs/concepts/events.md](docs/concepts/events.md) |
+| Revisions & types | [docs/concepts/revisions.md](docs/concepts/revisions.md) |
 | Journal (SQLite) | [docs/concepts/journal.md](docs/concepts/journal.md) |
 | Blob storage | [docs/concepts/blobs.md](docs/concepts/blobs.md) |
 | Sources | [docs/concepts/sources.md](docs/concepts/sources.md) |
@@ -107,8 +107,8 @@ Non-obvious caveats:
   loop (`telegram bot not running`) unless a bot token is configured — this is
   expected noise, not a failure. `mqtt-source` similarly needs a reachable
   broker. The HTTP gateway, ingest, and MCP query paths work without any of that.
-- Smoke test the core loop: `POST /ingest/:source` (returns `204`) then query
-  `POST /mcp` (Streamable HTTP JSON-RPC) with the `search_events` tool.
+- Smoke test the core loop: `POST /records` (returns `201` with `revision_id`) then query
+  `POST /mcp` (Streamable HTTP JSON-RPC) with the `search_records` tool.
 - `make test` runs `go test -race ./...`. `TestRouterCatchesUpViaPollAfterPubSubDrop`
   in `internal/modules` can flake with SQLite `SQLITE_BUSY` under full parallel
   race load; it passes reliably when run alone (`go test -race -run <name>

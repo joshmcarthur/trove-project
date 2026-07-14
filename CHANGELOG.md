@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### BREAKING CHANGES
+
+* Rename journal **Event** to **Revision** across SQLite (`revisions` table), RPC
+  (`AppendRevision`), and module SDK (`RevisionAppender` / `RevisionQuerier`).
+* MCP is **records-only**: `get_record`, `search_records`, `list_incomplete_records`.
+  Removed `get_event`, `search_events`, `get_events_by_type`, and `summarize_range`.
+* HTTP ingest endpoint is `POST /records`; response field is `revision_id` (was `event_id`).
+* Legacy databases with `events` tables migrate to `revisions` on `journal.Open`.
+
 ## [1.0.1](https://github.com/joshmcarthur/trove-project/compare/v1.0.0...v1.0.1) (2026-07-12)
 
 

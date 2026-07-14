@@ -7,27 +7,37 @@ nav_order: 7
 # Query interface
 
 The primary way to interact with Trove is conversational, via an MCP server. All
-real logic lives in an internal RPC API; MCP tools are a thin wrapper.
+real logic lives in an internal RPC API; MCP tools are a thin wrapper over **record**
+projections.
 
 See [spec §9](../spec.md#9-query-interface-mcp-over-rpc).
 
-## Internal RPC
+## Internal RPC (records)
 
 ```
-search_events(query, type_prefix?, source?, time_range?) -> []Event
-get_events_by_type(type, time_range) -> []Event
-get_event(id) -> Event
-summarize_range(time_range) -> Summary
+get_record(record_ref, version?) -> Record
+search_records(query, type_prefix?, source?, time_range?, include_deleted?) -> []Record
+list_incomplete_records(source?, limit?) -> []Record
 ```
+
+Revision audit reads (`GetRevision`, `SearchRevisions`, `SummarizeRange`) are
+available on module `Core` and host RPC — not exposed as MCP tools.
 
 ## MCP tools
 
-Map 1:1 onto the RPC methods — narrow and typed, not raw SQL access.
-`summarize_range` exists so "how was my week" does not dump thousands of rows
-into context.
+Three built-in tools map onto the record RPC methods — narrow and typed, not raw
+SQL access:
 
-`search_events` will use FTS5 initially; semantic search via `sqlite-vec` when
+| Tool | Purpose |
+|------|---------|
+| `get_record` | Folded record by `record_ref` (optional `version`) |
+| `search_records` | FTS5 keyword search over record bodies |
+| `list_incomplete_records` | Records with `completeness = incomplete` |
+
+`search_records` uses FTS5 initially; semantic search via `sqlite-vec` when
 embeddings land.
+
+Additional tools from loaded modules (e.g. classify) are aggregated at runtime.
 
 ## Implementation
 

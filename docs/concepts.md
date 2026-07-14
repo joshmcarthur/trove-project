@@ -5,40 +5,47 @@ nav_order: 3
 
 # Core Concepts
 
-Trove is built around a few ideas that work together: immutable events in an
-append-only journal, optional blob attachments, dynamically loaded source
-modules, and conversational retrieval via MCP.
+Trove is built around a few ideas that work together: immutable revisions in an
+append-only journal, folded **records** for query, optional blob attachments,
+dynamically loaded source modules, and conversational retrieval via MCP.
 
-## Events
+## Revisions
 
-The fundamental unit of data — an immutable fact with a ULID, timestamp, typed
-namespace, source identifier, and JSON payload. Types are `trove://` URIs
-registered in the local type catalog; payloads are validated against JTD contracts.
+The fundamental journal unit — an append-only row with ULID, timestamp, operation,
+`record_ref`, typed namespace, source identifier, and JSON payload. Types are
+`trove://` URIs registered in the local type catalog; payloads are validated against
+JTD contracts.
 
-[Events](./concepts/events.md)
+[Revisions](./concepts/revisions.md)
+
+## Records
+
+Folded projections at `(record_ref, version)` — the primary MCP search surface.
+
+[Records](./concepts/records.md)
 
 ## Type catalog
 
-Local registry of event payload contracts — `trove://` URIs, TTD files, and
-`schema_ref` on validated journal events.
+Local registry of payload contracts — `trove://` URIs, TTD files, and
+`schema_ref` on validated journal revisions.
 
 [Type catalog](./concepts/type-catalog.md)
 
 ## Journal
 
-Append-only SQLite store. Single source of truth for all captured events.
+Append-only SQLite store. Single source of truth for all captured revisions.
 
 [Journal](./concepts/journal.md)
 
 ## Blobs
 
-Content-addressed storage for large attachments, referenced from events by hash.
+Content-addressed storage for large attachments, referenced from revisions by hash.
 
 [Blobs](./concepts/blobs.md)
 
 ## Sources
 
-Modules that emit events — HTTP ingest, MQTT, Home Assistant, and others.
+Modules that append revisions — HTTP ingest, MQTT, Telegram, and others.
 
 [Sources](./concepts/sources.md)
 
@@ -51,13 +58,13 @@ remote edge devices.
 
 ## Query
 
-Internal RPC API and MCP tools for conversational retrieval.
+Internal RPC API and MCP tools for conversational retrieval over records.
 
 [Query](./concepts/query.md)
 
 ## Processors and sinks
 
-Derived events and side-effect handlers — deliberately minimal in v0.
+Derived revisions and side-effect handlers — deliberately minimal in v0.
 
 [Processors and sinks](./concepts/processors-and-sinks.md)
 
@@ -73,28 +80,31 @@ flowchart TB
 
   subgraph core [Trove core]
     journal[(SQLite journal)]
+    records[(Record projection)]
     blobs[(Blob store)]
     catalog[Type catalog]
   end
 
   subgraph query [Retrieval]
-    mcp[MCP query tools]
+    mcp[MCP record tools]
     client[Cursor / MCP client]
   end
 
   httpIngest --> journal
   mqtt --> journal
   telegram --> journal
+  journal --> records
   journal --> blobs
   catalog --> journal
-  journal --> mcp
+  records --> mcp
   mcp --> client
 ```
 
-1. **Source modules** capture facts and call `Emit(event)` into the core.
-2. The **journal** persists events append-only in SQLite.
-3. Large payloads go to the **blob store**; events hold a `blob_ref`.
-4. The **type catalog** validates payloads against JTD contracts at emit time.
-5. **MCP query tools** search and summarize the journal for conversational use.
+1. **Source modules** capture facts and call `AppendRevision` into the core.
+2. The **journal** persists revisions append-only in SQLite.
+3. The **materializer** folds revisions into queryable **records**.
+4. Large payloads go to the **blob store**; revisions hold a `blob_ref`.
+5. The **type catalog** validates payloads against JTD contracts at append time.
+6. **MCP record tools** search folded records for conversational use.
 
 For implementation order, see the [roadmap](./roadmap.md).

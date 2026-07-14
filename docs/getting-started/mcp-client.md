@@ -6,16 +6,16 @@ nav_order: 6
 
 # MCP client setup
 
-Query your Trove journal from Cursor (or any MCP client that supports Streamable
-HTTP). Trove exposes four core tools backed by the internal query API, plus
+Query your Trove records from Cursor (or any MCP client that supports Streamable
+HTTP). Trove exposes three core record tools backed by the internal query API, plus
 additional tools registered by loaded modules — see
 [MCP query planning](../planning/mcp-query.md).
 
 ## Prerequisites
 
 1. Build Trove and configure `[http].listen` — see [Quick Start](./quick-start.md).
-2. `trove` running with a populated journal (capture events via
-   [HTTP ingest](./quick-start.md#capture-events) or Shortcuts first).
+2. `trove` running with a populated journal (capture records via
+   [HTTP ingest](./quick-start.md#capture-records) or Shortcuts first).
 3. Default HTTP gateway address: `:8080` (MCP at `POST /mcp` on the same port).
 
 ## Connect Cursor
@@ -40,15 +40,13 @@ Adjust the host and port to match `[http].listen` in your config. Reload Cursor
 ## Verify the connection
 
 1. Open **Cursor Settings → MCP**. The `trove` server should show as connected.
-2. Confirm at least **4 core tools** are listed:
-   - `search_events` — FTS5 keyword search
-   - `get_event` — fetch one event by ULID
-   - `get_events_by_type` — events with an exact type
-   - `summarize_range` — counts by type and notable events for a time window
-3. When `capture-classifier` is loaded, also expect `classify_event` and
-   `list_unclassified_captures`.
-4. In chat, ask the agent to call `summarize_range` for today, or `search_events`
-   with a keyword from a captured event.
+2. Confirm at least **3 core tools** are listed:
+   - `search_records` — FTS5 keyword search over folded records
+   - `get_record` — fetch one record by `record_ref`
+   - `list_incomplete_records` — records awaiting classification
+3. When `capture-classifier` is loaded, also expect module-specific tools.
+4. In chat, ask the agent to call `search_records` with a keyword from a captured
+   record, or `list_incomplete_records` to find unclassified captures.
 
 If the server fails to connect, check that `trove` is running and that nothing
 else is bound to the MCP port.
@@ -57,13 +55,12 @@ else is bound to the MCP port.
 
 | Tool | Purpose |
 |------|---------|
-| `search_events` | Keyword search with optional `type_prefix`, `source`, `time_from`, `time_to` |
-| `get_event` | Single event by `id` (ULID) |
-| `get_events_by_type` | All events of an exact `type`, optional time range |
-| `summarize_range` | Aggregated `total`, `by_type`, and `notable` events for `time_from` / `time_to` |
+| `search_records` | Keyword search with optional `type_prefix`, `source`, `time_from`, `time_to`, `include_deleted` |
+| `get_record` | Single record by `record_ref` (optional `version`) |
+| `list_incomplete_records` | Records with `completeness = incomplete`, optional `source` and `limit` |
 
-**Module tools** (when loaded): `classify_event`, `list_unclassified_captures` from
-`capture-classifier`.
+**Module tools** (when loaded): additional tools from modules that register
+`[[mcp.tools]]` in their manifest.
 
 Tool arguments use RFC3339 timestamps where a time range is accepted.
 
@@ -89,4 +86,4 @@ Do not expose an unauthenticated MCP endpoint on the public internet.
 
 - [Query concept](../concepts/query.md) — RPC and tool design
 - [Configuration](./configuration.md) — `[http].listen` in TOML
-- [iOS Shortcuts](./ios-shortcuts.md) — capture events to query later
+- [iOS Shortcuts](./ios-shortcuts.md) — capture records to query later

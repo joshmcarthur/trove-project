@@ -13,17 +13,17 @@ nav_order: 14
 
 ## Goal
 
-Introduce a **rebuildable record index** projected from an append-only event log
-(`apply` and `delete` operations). Records become the primary MCP query surface;
-events remain the audit/rebuild source of truth.
+Introduce a **rebuildable record index** projected from an append-only revision log
+(`apply` and `delete` operations). Records are the primary MCP query surface;
+revisions remain the audit/rebuild source of truth.
 
 See [records concept](../concepts/records.md) for vocabulary.
 
 ## Interfaces
 
-### Write — `EmitRecord`
+### Write — `AppendRevision`
 
-Appends a record-scoped journal event and materializes the record projection in
+Appends a record-scoped journal revision and materializes the record projection in
 one transaction (RPC, HTTP, module `Core`).
 
 ```
@@ -47,26 +47,23 @@ POST /records
 | `apply` | Optional (server allocates on create) | Create or amend record |
 | `delete` | Required | Tombstone; body retained |
 
-Response: `{ event_id, record_ref, version, completeness, operation }`
+Response: `{ revision_id, record_ref, version, completeness, operation }`
 
-gRPC: `EmitRecord(EmitRecordRequest) returns (EmitRecordResponse)` on `CoreServices`.
+gRPC: `AppendRevision(AppendRevisionRequest) returns (AppendRevisionResponse)` on `CoreServices`.
 
 ### Read — internal RPC / MCP
 
 ```
 get_record(record_ref, version?) -> Record
-list_records(filters...) -> []Record
 search_records(query, filters...) -> []Record
 list_incomplete_records(source?, limit?) -> []Record
 ```
 
 MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 
-`get_event` remains for audit.
-
 ## Data model
 
-### Journal (`events`)
+### Journal (`revisions`)
 
 | Column | Notes |
 |--------|-------|
@@ -80,7 +77,7 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 ### Projection
 
 - `record_heads` — current folded state per `record_ref`
-- `record_events` — `(record_ref, version)` → `event_id`
+- `record_revisions` — `(record_ref, version)` → `revision_id`
 - `records_fts` — FTS5 on type, source, body
 
 **Completeness:** `incomplete` \| `complete` \| `deleted`
@@ -89,7 +86,7 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 
 1. Merge `payload` into previous body (RFC 7396)
 2. Apply `transforms` (RFC 6902) against the body object
-3. Set `type` / `content_ref` from event fields
+3. Set `type` / `content_ref` from revision fields
 4. Validate folded body against TTD when type set
 5. Write `record_heads` + FTS
 
@@ -97,34 +94,28 @@ MCP tools: `get_record`, `search_records`, `list_incomplete_records`.
 
 ## Implementation notes
 
-- Materializer in `internal/records`; same SQLite txn as event append
+- Materializer in `internal/records`; same SQLite txn as revision append
 - TTDs describe record **body**, not journal envelope
-- No migration from `classify.pending` — wipe dev journals during rollout
+- Legacy `events` databases migrate to `revisions` on `journal.Open`
 - `retention_days` cascades to record projection tables
 - Processor routing: `consumes` on type; modules guard `operation` in `Process`/`Handle`
-- Rebuild: `trove records rebuild` replays all events
-
-### PR delivery
-
-See epic branch `cursor/records-layer-71b9` — stacked PRs; major version bump
-on merge (`feat!:`).
+- Rebuild: `trove records rebuild` replays all revisions
 
 ## Acceptance criteria
 
 ### Core
 
-- [x] `EmitRecord` `apply` without `record_ref` creates record at version 1
-- [x] `EmitRecord` `apply` with `record_ref` increments version
-- [x] `EmitRecord` `delete` sets completeness `deleted` and retains body
+- [x] `AppendRevision` `apply` without `record_ref` creates record at version 1
+- [x] `AppendRevision` `apply` with `record_ref` increments version
+- [x] `AppendRevision` `delete` sets completeness `deleted` and retains body
 - [x] Fold order: merge payload → transforms → type/blob_ref → validate
-- [x] Materialization in same txn as event append
+- [x] Materialization in same txn as revision append
 - [x] `trove records rebuild` reproduces identical `record_heads`
 
 ### Query
 
 - [x] MCP `get_record`, `search_records`, `list_incomplete_records`
 - [x] FTS on `records_fts`; deleted excluded from default search
-- [x] `get_event` available for audit
 
 ### Sources
 
@@ -135,13 +126,11 @@ on merge (`feat!:`).
 
 ### Retention
 
-- [x] `PruneBefore` cascades to `record_heads`, `record_events`, and `records_fts`
+- [x] `PruneBefore` cascades to `record_heads`, `record_revisions`, and `records_fts`
 
 ## Dependencies
 
-- **Blocked by:** none (greenfield during active development)
 - **Blocks:** record-centric embeddings
-- **Supersedes:** [deferred-capture](./deferred-capture.md)
 
 ## Open questions
 
@@ -153,5 +142,6 @@ on merge (`feat!:`).
 ## See also
 
 - [Records concept](../concepts/records.md)
-- [Events concept](../concepts/events.md)
+- [Revisions concept](../concepts/revisions.md)
 - [Type catalog](../concepts/type-catalog.md)
+- [Revision rename](./revision-rename.md)

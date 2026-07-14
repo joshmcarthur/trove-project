@@ -13,30 +13,28 @@ nav_order: 6
 
 ## Goal
 
-Expose journal retrieval via MCP tools backed by an internal RPC API. This is the
+Expose **record** retrieval via MCP tools backed by an internal RPC API. This is the
 historical failure point for prior art — validate conversational retrieval, not
 just capture.
 
 ## Interfaces
 
-Internal RPC:
+Internal RPC (records):
 
 ```
-search_events(query, type_prefix?, source?, time_range?) -> []Event
-get_events_by_type(type, time_range) -> []Event
-get_event(id) -> Event
-summarize_range(time_range) -> Summary
+get_record(record_ref, version?) -> Record
+search_records(query, type_prefix?, source?, time_range?, include_deleted?) -> []Record
+list_incomplete_records(source?, limit?) -> []Record
 ```
 
-MCP tools map 1:1 onto these methods.
+MCP tools map 1:1 onto these methods. Revision audit reads are module `Core` RPC only.
 
 ## Implementation notes
 
 - RPC layer and MCP server implemented in `internal/query`
-- `modules/mcp-query` is a processor module; journal reads go through
-  `CoreServices` query RPCs on the services broker
-- `search_events`: FTS5 keyword search
-- `summarize_range`: counts by type, notable events — avoids dumping raw rows
+- `modules/mcp-query` is a processor module; record reads go through host
+  `RecordProjection` RPCs on the services broker
+- `search_records`: FTS5 keyword search on `records_fts`
 - MCP streamable HTTP is served by the `mcp-query` module at `POST /mcp` on
   `[http].listen`. See [MCP client setup](../getting-started/mcp-client.md).
 - Built-in read tools are registered in-process; module tools from `[[mcp.tools]]`
@@ -44,18 +42,16 @@ MCP tools map 1:1 onto these methods.
 
 ## Acceptance criteria
 
-- [x] MCP `search_events` returns matching journal events
-- [x] MCP `get_event` resolves by ULID
-- [x] `summarize_range` returns aggregated summary for a time window
-- [x] MCP `get_events_by_type` returns events matching exact type
+- [x] MCP `search_records` returns matching folded records
+- [x] MCP `get_record` resolves by `record_ref`
+- [x] MCP `list_incomplete_records` returns incomplete records
 - [x] OpenClaw or Cursor can connect as MCP client
 
 ## Dependencies
 
 - **Blocks:** end-to-end v0 validation
-- **Blocked by:** journal with FTS5
+- **Blocked by:** journal with FTS5, records projection
 
 ## Open questions
 
-- `summarize_range` write-time vs query-time aggregation — [open-items.md](../open-items.md)
 - Gateway auth for MCP — resolved via `[http.auth].validator`; see [auth.md](./auth.md)

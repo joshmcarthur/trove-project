@@ -8,26 +8,26 @@ nav_order: 6
 
 A **record** is a versioned, rebuildable index entry — the primary query and search
 surface in Trove. Records are **not** stored as independent facts; they are
-**projections** materialized by replaying journal events for a stable `record_ref`.
+**projections** materialized by replaying journal **revisions** for a stable `record_ref`.
 
 See [spec §3](../spec.md#3-core-concepts) and [planning/records.md](../planning/records.md).
 
-## Events vs records vs blobs
+## Revisions vs records vs blobs
 
 | Layer | Role |
 |-------|------|
-| **Event** | Append-only journal row — audit log, replay source |
+| **Revision** | Append-only journal row — audit log, replay source |
 | **Record** | Folded view at `(record_ref, version)` — MCP search target |
 | **Blob** | Content-addressed bytes — referenced by `blob_ref` / `content_ref` |
 
 ```mermaid
 flowchart LR
-  events[(events)]
+  revisions[(revisions)]
   materializer[Materializer]
   records[(record_heads)]
   blobs[(blobs)]
-  events --> materializer --> records
-  events -.->|blob_ref| blobs
+  revisions --> materializer --> records
+  revisions -.->|blob_ref| blobs
   records -.->|content_ref| blobs
 ```
 
@@ -40,7 +40,7 @@ flowchart LR
 | `body` | Folded JSON state from payload + transforms |
 | `type` | `trove://type/...` catalog URI when known |
 | `operation` | Journal verb: `apply` or `delete` |
-| `completeness` | `incomplete`, `complete`, or `deleted` |
+| `completeness` | `incomplete`, `complete`, or `deleted` (on record head only) |
 | `content_ref` | Folded primary blob reference |
 
 ## Operations
@@ -60,8 +60,8 @@ Payload merges into body (RFC 7396). Transforms apply RFC 6902 patches after mer
 
 ## Immutability
 
-Events are never mutated. Record "changes" are new event versions materialized into
-a new `version` on `record_heads`. Wipe `record_heads` and replay events to rebuild.
+Revisions are never mutated. Record "changes" are new revisions materialized into
+a new `version` on `record_heads`. Wipe `record_heads` and replay revisions to rebuild.
 
 ## Type catalog
 
@@ -70,4 +70,4 @@ remain `incomplete` until a later `apply` sets `type`.
 
 ## Implementation
 
-**Status:** Planned — [planning/records.md](../planning/records.md)
+**Status:** Supported — [planning/records.md](../planning/records.md)
