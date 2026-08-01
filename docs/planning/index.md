@@ -67,6 +67,7 @@ Operational runbook — not a planning page:
 
 | Page | Package |
 |------|---------|
+| [AT Protocol bridge](./atproto-bridge.md) | `modules/atproto-bridge` |
 | [HA WebSocket source](./ha-source.md) | external module |
 | [Remote modules](./remote-modules.md) | `internal/modules` |
 | [Embeddings / semantic search](./embeddings.md) | `internal/journal` |
