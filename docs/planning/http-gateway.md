@@ -312,7 +312,7 @@ Rejected requests never reach module `HandleHTTP`.
 | Route ownership conflicts | Startup fail vs first-wins | Prefer startup fail |
 | Deprecation of `[mcp].listen` | Hard remove vs warn + fallback | One release cycle overlap |
 | Per-route vs global `max_body_bytes` | Global default + manifest override | Matches today's manifest field |
-| WebSocket upgrade routes | Defer | HA tap is separate module |
+| WebSocket upgrade routes | Support for `atproto-pds` firehose; see [atproto-pds](./atproto-pds.md) | Required for federation; was deferred for HA tap |
 
 Track decisions in [open-items.md](../open-items.md) when resolved.
 
