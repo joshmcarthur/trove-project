@@ -230,6 +230,7 @@ Prove the module can be a PDS for one DID on localhost:
 - Implement `createRecord`, `putRecord`, `deleteRecord`, `getRecord`,
   `listRecords`, `describeRepo`, `uploadBlob`
 - Lexicon validation for `app.bsky.feed.post` + `app.bsky.actor.profile` minimum
+  (pin `revision`; see [bridge versioning](./atproto-bridge.md#schema-and-lexicon-versioning))
 - Optional journal mirror on each commit
 - `GET /xrpc/_health`
 
