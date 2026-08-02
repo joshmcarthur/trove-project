@@ -250,17 +250,131 @@ surface stays on [atproto-pds](./atproto-pds.md) when federation is needed.
 
 ## Push paths (detail)
 
-### Translation
+### Mapping (Trove ↔ AT)
 
-Each allowlisted Trove revision maps to a lexicon record:
+There is **no mapping-function registry in Trove core today**. Cross-schema translation
+is handled in three layers (simple → powerful):
 
-| Trove type | AT collection | Notes |
-|------------|---------------|-------|
-| `trove://type/note/quick/1` | `app.bsky.feed.post` | `text` ← body.text |
-| `trove://type/shortcuts/share/saved/1` | `app.bsky.feed.post` | embed URL from payload |
+```mermaid
+flowchart LR
+  trove[Trove revision]
+  L1[Layer 1: built-in defaults]
+  L2[Layer 2: declarative maps]
+  L3[Layer 3: mapper processor module]
+  at[Lexicon value]
 
-Translation tables live in module config or small built-in defaults; custom
-`[[bridge.push.map]]` entries override.
+  trove --> L1
+  trove --> L2
+  trove --> L3
+  L1 --> at
+  L2 --> at
+  L3 --> at
+```
+
+#### Layer 1 — Built-in defaults
+
+Shipped in `atproto-bridge` for common pairs:
+
+| Trove type | AT collection | Mapping |
+|------------|---------------|---------|
+| `trove://type/note/quick/1` | `app.bsky.feed.post` | `text` ← `body.text` |
+| `trove://type/shortcuts/share/saved/1` | `app.bsky.feed.post` | `text` + embed from `url` |
+
+#### Layer 2 — Declarative field maps (config)
+
+For push and pull without writing Go. Each `[[bridge.push.map]]` or
+`[[bridge.pull.map]]` entry matches type/collection globs and declares field paths.
+
+```toml
+[[bridge.push.map]]
+types = ["trove://type/note/*"]
+collection = "app.bsky.feed.post"
+
+[bridge.push.map.fields]
+"$type" = "app.bsky.feed.post"                    # constant
+text    = "$.body.text"                           # JSONPath from revision body
+createdAt = "$.time"                              # RFC3339 from revision time
+langs   = "$.body.langs"                          # optional array
+
+[[bridge.push.map]]
+types = ["trove://type/shortcuts/share/saved/1"]
+collection = "app.bsky.feed.post"
+
+[bridge.push.map.fields]
+"$type" = "app.bsky.feed.post"
+text    = "$.body.title"
+"embed.external.uri" = "$.body.url"
+"embed.external.title" = "$.body.title"
+```
+
+Pull inverse example:
+
+```toml
+[[bridge.pull.map]]
+collections = ["app.bsky.feed.post"]
+
+[bridge.pull.map.fields]
+"value.text" = "$.text"                           # from lexicon record
+```
+
+**Expression syntax (planned):**
+
+| Form | Meaning |
+|------|---------|
+| `"literal"` | Constant string |
+| `$.body.field` | JSONPath into folded record body |
+| `$.time`, `$.record_ref` | JSONPath into revision metadata |
+| `$.refs.reply` | Resolved `at://` from `references` with `rel: reply` |
+
+Validation: mapped output must pass target lexicon validation before push; pull maps
+run after allowlist filter.
+
+#### Layer 3 — Mapper processor modules (custom logic)
+
+For transforms declarative maps cannot express, use a **separate processor module**
+that sits *before* the bridge in the revision graph:
+
+```toml
+# modules/my-atproto-maps/manifest.toml
+name     = "my-atproto-maps"
+kind     = "processor"
+consumes = ["trove://type/note/*"]
+provides = ["trove://type/atproto/record/draft/1"]
+```
+
+```go
+// Process(revision) -> []*Revision with pre-built lexicon value in payload
+func (m *mapper) Process(ctx context.Context, rev *Revision, dc *DispatchContext) ([]*Revision, error) {
+    // arbitrary Go: trim text, merge fields, attach blobs, call external API, etc.
+}
+```
+
+Bridge push allowlist then targets the draft type:
+
+```toml
+[bridge.push]
+types = ["trove://type/atproto/record/draft/1"]
+
+[[bridge.push.map]]
+types = ["trove://type/atproto/record/draft/1"]
+collection = "$.payload.collection"   # draft carries target collection
+# fields pass through: value = "$.payload.value"
+```
+
+This reuses Trove's existing **processor** contract (`Process` → derived revisions)
+— no new plugin ABI. Multiple mapper modules can chain (watch `seen` / loop prevention).
+
+**Not** revision `transforms` (RFC 6902 JSON Patch): those patch the *same* record body
+during fold, not cross-schema AT translation.
+
+#### Choosing a layer
+
+| Need | Use |
+|------|-----|
+| Standard note → post | Layer 1 built-in |
+| Tweaked field paths, constants | Layer 2 declarative map |
+| Conditional logic, LLM enrichment, multi-record fan-out | Layer 3 processor module |
+| User-defined scripts (JS/WASM) | Out of scope — use layer 3 Go module |
 
 ### Write + confirm
 
@@ -293,7 +407,7 @@ does not own.
 ### Phase 1 — Push with allowlists
 
 - Processor sink: `Handle()` + `bridge.push.types` filtering
-- Translate `note/*` → `app.bsky.feed.post`
+- Layer 1 built-in maps + Layer 2 declarative `[[bridge.push.map]]`
 - Write to local PDS or upstream XRPC
 - Confirmation envelope in journal
 
@@ -346,6 +460,8 @@ does not own.
 | One module vs split ingest/emit | Single `atproto-bridge` processor |
 | Allowlist in manifest vs config only | Config for pull/push lists; manifest `consumes` mirrors push types |
 | NSID glob implementation | Reuse `path.Match`; document examples in getting-started |
+| Field map expression language | JSONPath v1; constants + `$.body.*` / `$.time` |
+| Draft type for layer-3 mappers | `trove://type/atproto/record/draft/1` with `{collection, value}` |
 | Upstream push auth | App password file for v1; OAuth later |
 | Pull blob media | Fetch via `getBlob` → `core.Put` when record references blobs |
 
