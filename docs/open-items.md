@@ -18,6 +18,10 @@ From [spec §13](../spec.md#13-open-items-not-yet-decided):
 | `summarize_range`: pre-aggregate at write vs query time | [mcp-query](./planning/mcp-query.md), [processors-sinks](./planning/processors-sinks.md) |
 | References on delete tombstone | [references](./planning/references.md) — retain or clear `references` on `delete` |
 | Enricher idempotency keys | [references](./planning/references.md) — parallel processors on one capture |
+| AT Protocol bridge: lexicon revision pinning policy | [atproto-bridge](./planning/atproto-bridge.md) |
+| AT Protocol bridge: upstream push auth | [atproto-bridge](./planning/atproto-bridge.md) |
+| AT Protocol PDS: gateway WebSocket for firehose | [atproto-pds](./planning/atproto-pds.md), [http-gateway](./planning/http-gateway.md) |
+| AT Protocol PDS: OAuth vs app-password v1 | [atproto-pds](./planning/atproto-pds.md) |
 
 ## Resolved
 
