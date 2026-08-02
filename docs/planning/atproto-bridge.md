@@ -83,13 +83,175 @@ trove://type/atproto/record/stored/1
 | `payload.collection` | NSID | NSID |
 | `payload.rkey` | From repo | Assigned on create |
 | `payload.cid` | From repo | From write response |
-| `payload.value` | Lexicon JSON | Lexicon JSON (translated from Trove body) |
+| `payload.value` | Lexicon JSON (verbatim) | Lexicon JSON (translated from Trove body) |
+| `payload.value_type` | `$type` from `value` | `$type` stamped on output |
+| `payload.lexicon` | Collection NSID | Target collection NSID |
+| `payload.lexicon_revision` | Revision at pull time (if known) | Revision validated against at push |
+| `payload.trove_origin_type` | — | Source `trove://type/...` URI (incl. version) |
+| `payload.trove_origin_schema_ref` | — | Source revision `schema_ref` |
+| `payload.map_id` | — | Which `[[bridge.push.map]]` entry applied |
 | `payload.direction` | `pulled` | `pushed` |
 | `payload.origin` | `firehose` \| `sync` \| `fetch` | `sink` |
-| `references` | `at://` edges + optional `trove://record/...` link back | `{ ref: trove://record/..., rel: trove_origin }` |
+| `schema_ref` | Envelope TTD at write | Envelope TTD at write |
 
 Dedupe on `(at_uri, cid)` for pulls; on `(trove_origin_record_ref, at_uri)` for push
 confirmations.
+
+## Schema and lexicon versioning
+
+Trove and AT Protocol version schemas differently. The bridge must preserve **both**
+sides at the boundary so historical records remain interpretable after upgrades.
+
+### Two versioning systems
+
+| System | Identity | Version signal | Breaking change |
+|--------|----------|----------------|-----------------|
+| **Trove** | `trove://type/{path}/{version}` | Integer suffix in URI; `supersedes` in TTD | Bump URI (`/1` → `/2`); old rows keep `schema_ref` |
+| **AT lexicon** | NSID (e.g. `app.bsky.feed.post`) | Top-level `revision` on `com.atproto.lexicon.schema` | Breaking → new NSID (`…V2`); non-breaking → `revision++` |
+| **AT record** | `at://{did}/{collection}/{rkey}` | Immutable once written | New shape → new rkey or new collection NSID |
+
+Trove **record `version`** (monotonic per `record_ref`) is unrelated — it tracks fold
+history, not schema contract version.
+
+```mermaid
+flowchart LR
+  subgraph troveSide [Trove]
+    tType["trove://type/note/quick/2"]
+    tSchema[schema_ref on revision]
+  end
+
+  subgraph bridgeLayer [Bridge map]
+    map["bridge.push.map\n(types + lexicon pin)"]
+  end
+
+  subgraph atSide [AT Protocol]
+    nsid[app.bsky.feed.post]
+    lexRev[lexicon revision 4]
+    record["value.$type + cid"]
+  end
+
+  tType --> map
+  tSchema --> map
+  map --> nsid
+  map --> lexRev
+  map --> record
+```
+
+### Rules
+
+1. **Mappings are version-specific.** `[[bridge.push.map]].types` matches full Trove
+   URIs or globs — prefer exact version (`…/quick/1`) when shapes differ; use `/*` only
+   when all versions share the same field map.
+
+2. **Store provenance on every envelope.** `trove_origin_type`, `trove_origin_schema_ref`,
+   `lexicon`, `lexicon_revision`, and `value_type` let you answer "what contract produced
+   this?" years later — parallel to Trove's `schema_ref` for native types.
+
+3. **Pull: preserve bytes, don't upgrade.** Ingest `value` verbatim. Do not re-validate
+   pulled records against a newer lexicon revision on read. Optional lenient validation
+   at ingest only (warn, don't mutate).
+
+4. **Push: validate against pinned lexicon.** Each map entry names target `lexicon`
+   (NSID). Bridge resolves the lexicon catalog entry (bundled or fetched) and validates
+   output before `createRecord`. Pin `lexicon_revision` when reproducibility matters;
+   default `latest` uses highest known revision.
+
+5. **Lexicon catalog in the bridge module.** Maintain a local catalog (like Trove's type
+   catalog): bundled `app.bsky.*` + `com.atproto.*`, plus fetched
+   `com.atproto.lexicon.schema` records with monotonic `revision`. Track
+   `lexicon_ref` (content hash of lexicon JSON) alongside `revision` number.
+
+6. **TTD envelope evolution.** When `atproto/record/stored` gains required fields, bump
+   to `trove://type/atproto/record/stored/2`. Old envelopes remain valid via their
+   `schema_ref`.
+
+### Map config with versions
+
+```toml
+[[bridge.push.map]]
+id = "note-quick-v1-to-bsky-post"          # stored in payload.map_id
+types = ["trove://type/note/quick/1"]        # Trove schema version pinned
+collection = "app.bsky.feed.post"
+lexicon = "app.bsky.feed.post"
+lexicon_revision = "latest"                # or pinned: 4
+
+[bridge.push.map.fields]
+"$type" = "app.bsky.feed.post"
+text    = "$.body.text"
+
+[[bridge.push.map]]
+id = "note-quick-v2-to-bsky-post"
+types = ["trove://type/note/quick/2"]        # new map when Trove type bumps
+supersedes = ["note-quick-v1-to-bsky-post"]  # migration hint (documentation)
+collection = "app.bsky.feed.post"
+lexicon = "app.bsky.feed.post"
+
+[bridge.push.map.fields]
+"$type" = "app.bsky.feed.post"
+text    = "$.body.text"
+facets  = "$.body.facets"                  # new field in v2 only
+```
+
+Pull maps key on **collection** (+ optional lexicon revision range):
+
+```toml
+[[bridge.pull.map]]
+collections = ["app.bsky.feed.post"]
+lexicon = "app.bsky.feed.post"
+# lexicon_revision = "*"                  # any revision (default)
+# Store value as-is; lexicon_revision captured from catalog at pull time
+```
+
+### Lexicon breaking changes
+
+When AT designers mint a new NSID (`app.bsky.feed.postV2`):
+
+- Add new `[[bridge.push.map]]` / allowlist entry for the new collection
+- Keep old map for records still targeting v1 NSID
+- Pull allowlist adds new collection pattern
+- Do **not** mutate stored envelopes — old `at_uri` + `cid` pairs are immutable history
+
+When Trove bumps `trove://type/note/quick/2`:
+
+- Register new TTD in type catalog (`supersedes` → v1 URI)
+- Add new push map keyed to `/2`
+- Existing journal rows keep `schema_ref` pointing at v1 TTD bytes
+
+### Layer 3 mapper modules and versions
+
+Mapper processors should declare `provides` with a versioned draft type:
+
+```toml
+provides = ["trove://type/atproto/record/draft/1"]
+
+[[types]]
+name = "atproto.record.draft"
+version = 1
+```
+
+Draft payload carries explicit version metadata for the bridge:
+
+```json
+{
+  "collection": "app.bsky.feed.post",
+  "lexicon": "app.bsky.feed.post",
+  "lexicon_revision": 4,
+  "value": { "$type": "app.bsky.feed.post", "text": "..." },
+  "trove_origin_type": "trove://type/note/quick/2"
+}
+```
+
+Bump draft type URI when the draft contract changes.
+
+### Compatibility checks (push path)
+
+Before `createRecord`:
+
+1. Resolve `lexicon` → catalog entry at `lexicon_revision` (or latest)
+2. Validate mapped `value` against lexicon (strict at write time)
+3. On failure: reject push, log map id + both version signals; do not partially write
+4. Optional: `check_compatibility` when user updates bundled lexicons (startup warning)
+
 
 ## Allowlists
 
@@ -287,8 +449,10 @@ For push and pull without writing Go. Each `[[bridge.push.map]]` or
 
 ```toml
 [[bridge.push.map]]
-types = ["trove://type/note/*"]
+id = "note-any-to-bsky-post"
+types = ["trove://type/note/*"]              # glob — only when all versions share shape
 collection = "app.bsky.feed.post"
+lexicon = "app.bsky.feed.post"
 
 [bridge.push.map.fields]
 "$type" = "app.bsky.feed.post"                    # constant
@@ -429,14 +593,18 @@ does not own.
 
 - [ ] `bridge.push.types` globs filter revisions; non-matching skipped
 - [ ] Allowlisted note creates `app.bsky.feed.post` on target
+- [ ] Envelope stores `trove_origin_type`, `lexicon`, `lexicon_revision`, `map_id`
+- [ ] Push validates against pinned/latest lexicon revision
 - [ ] Confirmation envelope in journal with `trove_origin` reference
 - [ ] Re-delivery of same revision does not duplicate AT record
 - [ ] `operations = ["apply"]` excludes deletes
+- [ ] Version-specific maps: `trove://type/note/quick/1` vs `/2` route to correct fields
 
 ### Phase 2 (pull)
 
 - [ ] Firehose cursor resumes without duplicate envelopes
 - [ ] `repos` + `collections` allowlists enforced; out-of-scope commits ignored
+- [ ] Pulled records stored verbatim with captured `lexicon_revision`
 - [ ] Pulled post searchable via MCP alongside Trove-native records
 - [ ] Empty allowlist denies all (fail closed)
 
@@ -445,6 +613,8 @@ does not own.
 - [ ] `getRepo` sync backfills allowlisted records
 - [ ] On-demand fetch for referenced `at://` when allowlisted
 - [ ] `deny_*` overrides work
+- [ ] Lexicon catalog fetch + startup compatibility warnings
+- [ ] New NSID (`…V2`) handled via separate map entries without mutating history
 
 ## Dependencies
 
@@ -461,7 +631,10 @@ does not own.
 | Allowlist in manifest vs config only | Config for pull/push lists; manifest `consumes` mirrors push types |
 | NSID glob implementation | Reuse `path.Match`; document examples in getting-started |
 | Field map expression language | JSONPath v1; constants + `$.body.*` / `$.time` |
-| Draft type for layer-3 mappers | `trove://type/atproto/record/draft/1` with `{collection, value}` |
+| Draft type for layer-3 mappers | `trove://type/atproto/record/draft/1` with `{collection, value, lexicon_revision}` |
+| Lexicon catalog source | Bundled `app.bsky.*` + fetch `com.atproto.lexicon.schema` at startup |
+| `lexicon_revision` pin vs latest | Pin for reproducible push; latest default; always store actual revision on envelope |
+| Envelope type bump | `atproto/record/stored/2` when required fields added; v1 rows keep `schema_ref` |
 | Upstream push auth | App password file for v1; OAuth later |
 | Pull blob media | Fetch via `getBlob` → `core.Put` when record references blobs |
 
