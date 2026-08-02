@@ -55,6 +55,7 @@ Build order from spec §11:
 | Remote modules (Tailscale) | Later | §8 | [remote-modules](./planning/remote-modules.md) | `internal/modules` |
 | Semantic search (sqlite-vec) | Later | §4 | [embeddings](./planning/embeddings.md) | `internal/journal` |
 | Processors / sinks | Supported | §7 | [processors-sinks](./planning/processors-sinks.md) | `internal/modules` |
+| AT Protocol bridge (pull/push allowlists) | Later | §8 | [atproto-bridge](./planning/atproto-bridge.md) | `modules/atproto-bridge` |
 | AT Protocol PDS module (single-user federation) | Later | §8 | [atproto-pds](./planning/atproto-pds.md) | `modules/atproto-pds` |
 | Alternative journal backends | Non-goal | §2, §12 | [non-goals](./non-goals.md) | — |
 | Multi-journal sync | Non-goal | §12 | [non-goals](./non-goals.md) | — |

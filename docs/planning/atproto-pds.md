@@ -18,10 +18,9 @@ core stays a personal event journal; the `atproto-pds` module owns AT Protocol
 identity, signing, repository storage, XRPC, and federation — including the
 WebSocket firehose relays need to pick up new commits.
 
-This is the preferred integration path for AT Protocol in Trove: not a core
-rewrite, not a non-federated translation shim, but a module that **is** the PDS
-for one configured DID while optionally mirroring records into the Trove journal
-so MCP and other Trove sources remain searchable in one place.
+This module hosts your federated repo. Bidirectional **pull/push with allowlists** is
+the [AT Protocol bridge](./atproto-bridge.md) — run both modules together in a typical
+deployment.
 
 ## Design principles
 
