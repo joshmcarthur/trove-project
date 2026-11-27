@@ -8,6 +8,7 @@ from .enqueue import (
     enqueue_for_items,
 )
 from .result import Result
+from .result_link import ResultLink
 from .transient_error import TransientError
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "Context",
     "Emit",
     "Result",
+    "ResultLink",
     "TransientError",
     "derive_item",
     "enqueue_derive",
