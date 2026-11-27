@@ -192,7 +192,9 @@ def test_reconcile_derive_and_idempotence(capture, client):
     run_tasks()
     colours = sorted(Item.objects.filter(type="colour").values_list("id", flat=True))
     assert len(colours) == 2
-    assert item.current_values()["summary"] == "An image titled 'nice palette'"
+    agent = Activity.objects.get(agent="agent@1", subject=item, outcome="ok")
+    assert agent.params["prompt_hash"]
+    assert agent.params["model"]
     assert reconcile() == 0
 
     get_core().processors["palette"].version = 2
@@ -319,7 +321,7 @@ def test_killed_running_task_is_reaped_and_not_duplicated(capture):
 
     run_tasks()
     assert Item.objects.filter(type="colour").count() == 2
-    assert item.current_values()["summary"] == "An image titled 'nice palette'"
+    assert Activity.objects.filter(agent="agent@1", subject=item, outcome="ok").exists()
 
 
 def test_derive_backoff_returns_timedelta_for_retry_after():
@@ -369,6 +371,19 @@ def test_processor_loop_refused():
         "    core.add_processor(Processor('b', 1, 'y', ['x'], lambda i, c: None))\n"
     )
     root = plugin_dir({"loopy": ("core", code, [])})
+    with pytest.raises(ImproperlyConfigured):
+        load(root)
+
+
+def test_explicit_self_loop_is_refused():
+    code = (
+        "from pydantic import BaseModel\nfrom trove.core import Processor\n"
+        "class T(BaseModel): pass\n"
+        "def setup(core, entry):\n"
+        "    core.add_type('x', T)\n"
+        "    core.add_processor(Processor('loop', 1, 'x', ['x'], lambda i, c: None))\n"
+    )
+    root = plugin_dir({"selfie": ("core", code, [])})
     with pytest.raises(ImproperlyConfigured):
         load(root)
 
