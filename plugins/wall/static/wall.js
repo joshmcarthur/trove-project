@@ -83,8 +83,63 @@ function provenanceNote(row) {
   return parts.join(" · ");
 }
 
+function reverseLinks(id) {
+  const rows = [];
+  for (const item of items) {
+    for (const link of item.links || []) {
+      if (link.id === id) {
+        rows.push({
+          rel: link.rel,
+          id: item.id,
+          type: item.type,
+          values: item.values,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function itemFromLinks(id) {
+  for (const item of items) {
+    const link = (item.links || []).find((row) => row.id === id);
+    if (!link) {
+      continue;
+    }
+    return {
+      id: link.id,
+      type: link.type,
+      values: link.values,
+      colours: [],
+      links: reverseLinks(id),
+      provenance: [],
+    };
+  }
+  return null;
+}
+
 function selectedItem() {
-  return items.find((item) => item.id === selectedId) || items[0] || null;
+  if (selectedId) {
+    const top = items.find((item) => item.id === selectedId);
+    if (top) {
+      return top;
+    }
+    const nested = itemFromLinks(selectedId);
+    if (nested) {
+      return nested;
+    }
+  }
+  return items[0] || null;
+}
+
+function cardShowsLinks(item, current) {
+  if (!current) {
+    return false;
+  }
+  if (current.id === item.id) {
+    return true;
+  }
+  return (item.links || []).some((link) => link.id === current.id);
 }
 
 function photoSha(item) {
@@ -107,10 +162,15 @@ function photoSha(item) {
   return null;
 }
 
-function derivedRows(item) {
-  return (item.links || []).filter(
-    (link) => link.rel === "derived_from" && link.type !== "colour",
-  );
+function linkedRows(item) {
+  return (item.links || []).filter((link) => link.type !== "colour");
+}
+
+function linkName(link) {
+  if (link.type === "capture.file" && link.content_type === "multipart/related") {
+    return "Archive";
+  }
+  return link.type;
 }
 
 async function authorizedGet(url, retried = false) {
@@ -198,7 +258,10 @@ async function loadItems() {
   }
   const payload = await response.json();
   items = payload.items || [];
-  if (!items.some((item) => item.id === selectedId)) {
+  const known =
+    items.some((item) => item.id === selectedId) ||
+    items.some((item) => (item.links || []).some((link) => link.id === selectedId));
+  if (!known) {
     selectedId = items[0] ? items[0].id : null;
   }
   status = items.length ? `${items.length} on the wall` : "Nothing on the wall yet.";
@@ -233,8 +296,17 @@ function DerivedList({ rows }) {
       <h3>Derived</h3>
       ${rows.map(
         (link) => html`
-          <div key=${link.id} class="derived-item">
-            <p class="type">${link.type}</p>
+          <button
+            type="button"
+            key=${`${link.rel}:${link.id}`}
+            class="derived-item"
+            aria-current=${selectedId === link.id ? "true" : undefined}
+            onClick=${() => {
+              selectedId = link.id;
+              paint();
+            }}
+          >
+            <p class="type">${linkName(link)}</p>
             <dl class="kv">
               ${visibleValues(link.values).map(
                 ([key, value]) => html`
@@ -245,7 +317,7 @@ function DerivedList({ rows }) {
                 `,
               )}
             </dl>
-          </div>
+          </button>
         `,
       )}
     </div>
@@ -264,37 +336,42 @@ function Tile({ item, title }) {
 function ItemCard({ item, current }) {
   const title = item.values.title || item.type;
   const extras = visibleValues(item.values).slice(0, 4);
-  const derived = current ? derivedRows(item) : [];
+  const derived = cardShowsLinks(item, current) ? linkedRows(item) : [];
+  const onGrid = current && current.id === item.id;
   return html`
-    <button
-      type="button"
+    <article
       class="card"
-      aria-current=${current ? "true" : undefined}
-      onClick=${() => {
-        selectedId = item.id;
-        paint();
-      }}
+      aria-current=${onGrid || derived.length ? "true" : undefined}
     >
-      <${Tile} item=${item} title=${title} />
-      <div class="card-copy">
-        <p class="type">${item.type}</p>
-        <h2 class="title">${title}</h2>
-        <dl class="kv">
-          ${extras.map(
-            ([key, value]) => html`
-              <div key=${key}>
-                <dt>${key}</dt>
-                <dd>${displayValue(value)}</dd>
-              </div>
-            `,
-          )}
-        </dl>
-        ${item.colours.length
-          ? html`<div class="chips">${item.colours.map((hex) => html`<${Chip} hex=${hex} />`)}</div>`
-          : null}
-        <${DerivedList} rows=${derived} />
-      </div>
-    </button>
+      <button
+        type="button"
+        class="card-select"
+        onClick=${() => {
+          selectedId = item.id;
+          paint();
+        }}
+      >
+        <${Tile} item=${item} title=${title} />
+        <div class="card-copy">
+          <p class="type">${item.type}</p>
+          <h2 class="title">${title}</h2>
+          <dl class="kv">
+            ${extras.map(
+              ([key, value]) => html`
+                <div key=${key}>
+                  <dt>${key}</dt>
+                  <dd>${displayValue(value)}</dd>
+                </div>
+              `,
+            )}
+          </dl>
+          ${item.colours.length
+            ? html`<div class="chips">${item.colours.map((hex) => html`<${Chip} hex=${hex} />`)}</div>`
+            : null}
+        </div>
+      </button>
+      <${DerivedList} rows=${derived} />
+    </article>
   `;
 }
 
@@ -342,8 +419,7 @@ function App() {
           <div class="layout">
             <section class="grid" aria-label="Items">
               ${items.map(
-                (item) =>
-                  html`<${ItemCard} item=${item} current=${current && current.id === item.id} />`,
+                (item) => html`<${ItemCard} item=${item} current=${current} />`,
               )}
             </section>
             <${Provenance} item=${current} />

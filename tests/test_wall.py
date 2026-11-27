@@ -164,8 +164,10 @@ def test_wall_items_include_live_derived_from_that_is_not_colour(client):
     assert by_id[colour.id]["rel"] == "derived_from"
     assert by_id[colour.id]["type"] == "colour"
     assert by_id[colour.id]["values"]["hex"] == "#336699"
-    assert colour.id not in {entry["id"] for entry in payload}
-    assert any(entry["id"] == bulb.id for entry in payload)
+    ids = {entry["id"] for entry in payload}
+    assert photo.id in ids
+    assert colour.id not in ids
+    assert bulb.id not in ids
 
 
 def test_wall_items_omit_retracted_derived_from(client):
@@ -181,6 +183,7 @@ def test_wall_items_omit_retracted_derived_from(client):
     row = next(entry for entry in payload if entry["id"] == photo.id)
     assert row["links"] == []
     assert row["colours"] == []
+    assert any(entry["id"] == bulb.id for entry in payload)
 
 
 def test_wall_items_include_unfurl_preview_on_link(client, blob_dir):
@@ -203,6 +206,62 @@ def test_wall_items_include_unfurl_preview_on_link(client, blob_dir):
     assert link["type"] == "capture.image"
     assert link["values"]["$blob"] == sha
     assert link["values"]["title"] == "Hallway lamp"
+    assert preview.id not in {entry["id"] for entry in payload}
+
+
+def test_wall_items_include_fits_on_both_items(client):
+    lamp = ItemFactory()
+    shade = ItemFactory(type="capture.file")
+    with record("edit", "user") as rec:
+        rec.link(lamp, shade, "fits")
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    by_id = {entry["id"]: entry for entry in payload}
+    assert lamp.id in by_id
+    assert shade.id in by_id
+    lamp_fits = next(row for row in by_id[lamp.id]["links"] if row["rel"] == "fits")
+    shade_fits = next(row for row in by_id[shade.id]["links"] if row["rel"] == "fits")
+    assert lamp_fits["id"] == shade.id
+    assert lamp_fits["type"] == "capture.file"
+    assert shade_fits["id"] == lamp.id
+    assert shade_fits["type"] == lamp.type
+
+
+def test_wall_items_include_archive_on_link(client, blob_dir):
+    with record("ingest", "test") as rec:
+        page = rec.item("capture.link")
+        rec.claim(page, "url", "https://example.com/lamp")
+        rec.claim(page, "title", "Hallway lamp")
+    with record("derive", "archive@1", subject=page) as rec:
+        archive = rec.item("capture.file")
+        sha = rec.blob(b"mhtml-bytes", "multipart/related")
+        rec.claim(archive, "$blob", sha)
+        rec.link(archive, page, "derived_from")
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    ids = {entry["id"] for entry in payload}
+    assert page.id in ids
+    assert archive.id not in ids
+    row = next(entry for entry in payload if entry["id"] == page.id)
+    link = next(entry for entry in row["links"] if entry["id"] == archive.id)
+    assert link["rel"] == "derived_from"
+    assert link["type"] == "capture.file"
+    assert link["values"]["$blob"] == sha
+    assert link["content_type"] == "multipart/related"
+
+
+def test_wall_items_omit_retracted_fits(client):
+    lamp = ItemFactory()
+    shade = ItemFactory(type="capture.file")
+    with record("edit", "user") as rec:
+        live = rec.link(lamp, shade, "fits")
+    with record("edit", "user") as rec:
+        rec.retract(live)
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    by_id = {entry["id"]: entry for entry in payload}
+    assert by_id[lamp.id]["links"] == []
+    assert by_id[shade.id]["links"] == []
 
 
 def test_wall_spa_renders_model_cost_and_prompt_hash(client):
@@ -280,4 +339,7 @@ def test_wall_spa_lists_derived_items_and_link_preview(client):
     assert 'link.type !== "colour"' in text
     assert 'item.type === "capture.link"' in text
     assert "Derived" in text
+    assert "Archive" in text
+    assert "multipart/related" in text
+    assert "selectedId = link.id" in text
     assert "createObjectURL" in text
