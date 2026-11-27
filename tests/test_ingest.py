@@ -10,6 +10,7 @@ TOKEN = {"HTTP_AUTHORIZATION": "Bearer dev-shortcut-token"}
 FIXTURES = Path(__file__).parent / "fixtures"
 TINY_PDF = FIXTURES / "tiny.pdf"
 ENCRYPTED_PDF = FIXTURES / "encrypted.pdf"
+TINY_MP4 = FIXTURES / "tiny.mp4"
 
 pytestmark = pytest.mark.django_db(databases=["default", "data"])
 
@@ -28,6 +29,35 @@ def blob_dir(settings, tmp_path):
 
 def pdf(path=TINY_PDF, name="spec.pdf", content_type="application/pdf"):
     return SimpleUploadedFile(name, path.read_bytes(), content_type)
+
+
+def video(path=TINY_MP4, name="lamp.mp4", content_type="video/mp4"):
+    return SimpleUploadedFile(name, path.read_bytes(), content_type)
+
+
+def audio_only_mp4():
+    def u32(n):
+        return n.to_bytes(4, "big")
+
+    def box(typ, payload):
+        return u32(8 + len(payload)) + typ + payload
+
+    identity = (
+        u32(0x00010000) + u32(0) * 3 + u32(0x00010000) + u32(0) * 3 + u32(0x40000000)
+    )
+    mvhd = box(
+        b"mvhd",
+        b"\x00" * 12
+        + u32(1000)
+        + u32(500)
+        + u32(0x00010000)
+        + b"\x01\x00\x00\x00"
+        + u32(0) * 2
+        + identity
+        + b"\x00" * 24
+        + u32(2),
+    )
+    return box(b"ftyp", b"isom" + u32(0) + b"isommp41") + box(b"moov", mvhd)
 
 
 def test_url_only_creates_link_with_preferred_claims(client):
@@ -63,6 +93,7 @@ def test_url_only_creates_link_with_preferred_claims(client):
     "url",
     [
         "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://vimeo.com/123456789",
         "https://x.com/trove/status/1",
         "https://example.com/blog/post",
     ],
@@ -182,4 +213,83 @@ def test_large_pdf_is_accepted(client, blob_dir):
     assert response.json()["type"] == "capture.document"
     values = Item.objects.get(id=response.json()["id"]).current_values()
     assert values["pages"] == 1
+    assert "$blob" in values
+
+
+def test_mp4_becomes_video_with_duration_and_size(client, blob_dir):
+    response = client.post("/ingest/", {"file": video(), "title": "lamp"}, **TOKEN)
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.video"
+    item = Item.objects.get(id=payload["id"])
+    values = item.current_values()
+    assert values["duration"] == 1
+    assert (values["width"], values["height"]) == (2, 2)
+    assert values["title"] == "lamp"
+    assert (blob_dir / values["$blob"][:2]).exists()
+    ranks = {
+        claim.path: claim.rank
+        for claim in Claim.objects.filter(
+            item=item, path__in=("duration", "width", "height", "title")
+        )
+    }
+    assert ranks == {
+        "duration": Claim.Rank.NORMAL,
+        "width": Claim.Rank.NORMAL,
+        "height": Claim.Rank.NORMAL,
+        "title": Claim.Rank.PREFERRED,
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "content_type"),
+    [
+        ("clip.mov", "video/quicktime"),
+        ("clip.mp4", "application/octet-stream"),
+    ],
+)
+def test_quicktime_and_octet_stream_mp4_are_video(client, blob_dir, name, content_type):
+    response = client.post(
+        "/ingest/", {"file": video(name=name, content_type=content_type)}, **TOKEN
+    )
+    assert response.status_code == 201, response.content
+    assert response.json()["type"] == "capture.video"
+    values = Item.objects.get(id=response.json()["id"]).current_values()
+    assert values["duration"] == 1
+    assert (values["width"], values["height"]) == (2, 2)
+    assert "$blob" in values
+
+
+def test_audio_only_video_keeps_blob_and_duration(client, blob_dir):
+    upload = SimpleUploadedFile("hum.mp4", audio_only_mp4(), "video/mp4")
+    response = client.post("/ingest/", {"file": upload}, **TOKEN)
+    assert response.status_code == 201, response.content
+    assert response.json()["type"] == "capture.video"
+    values = Item.objects.get(id=response.json()["id"]).current_values()
+    assert values["duration"] == 0.5
+    assert "$blob" in values
+    assert "width" not in values
+    assert "height" not in values
+    assert (blob_dir / values["$blob"][:2]).exists()
+
+
+def test_unknown_video_bytes_still_store_a_blob(client, blob_dir):
+    junk = SimpleUploadedFile("clip.webm", b"not a container", "video/webm")
+    response = client.post("/ingest/", {"file": junk}, **TOKEN)
+    assert response.status_code == 201, response.content
+    assert response.json()["type"] == "capture.video"
+    values = Item.objects.get(id=response.json()["id"]).current_values()
+    assert "$blob" in values
+    assert "duration" not in values
+    assert (blob_dir / values["$blob"][:2]).exists()
+
+
+def test_large_video_is_accepted(client, blob_dir):
+    padded = TINY_MP4.read_bytes() + (b"\x00" * 64_000)
+    huge = SimpleUploadedFile("big.mp4", padded, "video/mp4")
+    response = client.post("/ingest/", {"file": huge}, **TOKEN)
+    assert response.status_code == 201, response.content
+    assert response.json()["type"] == "capture.video"
+    values = Item.objects.get(id=response.json()["id"]).current_values()
+    assert values["duration"] == 1
     assert "$blob" in values
