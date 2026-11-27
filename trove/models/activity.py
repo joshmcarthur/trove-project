@@ -27,3 +27,6 @@ class Activity(Fact):
     error = models.TextField(blank=True, default="")
     started = models.DateTimeField()
     ended = models.DateTimeField()
+
+    class Meta:
+        verbose_name_plural = "activities"

@@ -9,3 +9,7 @@ class ConfigEntry(models.Model):
     data = models.JSONField(default=dict)
     options = models.JSONField(default=dict)
     version = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        verbose_name = "plugin"
+        verbose_name_plural = "plugins"

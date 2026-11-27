@@ -1,0 +1,28 @@
+{% extends "admin/change_list.html" %}
+{% block result_list %}
+<div class="results">
+  <table id="result_list">
+    <thead>
+      <tr>
+        <th>Plugin</th>
+        <th>Status</th>
+        <th>Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for plugin in plugin_status %}
+      <tr>
+        <td>{{ plugin.domain }}</td>
+        <td>{{ plugin.status }}</td>
+        <td>{{ plugin.error }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="3">No plugins loaded.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ block.super }}
+{% endblock %}
