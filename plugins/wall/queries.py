@@ -1,38 +1,46 @@
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 
-from trove.models import Item, Link
+from trove.models import Blob, Item, Link
 
 
 def wall_items() -> dict:
-    payload = []
-    items = (
+    has_derived_parent = Exists(
+        Link.objects.live().filter(source_id=OuterRef("pk"), rel="derived_from")
+    )
+    items = list(
         Item.objects.exclude(type="colour")
+        .annotate(_derived=has_derived_parent)
+        .filter(_derived=False)
         .select_related("activity")
         .prefetch_related("claims__activity", "subject_activities")
         .order_by("created")
     )
-    for item in items:
-        colours = []
-        links = []
-        derived = (
-            Link.objects.live()
-            .filter(target=item, rel="derived_from")
-            .select_related("source")
-        )
-        for link in derived:
-            source = link.source
-            values = source.current_values()
-            links.append(
-                {
-                    "rel": link.rel,
-                    "id": source.id,
-                    "type": source.type,
-                    "values": values,
-                }
+    item_ids = {item.id for item in items}
+    live_links = list(
+        Link.objects.live()
+        .filter(Q(source_id__in=item_ids) | Q(target_id__in=item_ids))
+        .select_related("source", "target")
+        .prefetch_related("source__claims", "target__claims")
+    )
+    content_types = _blob_types(live_links)
+    links_by_item: dict[str, list] = {item.id: [] for item in items}
+    for link in live_links:
+        if link.source_id in links_by_item:
+            links_by_item[link.source_id].append(
+                _link_row(link, link.source, content_types)
             )
-            if source.type != "colour":
+        if link.target_id in links_by_item and link.target_id != link.source_id:
+            links_by_item[link.target_id].append(
+                _link_row(link, link.target, content_types)
+            )
+    payload = []
+    for item in items:
+        rows = links_by_item[item.id]
+        colours = []
+        for row in rows:
+            if row["rel"] != "derived_from" or row["type"] != "colour":
                 continue
-            hexv = values.get("hex")
+            hexv = row["values"].get("hex")
             if hexv:
                 colours.append(hexv)
         payload.append(
@@ -41,11 +49,42 @@ def wall_items() -> dict:
                 "type": item.type,
                 "values": item.current_values(),
                 "colours": colours,
-                "links": links,
+                "links": rows,
                 "provenance": provenance_for(item),
             }
         )
     return {"items": payload}
+
+
+def _blob_types(links: list[Link]) -> dict[str, str]:
+    shas = []
+    for link in links:
+        for end in (link.source, link.target):
+            sha = end.current_values().get("$blob")
+            if isinstance(sha, str) and sha:
+                shas.append(sha)
+    if not shas:
+        return {}
+    return {
+        blob.sha256: blob.content_type for blob in Blob.objects.filter(sha256__in=shas)
+    }
+
+
+def _link_row(link: Link, item: Item, content_types: dict[str, str]) -> dict:
+    other = link.target if link.source_id == item.id else link.source
+    values = other.current_values()
+    row = {
+        "rel": link.rel,
+        "id": other.id,
+        "type": other.type,
+        "values": values,
+    }
+    sha = values.get("$blob")
+    if isinstance(sha, str):
+        ctype = content_types.get(sha)
+        if ctype:
+            row["content_type"] = ctype
+    return row
 
 
 def provenance_for(item: Item) -> list[dict]:

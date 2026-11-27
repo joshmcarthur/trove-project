@@ -135,16 +135,19 @@ def test_corrupt_video_fails_derive_and_keeps_the_blob(client, blob_dir, core):
     assert not Item.objects.filter(type="capture.image").exists()
 
 
-def test_wall_lists_the_poster_with_other_images(client, blob_dir, core):
+def test_wall_shows_the_poster_on_the_video(client, blob_dir, core):
     item = ingest_video(client, video())
     derive_poster(core, item)
     still = Item.objects.get(type="capture.image")
     payload = wall_items()["items"]
     ids = {row["id"] for row in payload}
     assert item.id in ids
-    row = next(entry for entry in payload if entry["id"] == still.id)
-    assert row["type"] == "capture.image"
-    assert row["values"]["$blob"]
+    assert still.id not in ids
+    row = next(entry for entry in payload if entry["id"] == item.id)
+    link = next(entry for entry in row["links"] if entry["id"] == still.id)
+    assert link["rel"] == "derived_from"
+    assert link["type"] == "capture.image"
+    assert link["values"]["$blob"]
 
 
 def test_palette_can_consume_the_poster(client, blob_dir, core):

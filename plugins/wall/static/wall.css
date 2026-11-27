@@ -80,6 +80,17 @@ body {
   border: 1px solid var(--line);
   background: var(--paper);
   color: inherit;
+}
+
+.card-select {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -104,7 +115,8 @@ body {
   padding: 0.85rem 0.85rem 0.7rem;
 }
 
-.card:focus-visible {
+.card-select:focus-visible,
+.derived-item:focus-visible {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
@@ -167,8 +179,8 @@ body {
   padding-top: 0.75rem;
 }
 
-.chips + .derived {
-  margin-top: 0;
+.card > .derived {
+  padding: 0 0.85rem 0.7rem;
 }
 
 .chips {
@@ -183,8 +195,25 @@ body {
   font-weight: 600;
 }
 
+.derived-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
 .derived-item + .derived-item {
   margin-top: 0.5rem;
+}
+
+.derived-item[aria-current="true"] {
+  outline: 1px solid currentColor;
 }
 
 .chip {
