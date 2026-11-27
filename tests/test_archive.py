@@ -1,7 +1,11 @@
-import io
+import sys
+import urllib.request
 from email.message import EmailMessage
+from io import BytesIO
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.response import addinfourl
 
 import pytest
 
@@ -70,18 +74,48 @@ def make_link(url):
     return item
 
 
+def patch_open(monkeypatch, fake):
+    monkeypatch.setattr(sys.modules["trove_plugins.archive.run"], "_open", fake)
+
+
 def returns(body, url=PAGE, timeout_seen=None):
-    def urlopen(request, timeout=None):
+    def open_http(request, timeout=None):
         if timeout_seen is not None:
             timeout_seen.append(timeout)
         assert not request.has_header("Authorization")
         return Fetched(body, url=url)
 
-    return urlopen
+    return open_http
+
+
+class RedirectToPrivate(urllib.request.BaseHandler):
+    handler_order = 1
+
+    def __init__(self, location):
+        self.location = location
+        self.opened = []
+
+    def http_open(self, req):
+        return self._open(req)
+
+    def https_open(self, req):
+        return self._open(req)
+
+    def _open(self, req):
+        url = req.full_url
+        self.opened.append(url)
+        host = urlparse(url).hostname
+        if host in {"127.0.0.1", "100.64.0.1"}:
+            raise AssertionError(f"private hop opened: {url}")
+        headers = EmailMessage()
+        headers["Location"] = self.location
+        resp = addinfourl(BytesIO(b""), headers, url, code=302)
+        resp.msg = "Found"
+        return resp
 
 
 def http_404(request, timeout=None):
-    raise HTTPError(request.full_url, 404, "Not Found", {}, io.BytesIO(b""))
+    raise HTTPError(request.full_url, 404, "Not Found", {}, BytesIO(b""))
 
 
 def timed_out(request, timeout=None):
@@ -112,7 +146,7 @@ def test_missing_url_fails_and_keeps_the_item(core):
 
 def test_public_https_url_stores_mhtml_blob(core, blob_dir, public_dns, monkeypatch):
     timeouts = []
-    monkeypatch.setattr("urllib.request.urlopen", returns(MHTML, timeout_seen=timeouts))
+    patch_open(monkeypatch, returns(MHTML, timeout_seen=timeouts))
     item = archive(core, make_link(PAGE))
     files = derived_files(item)
     assert len(files) == 1
@@ -136,7 +170,7 @@ def test_public_https_url_stores_mhtml_blob(core, blob_dir, public_dns, monkeypa
 
 
 def test_same_url_twice_gets_two_archive_items(core, blob_dir, public_dns, monkeypatch):
-    monkeypatch.setattr("urllib.request.urlopen", returns(MHTML))
+    patch_open(monkeypatch, returns(MHTML))
     first = archive(core, make_link(PAGE))
     second = archive(core, make_link(PAGE))
     assert first.id != second.id
@@ -148,12 +182,23 @@ def test_same_url_twice_gets_two_archive_items(core, blob_dir, public_dns, monke
 
 
 def test_rederive_reuses_the_same_archive_item(core, blob_dir, public_dns, monkeypatch):
-    monkeypatch.setattr("urllib.request.urlopen", returns(MHTML))
+    patch_open(monkeypatch, returns(MHTML))
     item = archive(core, make_link(PAGE))
     first = derived_files(item)[0]
-    archive(core, item)
+    processor = core.processors["archive"]
+    processor.version = 2
+    try:
+        archive(core, item)
+    finally:
+        processor.version = 1
     files = derived_files(item)
     assert [row.id for row in files] == [first.id]
+    agents = list(
+        Activity.objects.filter(kind="derive", subject=item, outcome="ok")
+        .order_by("started")
+        .values_list("agent", flat=True)
+    )
+    assert agents == ["archive@1", "archive@2"]
 
 
 @pytest.mark.parametrize(
@@ -174,9 +219,29 @@ def test_private_urls_fail_without_fetching(core, monkeypatch, url):
         seen.append(request.full_url)
         return Fetched(MHTML)
 
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    patch_open(monkeypatch, urlopen)
     item = archive(core, make_link(url))
     assert seen == []
+    act = Activity.objects.get(agent="archive@1", subject=item)
+    assert act.outcome == "failed"
+    assert Item.objects.filter(id=item.id, type="capture.link").exists()
+    assert not Item.objects.filter(type="capture.file").exists()
+    assert not Blob.objects.exists()
+
+
+@pytest.mark.parametrize("location", ["http://127.0.0.1/", "http://100.64.0.1/"])
+def test_redirect_to_private_ip_is_not_opened(core, public_dns, monkeypatch, location):
+    archive_run = sys.modules["trove_plugins.archive.run"]
+    handler = RedirectToPrivate(location)
+    monkeypatch.setattr(
+        archive_run,
+        "_build_opener",
+        lambda: urllib.request.build_opener(
+            archive_run._PublicRedirectHandler, handler
+        ),
+    )
+    item = archive(core, make_link(PAGE))
+    assert handler.opened == [PAGE]
     act = Activity.objects.get(agent="archive@1", subject=item)
     assert act.outcome == "failed"
     assert Item.objects.filter(id=item.id, type="capture.link").exists()
@@ -187,9 +252,7 @@ def test_private_urls_fail_without_fetching(core, monkeypatch, url):
 def test_oversize_archive_fails_without_storing(
     core, blob_dir, public_dns, monkeypatch
 ):
-    monkeypatch.setattr(
-        "urllib.request.urlopen", returns(b"x" * (20 * 1024 * 1024 + 1))
-    )
+    patch_open(monkeypatch, returns(b"x" * (20 * 1024 * 1024 + 1)))
     item = archive(core, make_link(PAGE))
     act = Activity.objects.get(agent="archive@1", subject=item)
     assert act.outcome == "failed"
@@ -202,7 +265,7 @@ def test_oversize_archive_fails_without_storing(
 def test_fetch_failures_fail_derive_and_keep_the_link(
     core, public_dns, monkeypatch, fake
 ):
-    monkeypatch.setattr("urllib.request.urlopen", fake)
+    patch_open(monkeypatch, fake)
     item = archive(core, make_link(PAGE))
     act = Activity.objects.get(agent="archive@1", subject=item)
     assert act.outcome == "failed"

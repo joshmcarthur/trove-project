@@ -20,6 +20,12 @@ class ArchiveError(Exception):
     pass
 
 
+class _PublicRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _require_public_http(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def run(item, ctx):
     url = ctx.values(item).get("url")
     if not isinstance(url, str) or not url.strip():
@@ -37,11 +43,19 @@ def run(item, ctx):
     )
 
 
+def _build_opener():
+    return urllib.request.build_opener(_PublicRedirectHandler)
+
+
+def _open(request, timeout):
+    return _build_opener().open(request, timeout=timeout)
+
+
 def _fetch(url: str) -> bytes:
     _require_public_http(url)
     request = Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        with _open(request, timeout=TIMEOUT) as response:
             _require_public_http(response.geturl())
             data = response.read(MAX_BYTES + 1)
     except HTTPError as exc:
