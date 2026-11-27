@@ -31,6 +31,8 @@ uv run zensical serve
 ```
 
 Do not use `manage.py test`. Put Django model graphs in `tests/factories.py`.
+`manage.py backup` writes a tarball; restore is unpack plus migrate. The steps
+are in [docs/getting-started.md](docs/getting-started.md).
 
 CI on pull requests to `main` runs `uv sync --frozen --group dev`, then ruff
 format, ruff check, and pytest.
