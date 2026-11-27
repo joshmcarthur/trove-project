@@ -42,11 +42,21 @@ def provenance_for(item: Item) -> list[dict]:
     def add(activity):
         if activity is None or activity.id in seen:
             return
-        seen[activity.id] = {
+        row = {
             "kind": activity.kind,
             "agent": activity.agent,
             "when": activity.ended.isoformat(),
         }
+        params = activity.params or {}
+        model = params.get("model")
+        if model:
+            row["model"] = model
+        prompt_hash = params.get("prompt_hash")
+        if prompt_hash:
+            row["prompt_hash"] = prompt_hash
+        if activity.cost is not None:
+            row["cost"] = activity.cost
+        seen[activity.id] = row
 
     add(item.activity)
     for claim in item.claims.all():

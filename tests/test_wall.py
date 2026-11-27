@@ -97,6 +97,58 @@ def test_wall_items_include_current_values_and_provenance(client):
     assert all("when" in entry for entry in row["provenance"])
 
 
+def test_wall_provenance_includes_derive_model_and_cost(client):
+    item = ItemFactory()
+    prompt_hash = "ab" * 32
+    with record(
+        "derive",
+        "agent@1",
+        subject=item,
+        params={
+            "model": "gpt-4o-mini",
+            "prompt_hash": prompt_hash,
+            "endpoint": "https://example.test",
+        },
+    ) as rec:
+        rec.cost = 0.012
+        rec.claim(item, "title", "hallway lamp")
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    row = next(entry for entry in payload if entry["id"] == item.id)
+    derive = next(entry for entry in row["provenance"] if entry["kind"] == "derive")
+    ingest = next(entry for entry in row["provenance"] if entry["kind"] == "ingest")
+    assert derive["model"] == "gpt-4o-mini"
+    assert derive["prompt_hash"] == prompt_hash
+    assert derive["cost"] == 0.012
+    assert "endpoint" not in derive
+    assert "model" not in ingest
+    assert "prompt_hash" not in ingest
+    assert "cost" not in ingest
+
+
+def test_wall_provenance_omits_missing_model_and_cost(client):
+    item = ItemFactory()
+    with record("derive", "agent@1", subject=item) as rec:
+        rec.claim(item, "title", "hallway lamp")
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    row = next(entry for entry in payload if entry["id"] == item.id)
+    derive = next(entry for entry in row["provenance"] if entry["kind"] == "derive")
+    assert derive["agent"] == "agent@1"
+    assert "when" in derive
+    assert "model" not in derive
+    assert "prompt_hash" not in derive
+    assert "cost" not in derive
+
+
+def test_wall_spa_renders_model_cost_and_prompt_hash(client):
+    text = client.get("/wall/vendor/wall.js").content.decode()
+    assert "row.model" in text
+    assert "row.prompt_hash" in text
+    assert "row.cost" in text
+    assert "gpt-4o-mini" not in text
+
+
 def test_wall_blob_returns_png_bytes_and_content_type(client, blob_dir):
     data = image_bytes("PNG")
     item, sha = store_blob("capture.image", data, "image/png")
