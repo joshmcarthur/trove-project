@@ -49,7 +49,7 @@ def test_prompt_types_skip_colour_and_capture(core):
     names = {row["name"] for row in fillable_types(core)}
     assert "colour" not in names
     assert not any(name.startswith("capture.") for name in names)
-    assert {"bulb", "reference_shot", "link"} <= names
+    assert {"bulb", "reference_shot", "link", "screenshot"} <= names
     blob = json.dumps(fillable_types(core))
     assert "hex" not in blob.lower()
 

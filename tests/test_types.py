@@ -9,7 +9,7 @@ from trove.tasks.execute import execute_derive
 
 pytestmark = pytest.mark.django_db(databases=["default", "data"])
 
-AGENT_TYPES = ("bulb", "reference_shot", "link")
+AGENT_TYPES = ("bulb", "reference_shot", "link", "screenshot")
 COLOUR_KEYS = {"hex", "colour", "color", "rgb"}
 
 
@@ -64,6 +64,11 @@ def test_derive_can_fill_types_without_colour(core):
                         "title": "lamp spec",
                     },
                 ),
+                Emit(
+                    type="screenshot",
+                    key="settings",
+                    claims={"surface": "Settings"},
+                ),
             ]
         )
 
@@ -74,10 +79,13 @@ def test_derive_can_fill_types_without_colour(core):
     bulb = Item.objects.get(type="bulb")
     shot = Item.objects.get(type="reference_shot")
     link = Item.objects.get(type="link")
+    shot_ui = Item.objects.get(type="screenshot")
     assert bulb.current_values()["base"] == "E27"
     assert shot.current_values()["subject"] == "hallway lamp"
     assert link.current_values()["url"] == "https://example.com/lamp"
+    assert shot_ui.current_values()["surface"] == "Settings"
     assert "hex" not in bulb.current_values()
+    assert "hex" not in shot_ui.current_values()
 
 
 def test_colour_claim_is_rejected_on_agent_types(core):

@@ -20,6 +20,16 @@ class ReferenceShot(BaseModel):
     subject: str | None = Field(default=None, description="What the photo is of.")
 
 
+class Screenshot(BaseModel):
+    """App chrome or a UI shot, not a photograph."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface: str | None = Field(
+        default=None, description="App or screen this shot is of."
+    )
+
+
 class Link(BaseModel):
     """A web page or post you saved as a URL."""
 
