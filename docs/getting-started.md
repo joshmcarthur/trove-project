@@ -42,8 +42,7 @@ Tailscale network until auth is in place.
 ## iOS Shortcut
 
 The iOS capture path in version 1 is a share-sheet Shortcut: it posts the
-shared file to `/ingest/` with the long-lived token and expects 201. A native
-share extension is roadmap.
+shared file to `/ingest/` with the long-lived token and expects 201. A native share extension is on the roadmap.
 
 There is no importable `.shortcut` in this tree yet. Build one that POSTs the
 file and the token. The Go `/records` JSON path is gone.

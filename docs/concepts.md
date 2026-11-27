@@ -20,7 +20,7 @@ page count, duration) are claims on the item, not columns on `blobs`.
 
 A claim is one value at one path on one item, written by a processor or a
 person, always inside an activity. A human correction is a preferred claim.
-Processor and AI output is normal. Deprecated claims are hidden.
+Output from processors and AI has normal rank. Deprecated claims are hidden.
 
 ## Links
 
@@ -49,9 +49,7 @@ function, in the Home Assistant style. They declare types, processors, views,
 and optional add-on processes. They read through the query layer and write
 through the recorder only.
 
-Ingest is the only core plugin; Trove will not start without it. Wall,
-palette, and agent ship built-in for version 1. MCP, embeddings, proposals,
-and Telegram are roadmap.
+Ingest is the only core plugin; Trove will not start without it. Wall, palette, and agent are built-in plugins in version 1. MCP, embeddings, proposals, and Telegram are on the roadmap.
 
 ## Jobs
 
