@@ -10,6 +10,7 @@ from .ids import new_id
 from .item import Item
 from .link import Link
 from .link_query_set import LinkQuerySet
+from .setup_code import SetupCode
 
 __all__ = [
     "Activity",
@@ -23,5 +24,6 @@ __all__ = [
     "Item",
     "Link",
     "LinkQuerySet",
+    "SetupCode",
     "new_id",
 ]

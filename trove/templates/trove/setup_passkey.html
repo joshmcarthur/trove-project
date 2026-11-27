@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Register owner passkey</title>
+</head>
+<body>
+  <h1>Register the owner passkey</h1>
+  <p>This passkey is the only way in, and there is no password.</p>
+  <form method="post" action="{% url 'setup' %}">
+    {% csrf_token %}
+    {{ form.name }}
+    {{ form.credential }}
+    <button type="button" id="mfa_webauthn_signup">Create passkey</button>
+  </form>
+  {% include "mfa/webauthn/snippets/scripts.html" %}
+  {{ js_data|json_script:"js_data" }}
+  <script data-allauth-onload="allauth.webauthn.forms.signupForm" type="application/json">{
+    "ids": {
+        "signup": "mfa_webauthn_signup",
+        "credential": "{{ form.credential.auto_id }}",
+        "data": "js_data"
+    }
+}
+  </script>
+</body>
+</html>

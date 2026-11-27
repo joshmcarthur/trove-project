@@ -2,7 +2,6 @@
 
 import io
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
@@ -11,6 +10,7 @@ from pydantic import BaseModel
 
 from trove.models import Claim
 from trove.services.recorder import record
+from trove.services.tokens import INGEST_SCOPE, agent_for_request
 
 PREFERRED = Claim.Rank.PREFERRED
 
@@ -22,10 +22,7 @@ class Capture(BaseModel):
 
 
 def _client(request):
-    """Spike stand-in for django-oauth-toolkit: bearer token maps to a client name."""
-    auth = request.headers.get("Authorization", "")
-    token = auth.removeprefix("Bearer ").strip()
-    return settings.TROVE["INGEST_TOKENS"].get(token)
+    return agent_for_request(request, INGEST_SCOPE)
 
 
 def _file_metadata(data: bytes, content_type: str) -> dict:

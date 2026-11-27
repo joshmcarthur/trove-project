@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Trove setup</title>
+</head>
+<body>
+  <h1>Claim this Trove</h1>
+  <p>Enter the setup code from the server console.</p>
+  <form method="post" action="{% url 'setup' %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Continue</button>
+  </form>
+</body>
+</html>
