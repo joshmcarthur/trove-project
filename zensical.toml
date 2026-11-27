@@ -1,0 +1,18 @@
+[project]
+site_name = "Trove"
+site_url = "https://joshmcarthur.github.io/trove-project/"
+site_description = "Self-hosted collector: typed, linked, searchable items"
+docs_dir = "docs"
+site_dir = "site"
+exclude_docs = """
+/planning/
+"""
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = "getting-started.md" },
+  { "Concepts" = "concepts.md" },
+  { "Specification" = "spec.md" },
+  { "Roadmap" = "roadmap.md" },
+  { "Non-goals" = "non-goals.md" },
+  { "Contributing" = "contributing.md" },
+]
