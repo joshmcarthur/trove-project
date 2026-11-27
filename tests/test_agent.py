@@ -42,6 +42,7 @@ def test_describe_still_includes_colour_and_capture(core):
     assert "capture.image" in names
     assert "capture.file" in names
     assert "capture.link" in names
+    assert "capture.document" in names
 
 
 def test_prompt_types_skip_colour_and_capture(core):
