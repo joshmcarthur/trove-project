@@ -144,6 +144,19 @@ def test_ingest(capture, client, blob_dir):
     assert client.post("/ingest/", {"url": "x"}).status_code == 401
 
 
+def test_ingest_capture_metadata_is_preferred(capture):
+    item = capture(notes="for the hallway", url="https://example.com")
+    ranks = {
+        claim.path: claim.rank
+        for claim in Claim.objects.filter(item=item, path__in=("title", "notes", "url"))
+    }
+    assert ranks == {
+        "title": Claim.Rank.PREFERRED,
+        "notes": Claim.Rank.PREFERRED,
+        "url": Claim.Rank.PREFERRED,
+    }
+
+
 def test_ingest_heic(client, blob_dir):
     response = client.post("/ingest/", {"file": heic()}, **TOKEN)
     assert response.status_code == 201, response.content

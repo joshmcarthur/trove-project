@@ -41,11 +41,27 @@ Tailscale network until auth is in place.
 
 ## iOS Shortcut
 
-The iOS capture path in version 1 is a share-sheet Shortcut: it posts the
-shared file to `/ingest/` with the long-lived token and expects 201. A native share extension is on the roadmap.
+Share a photo or file into Capture. The Shortcut posts it to `/ingest/` with
+a `write:capture` token and shows the 201 JSON body, which has `id` and
+`type`. This replaces the Go `/records` JSON path.
 
-There is no importable `.shortcut` in this tree yet. Build one that POSTs the
-file and the token. The Go `/records` JSON path is gone.
+The workflow is `ios/Capture.plist`. iOS 15 and later will only import a
+signed `.shortcut`. On a Mac signed into iCloud:
+
+```bash
+plutil -convert binary1 -o /tmp/Capture.shortcut ios/Capture.plist
+shortcuts sign --mode anyone --input /tmp/Capture.shortcut --output ~/Desktop/Capture.shortcut
+```
+
+AirDrop `~/Desktop/Capture.shortcut` to the iPhone and open it. Import asks
+for the Trove base URL with no trailing slash (`https://trove.example.ts.net`)
+and the token printed by `uv run python manage.py token create shortcut:iphone`.
+Register the owner passkey at `/setup` before you mint that token.
+
+Title, notes, and a page URL are blank Text actions in the shortcut. Leave
+them, edit them, or replace them with Ask for Input. Fields you send become
+preferred claims. Camera-roll HEIC is a normal file upload, and a native
+share extension is on the roadmap.
 
 ## Two-week live test
 
