@@ -8,8 +8,10 @@ from django.core.management.base import BaseCommand
 from django.db import connections
 
 from trove.runtime.core import get_core
+from trove.services.clients import ensure_wall_client
 from trove.services.reap import reap_abandoned
 from trove.services.reconcile import reconcile
+from trove.services.setup_code import announce_setup
 
 
 class Command(BaseCommand):
@@ -23,6 +25,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        announce_setup(self.stdout)
+        ensure_wall_client()
         get_core()
         reap_abandoned()
         n = reconcile()

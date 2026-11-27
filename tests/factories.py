@@ -8,7 +8,9 @@ from django.utils import timezone
 from factory import Faker, Sequence, SubFactory
 from factory.django import DjangoModelFactory
 
-from trove.models import Activity, Blob, Claim, ConfigEntry, Item, Link
+from trove.models import Activity, Blob, Claim, ConfigEntry, Item, Link, SetupCode
+from trove.services.owner import ensure_owner
+from trove.services.tokens import mint_ingest_token
 
 
 class ActivityFactory(DjangoModelFactory):
@@ -72,3 +74,18 @@ class ConfigEntryFactory(DjangoModelFactory):
 
     domain = Sequence(lambda n: f"plugin{n}")
     enabled = True
+
+
+class SetupCodeFactory(DjangoModelFactory):
+    class Meta:
+        model = SetupCode
+        database = "default"
+
+    code = Sequence(lambda n: f"ab{n:02d}-cd{n:02d}")
+
+
+def seed_dev_ingest_token(
+    client_name: str = "shortcut:iphone", raw_token: str = "dev-shortcut-token"
+) -> str:
+    ensure_owner()
+    return mint_ingest_token(client_name, raw_token=raw_token)

@@ -16,7 +16,7 @@ from django_ox.testing import run_tasks
 from PIL import Image
 from pydantic import ValidationError
 
-from tests.factories import ConfigEntryFactory, ItemFactory
+from tests.factories import ConfigEntryFactory, ItemFactory, seed_dev_ingest_token
 from trove.core import Processor, get_core, reset_core
 from trove.models import Activity, AppendOnlyError, Claim, Item, Link
 from trove.services.reap import reap_abandoned
@@ -29,6 +29,11 @@ from trove.tasks.execute import execute_derive
 TOKEN = {"HTTP_AUTHORIZATION": "Bearer dev-shortcut-token"}
 
 pytestmark = pytest.mark.django_db(databases=["default", "data"])
+
+
+@pytest.fixture(autouse=True)
+def ingest_token():
+    seed_dev_ingest_token()
 
 
 def png(colour="#336699", second=(230, 120, 40)):
@@ -98,6 +103,10 @@ def test_two_databases():
     assert "auth_user" not in tables("data")
     assert "django_ox_oxtask" in tables("data")
     assert "django_ox_oxtask" not in tables("default")
+    assert "oauth2_provider_accesstoken" in tables("default")
+    assert "oauth2_provider_accesstoken" not in tables("data")
+    assert "mfa_authenticator" in tables("default")
+    assert "mfa_authenticator" not in tables("data")
 
 
 def test_append_only(capture):

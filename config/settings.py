@@ -14,6 +14,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.admin",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
+    "allauth",
+    "allauth.account",
+    "allauth.mfa",
+    "oauth2_provider",
     "django_ox",
     "trove",
 ]
@@ -25,6 +30,12 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+]
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -62,6 +73,30 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 STATIC_URL = "static/"
 
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/admin/"
+ACCOUNT_SIGNUP_ENABLED = False
+ACCOUNT_LOGIN_METHODS = {"username"}
+ACCOUNT_EMAIL_VERIFICATION = "none"
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+MFA_SUPPORTED_TYPES = ["webauthn"]
+MFA_PASSKEY_LOGIN_ENABLED = True
+MFA_ALLOW_UNVERIFIED_EMAIL = True
+MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = DEBUG
+
+OAUTH2_PROVIDER = {
+    "PKCE_REQUIRED": True,
+    "SCOPES": {
+        "read:all": "Read the collection",
+        "write:capture": "Create captures",
+    },
+    "DEFAULT_SCOPES": [],
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 60 * 60 * 24 * 30,
+    "ROTATE_REFRESH_TOKEN": True,
+}
+
 TASKS = {
     "default": {
         "BACKEND": "django_ox.backend.OxBackend",
@@ -76,5 +111,4 @@ TROVE = {
     "BLOB_DIR": BASE_DIR / "blobs",
     "PLUGIN_DIRS": [BASE_DIR / "plugins"],
     "WORKER_CONCURRENCY": 2,
-    "INGEST_TOKENS": {"dev-shortcut-token": "shortcut:iphone"},
 }

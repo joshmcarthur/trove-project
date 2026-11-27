@@ -4,7 +4,10 @@ from django.apps import apps
 
 
 def _db_for(model):
-    if model._meta.app_label == "django_ox":
+    meta = getattr(model, "_meta", None)
+    if meta is None:
+        return "default"
+    if meta.app_label == "django_ox":
         return "data"
     return getattr(model, "trove_database", "default")
 

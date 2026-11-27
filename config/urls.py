@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from trove.runtime.core import get_core
+from trove.views.setup import SetupView
 
 
 def _plugin_urlpatterns():
@@ -15,5 +16,8 @@ def _plugin_urlpatterns():
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("setup/", SetupView.as_view(), name="setup"),
+    path("accounts/", include("allauth.urls")),
+    path("o/", include("oauth2_provider.urls")),
     *_plugin_urlpatterns(),
 ]

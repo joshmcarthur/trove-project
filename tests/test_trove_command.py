@@ -24,6 +24,12 @@ def test_trove_starts_web_and_one_ox_worker(monkeypatch):
     monkeypatch.setattr("trove.management.commands.trove.get_core", lambda: None)
     monkeypatch.setattr("trove.management.commands.trove.reap_abandoned", lambda: 0)
     monkeypatch.setattr("trove.management.commands.trove.reconcile", lambda: 0)
+    monkeypatch.setattr(
+        "trove.management.commands.trove.announce_setup", lambda stdout: None
+    )
+    monkeypatch.setattr(
+        "trove.management.commands.trove.ensure_wall_client", lambda: None
+    )
     monkeypatch.setattr("subprocess.Popen", fake_popen)
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: seen.__setitem__("web", True))
 
