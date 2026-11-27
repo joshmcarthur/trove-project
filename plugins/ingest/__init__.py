@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from PIL import Image
 from pydantic import BaseModel
 
 from trove.models import Claim
@@ -25,12 +26,8 @@ def _client(request):
     return agent_for_request(request, INGEST_SCOPE)
 
 
-def _file_metadata(data: bytes, content_type: str) -> dict:
-    if not content_type.startswith("image/"):
-        return {}
+def _file_metadata(data: bytes) -> dict:
     try:
-        from PIL import Image
-
         with Image.open(io.BytesIO(data)) as img:
             return {"width": img.width, "height": img.height}
     except Exception:  # noqa: BLE001
@@ -53,11 +50,14 @@ def ingest(request):
                 upload.read(),
                 upload.content_type or "application/octet-stream",
             )
+            meta = _file_metadata(data)
             item = rec.item(
-                "capture.image" if ctype.startswith("image/") else "capture.file"
+                "capture.image"
+                if ctype.startswith("image/") or meta
+                else "capture.file"
             )
             rec.claim(item, "$blob", rec.blob(data, ctype))
-            for key, value in _file_metadata(data, ctype).items():
+            for key, value in meta.items():
                 rec.claim(item, key, value)
         else:
             item = rec.item("capture.link")
