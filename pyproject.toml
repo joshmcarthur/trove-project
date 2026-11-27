@@ -14,6 +14,7 @@ dependencies = [
     "django-oauth-toolkit>=3.4.1",
     "pillow-heif>=1",
     "pypdfium2>=5.15.2",
+    "av>=19.0.2",
 ]
 
 [dependency-groups]
