@@ -1,6 +1,7 @@
 """Core plugin: accept a POSTed file plus metadata from any authenticated client."""
 
 import io
+from urllib.parse import urlparse
 
 from django.http import JsonResponse
 from django.urls import path
@@ -34,6 +35,14 @@ def _file_metadata(data: bytes) -> dict:
         return {}
 
 
+def _posted_url(request):
+    raw = request.POST.get("url")
+    if raw is None:
+        return None
+    url = raw.strip()
+    return url or None
+
+
 @csrf_exempt
 @require_POST
 def ingest(request):
@@ -41,7 +50,9 @@ def ingest(request):
     if agent is None:
         return JsonResponse({"error": "unauthorised"}, status=401)
     upload = request.FILES.get("file")
-    url = request.POST.get("url")
+    url = _posted_url(request)
+    if url is not None and urlparse(url).scheme == "data":
+        return JsonResponse({"error": "data urls are not allowed"}, status=400)
     if upload is None and not url:
         return JsonResponse({"error": "send a file or a url"}, status=400)
     with record("ingest", agent) as rec:
@@ -61,7 +72,9 @@ def ingest(request):
                 rec.claim(item, key, value)
         else:
             item = rec.item("capture.link")
-        for key in ("title", "notes", "url"):
+        if url:
+            rec.claim(item, "url", url, rank=PREFERRED)
+        for key in ("title", "notes"):
             if request.POST.get(key):
                 rec.claim(item, key, request.POST[key], rank=PREFERRED)
     return JsonResponse({"id": item.id, "type": item.type}, status=201)
