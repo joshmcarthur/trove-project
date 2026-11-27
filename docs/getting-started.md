@@ -45,6 +45,11 @@ That creates a blob, an item, and claims inside an `ingest` activity.
 Metadata you supply (title, notes) is a preferred claim. A successful
 capture returns 201.
 
+At ingest, Trove fetches a public `.pdf` or image URL and creates a
+`capture.document` or `capture.image` item with a blob. The submitted
+URL is a preferred claim. Page URLs, private or Tailscale hosts,
+`file:` URLs, and fetch errors stay `capture.link`.
+
 Empty files and a POST with no file and no URL return 400 and create no
 item. Post the same bytes twice and you get two items that share one
 content-addressed blob; the second call is still 201. Bodies larger than

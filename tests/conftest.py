@@ -1,3 +1,4 @@
+import ipaddress
 import json
 from io import BytesIO
 from urllib.error import HTTPError
@@ -46,3 +47,19 @@ def stub_model_http(monkeypatch):
     monkeypatch.setattr(
         "urllib.request.urlopen", lambda *args, **kwargs: FakeResponse()
     )
+
+
+@pytest.fixture(autouse=True)
+def stub_public_http_network(monkeypatch):
+    def blocked(*args, **kwargs):
+        raise AssertionError("stub trove.services.public_http.urlopen in this test")
+
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            ip = ipaddress.ip_address("93.184.216.34")
+        return [(0, 0, 0, "", (str(ip), 0))]
+
+    monkeypatch.setattr("trove.services.public_http.urlopen", blocked)
+    monkeypatch.setattr("trove.services.public_url.getaddrinfo", fake_getaddrinfo)

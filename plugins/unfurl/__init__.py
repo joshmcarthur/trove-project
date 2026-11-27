@@ -1,15 +1,13 @@
 """Builtin plugin: fetch a link's title and preview image."""
 
-import urllib.request
 from html.parser import HTMLParser
-from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlparse
-from urllib.request import Request
+from urllib.parse import urljoin
 
 from trove.core import Processor
+from trove.services.fetch_error import FetchError
+from trove.services.public_http import fetch_public_http
 from trove.tasks import Emit, Result
 
-TIMEOUT = 10
 MAX_BYTES = 1_048_576
 USER_AGENT = "Trove/0.1 (unfurl)"
 HTML_TYPES = {"text/html", "application/xhtml+xml"}
@@ -68,7 +66,6 @@ def run(item, ctx):
     if not isinstance(url, str) or not url.strip():
         raise UnfurlError("link has no url")
     url = url.strip()
-    _require_http(url)
     body, content_type, final_url, charset = _get(url)
     if content_type not in HTML_TYPES:
         raise UnfurlError("non-HTML")
@@ -97,23 +94,13 @@ def setup(core, entry):
     core.add_processor(Processor("unfurl", 1, "capture.link", ["capture.image"], run))
 
 
-def _require_http(url: str):
-    if urlparse(url).scheme.lower() not in {"http", "https"}:
-        raise UnfurlError("only http(s) urls")
-
-
 def _get(url: str) -> tuple[bytes, str, str, str]:
-    request = Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            content_type = response.headers.get_content_type()
-            charset = response.headers.get_content_charset() or "utf-8"
-            data = response.read(MAX_BYTES + 1)
-            final_url = response.geturl()
-    except HTTPError as exc:
-        raise UnfurlError(f"HTTP {exc.code}") from exc
-    except (TimeoutError, URLError, OSError) as exc:
-        raise UnfurlError(str(exc) or "fetch failed") from exc
+        data, content_type, final_url, charset = fetch_public_http(
+            url, max_bytes=MAX_BYTES, user_agent=USER_AGENT
+        )
+    except FetchError as exc:
+        raise UnfurlError(str(exc)) from exc
     if len(data) > MAX_BYTES:
         data = data[:MAX_BYTES]
     return data, content_type, final_url, charset
@@ -135,7 +122,6 @@ def _preview(image_url: str | None, final_url: str):
         return None
     url = urljoin(final_url, image_url)
     try:
-        _require_http(url)
         body, content_type, _final, _charset = _get(url)
     except UnfurlError:
         return None

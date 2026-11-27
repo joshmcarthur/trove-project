@@ -10,18 +10,33 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.middleware.csrf import get_token
 from django.template import RequestContext, Template
 from django.urls import path
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt, csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from PIL import Image
 from pydantic import BaseModel
 
 from trove.models import Claim
-from trove.services.recorder import record
+from trove.services.fetch_error import FetchError
+from trove.services.public_http import fetch_public_http
+from trove.services.recorder import record, record_failure
 from trove.services.tokens import INGEST_SCOPE, agent_for_request
 
 PLUGIN_DIR = Path(__file__).parent
 
 PREFERRED = Claim.Rank.PREFERRED
+INGEST_UA = "Trove/0.1 (ingest)"
+_FILE_URL_SUFFIXES = (
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".heic",
+    ".heif",
+)
+_URL_BLOB_TYPES = frozenset({"capture.document", "capture.image"})
 _PDF_COUNT = re.compile(rb"/Count\s+(\d+)")
 _PDF_PAGE = re.compile(rb"/Type\s*/Page(?!s)")
 _VIDEO_BRANDS = {
@@ -213,6 +228,10 @@ def _upload_type_and_meta(data: bytes, ctype: str) -> tuple[str, dict]:
     return "capture.file", {}
 
 
+def looks_like_file_url(url: str) -> bool:
+    return urlparse(url).path.lower().endswith(_FILE_URL_SUFFIXES)
+
+
 def _posted_url(request):
     raw = request.POST.get("url")
     if raw is None:
@@ -267,6 +286,10 @@ def _ingest_post(request):
     if url is not None and urlparse(url).scheme == "data":
         return JsonResponse({"error": "data urls are not allowed"}, status=400)
     data, ctype = None, None
+    item_type = "capture.link"
+    meta = {}
+    fetch_error = None
+    fetch_started = None
     if upload is not None:
         if _too_large(upload.size):
             return _reject_too_large()
@@ -274,22 +297,42 @@ def _ingest_post(request):
         ctype = upload.content_type or "application/octet-stream"
         if not data:
             return JsonResponse({"error": "empty file"}, status=400)
+        item_type, meta = _upload_type_and_meta(data, ctype)
     elif not url:
         return JsonResponse({"error": "send a file or a url"}, status=400)
-    with record("ingest", agent) as rec:
-        if data is not None:
-            item_type, meta = _upload_type_and_meta(data, ctype)
-            item = rec.item(item_type)
-            rec.claim(item, "$blob", rec.blob(data, ctype))
-            for key, value in meta.items():
-                rec.claim(item, key, value)
+    elif looks_like_file_url(url):
+        max_bytes = settings.TROVE["INGEST_MAX_BYTES"]
+        fetch_started = timezone.now()
+        try:
+            data, ctype, _, _ = fetch_public_http(
+                url, max_bytes=max_bytes, user_agent=INGEST_UA
+            )
+            if not data:
+                raise FetchError("empty file")
+            if len(data) > max_bytes:
+                raise FetchError("file too large")
+        except FetchError as exc:
+            fetch_error = exc
+            data, ctype = None, None
         else:
-            item = rec.item("capture.link")
+            item_type, meta = _upload_type_and_meta(data, ctype)
+            if item_type not in _URL_BLOB_TYPES:
+                data, ctype = None, None
+                item_type = "capture.link"
+                meta = {}
+    with record("ingest", agent) as rec:
+        item = rec.item(item_type)
+        if data is not None:
+            rec.claim(item, "$blob", rec.blob(data, ctype))
+        for key, value in meta.items():
+            rec.claim(item, key, value)
         if url:
             rec.claim(item, "url", url, rank=PREFERRED)
         for key in ("title", "notes"):
             if request.POST.get(key):
                 rec.claim(item, key, request.POST[key], rank=PREFERRED)
+    if fetch_error is not None:
+        record_failure("ingest", agent, item, fetch_error, fetch_started, {"url": url})
     if agent_for_request(request, INGEST_SCOPE) is None:
         return HttpResponseRedirect(f"/ingest/?id={item.id}")
     return JsonResponse({"id": item.id, "type": item.type}, status=201)

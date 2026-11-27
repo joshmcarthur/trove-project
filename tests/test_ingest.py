@@ -5,7 +5,14 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
-from tests.factories import seed_dev_ingest_token
+from tests.factories import (
+    fake_urlopen,
+    http_404,
+    png_bytes,
+    seed_dev_ingest_token,
+    stub_public_http,
+    timed_out,
+)
 from trove.models import Activity, Blob, Claim, Item
 from trove.services.owner import ensure_owner
 
@@ -445,3 +452,123 @@ def test_owner_session_post_needs_csrf():
     assert created.status_code == 302
     item_id = parse_qs(urlparse(created["Location"]).query)["id"][0]
     assert Item.objects.get(id=item_id).type == "capture.link"
+
+
+def test_page_url_does_not_fetch(client, monkeypatch):
+    seen = []
+
+    def urlopen(request, timeout=None):
+        seen.append(request.full_url)
+        raise AssertionError("ingest should not fetch a page url")
+
+    stub_public_http(monkeypatch, urlopen)
+    response = client.post(
+        "/ingest/", {"url": "https://example.com/blog/post"}, **TOKEN
+    )
+    assert response.status_code == 201
+    assert response.json()["type"] == "capture.link"
+    assert seen == []
+
+
+def test_public_pdf_url_becomes_document_keeping_preferred_url(
+    client, blob_dir, monkeypatch
+):
+    url = "https://example.com/spec.pdf"
+    stub_public_http(
+        monkeypatch, fake_urlopen(TINY_PDF.read_bytes(), "application/pdf", url)
+    )
+    response = client.post(
+        "/ingest/", {"url": url, "title": "spec", "notes": "from the cdn"}, **TOKEN
+    )
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.document"
+    item = Item.objects.get(id=payload["id"])
+    values = item.current_values()
+    assert values["url"] == url
+    assert values["title"] == "spec"
+    assert values["notes"] == "from the cdn"
+    assert values["pages"] == 1
+    assert (blob_dir / values["$blob"][:2]).exists()
+    assert Claim.objects.get(item=item, path="url").rank == Claim.Rank.PREFERRED
+    assert item.activity.outcome == Activity.Outcome.OK
+    assert not Activity.objects.filter(subject=item, outcome="failed").exists()
+
+
+def test_public_image_url_becomes_image_keeping_preferred_url(
+    client, blob_dir, monkeypatch
+):
+    url = "https://example.com/lamp.jpg"
+    body = png_bytes()
+    stub_public_http(monkeypatch, fake_urlopen(body, "image/png", url))
+    response = client.post("/ingest/", {"url": url}, **TOKEN)
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.image"
+    item = Item.objects.get(id=payload["id"])
+    values = item.current_values()
+    assert values["url"] == url
+    assert (values["width"], values["height"]) == (2, 2)
+    assert (blob_dir / values["$blob"][:2] / values["$blob"]).read_bytes() == body
+    assert Claim.objects.get(item=item, path="url").rank == Claim.Rank.PREFERRED
+
+
+def test_pdf_url_that_returns_html_stays_a_link(client, blob_dir, monkeypatch):
+    url = "https://example.com/spec.pdf"
+    stub_public_http(monkeypatch, fake_urlopen(b"<html>login</html>", "text/html", url))
+    response = client.post("/ingest/", {"url": url}, **TOKEN)
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.link"
+    item = Item.objects.get(id=payload["id"])
+    assert item.current_values() == {"url": url}
+    assert not Blob.objects.exists()
+
+
+@pytest.mark.parametrize("fake", [http_404, timed_out])
+def test_pdf_url_fetch_failure_keeps_the_link(client, monkeypatch, fake):
+    stub_public_http(monkeypatch, fake)
+    url = "https://example.com/spec.pdf"
+    response = client.post("/ingest/", {"url": url}, **TOKEN)
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.link"
+    item = Item.objects.get(id=payload["id"])
+    assert item.current_values()["url"] == url
+    assert item.activity.outcome == Activity.Outcome.OK
+    failed = Activity.objects.get(subject=item, outcome="failed")
+    assert (failed.kind, failed.agent) == ("ingest", "shortcut:iphone")
+    assert failed.error
+    assert not Blob.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///tmp/spec.pdf",
+        "http://127.0.0.1/spec.pdf",
+        "http://10.0.0.8/spec.pdf",
+        "http://192.168.1.9/lamp.jpg",
+        "http://100.64.1.2/lamp.jpg",
+        "http://[::ffff:100.64.1.2]/lamp.jpg",
+        "http://localhost/spec.pdf",
+    ],
+)
+def test_file_or_private_url_is_not_fetched(client, monkeypatch, url):
+    seen = []
+
+    def urlopen(request, timeout=None):
+        seen.append(request.full_url)
+        raise AssertionError("must not fetch file or private urls")
+
+    stub_public_http(monkeypatch, urlopen)
+    response = client.post("/ingest/", {"url": url}, **TOKEN)
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.link"
+    item = Item.objects.get(id=payload["id"])
+    assert item.current_values()["url"] == url
+    assert item.activity.outcome == Activity.Outcome.OK
+    failed = Activity.objects.get(subject=item, outcome="failed")
+    assert (failed.kind, failed.agent) == ("ingest", "shortcut:iphone")
+    assert seen == []

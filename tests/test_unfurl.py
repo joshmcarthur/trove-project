@@ -1,12 +1,15 @@
-import io
-from email.message import EmailMessage
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
 import pytest
-from PIL import Image
 
-from tests.factories import ItemFactory
+from tests.factories import (
+    Fetched,
+    ItemFactory,
+    http_404,
+    png_bytes,
+    stub_public_http,
+    timed_out,
+)
 from trove.core import get_core, reset_core
 from trove.models import Activity, Claim, Item, Link
 from trove.services.recorder import record
@@ -40,35 +43,6 @@ def blob_dir(settings, tmp_path):
     return path
 
 
-def png_bytes():
-    img = Image.new("RGB", (2, 2), "#336699")
-    buf = io.BytesIO()
-    img.save(buf, "PNG")
-    return buf.getvalue()
-
-
-class Fetched:
-    def __init__(self, body, content_type="text/html; charset=utf-8", url=PAGE):
-        self._body = body if isinstance(body, bytes) else body.encode()
-        self.headers = EmailMessage()
-        self.headers["Content-Type"] = content_type
-        self._url = url
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def read(self, n=-1):
-        if n is None or n < 0:
-            return self._body
-        return self._body[:n]
-
-    def geturl(self):
-        return self._url
-
-
 def make_link(url, title=None):
     with record("ingest", "test") as rec:
         item = rec.item("capture.link")
@@ -91,14 +65,6 @@ def pages(html=HTML, image=None, image_type="image/png"):
     return urlopen
 
 
-def http_404(request, timeout=None):
-    raise HTTPError(request.full_url, 404, "Not Found", {}, io.BytesIO(b""))
-
-
-def timed_out(request, timeout=None):
-    raise URLError(TimeoutError("timed out"))
-
-
 def pdf_body(request, timeout=None):
     return Fetched(b"%PDF", "application/pdf", request.full_url)
 
@@ -110,7 +76,7 @@ def unfurl(core, item):
 
 
 def test_unfurl_claims_title_and_preview(core, blob_dir, monkeypatch):
-    monkeypatch.setattr("urllib.request.urlopen", pages())
+    stub_public_http(monkeypatch, pages())
     item = unfurl(core, make_link(YOUTUBE))
     assert item.current_values()["title"] == "Hallway lamp"
     assert Claim.objects.get(item=item, path="title").rank == Claim.Rank.NORMAL
@@ -129,7 +95,7 @@ def test_unfurl_claims_title_and_preview(core, blob_dir, monkeypatch):
 
 
 def test_typed_title_beats_fetched_title(core, blob_dir, monkeypatch):
-    monkeypatch.setattr("urllib.request.urlopen", pages())
+    stub_public_http(monkeypatch, pages())
     item = unfurl(core, make_link(PAGE, title="mine"))
     assert item.current_values()["title"] == "mine"
     ranks = list(
@@ -154,7 +120,7 @@ def test_file_url_fails_without_fetching(core, monkeypatch):
         seen.append(request.full_url)
         return Fetched(HTML)
 
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    stub_public_http(monkeypatch, urlopen)
     item = unfurl(core, make_link("file:///etc/passwd"))
     assert seen == []
     act = Activity.objects.get(agent="unfurl@1", subject=item)
@@ -164,7 +130,7 @@ def test_file_url_fails_without_fetching(core, monkeypatch):
 
 @pytest.mark.parametrize("fake", [http_404, timed_out, pdf_body])
 def test_fetch_failures_fail_derive_and_keep_the_link(core, monkeypatch, fake):
-    monkeypatch.setattr("urllib.request.urlopen", fake)
+    stub_public_http(monkeypatch, fake)
     item = unfurl(core, make_link(PAGE))
     act = Activity.objects.get(agent="unfurl@1", subject=item)
     assert act.outcome == "failed"
