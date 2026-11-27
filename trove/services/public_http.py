@@ -85,33 +85,26 @@ def _pinned_ip(req) -> str:
     return require_public_http(req.full_url)
 
 
-def make_opener(*extra_handlers, follow_redirects=True):
+def make_opener(*extra_handlers):
     opener = urllib.request.OpenerDirector()
-    handlers = [
+    for handler in (
         *extra_handlers,
         urllib.request.UnknownHandler(),
         PinnedHTTPHandler(),
         PinnedHTTPSHandler(),
         urllib.request.HTTPDefaultErrorHandler(),
         urllib.request.HTTPErrorProcessor(),
-    ]
-    if follow_redirects:
-        handlers.append(PublicRedirectHandler())
-    for handler in handlers:
+        PublicRedirectHandler(),
+    ):
         opener.add_handler(handler)
     return opener
 
 
 _OPENER = make_opener()
-_HOP_OPENER = make_opener(follow_redirects=False)
 
 
 def urlopen(request, timeout=None):
     return _OPENER.open(request, timeout=timeout)
-
-
-def open_hop(request, timeout=None):
-    return _HOP_OPENER.open(request, timeout=timeout)
 
 
 def fetch_public_http(
