@@ -1,6 +1,8 @@
 from trove.core import Processor
 from trove.tasks import Result
 
+from .types import Bulb, Link, ReferenceShot
+
 
 def run(item, ctx):
     values = ctx.values(item)
@@ -11,4 +13,7 @@ def run(item, ctx):
 
 
 def setup(core, entry):
+    core.add_type("bulb", Bulb)
+    core.add_type("reference_shot", ReferenceShot)
+    core.add_type("link", Link)
     core.add_processor(Processor("agent", 1, "capture.*", [], run))
