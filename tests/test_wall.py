@@ -343,3 +343,9 @@ def test_wall_spa_lists_derived_items_and_link_preview(client):
     assert "multipart/related" in text
     assert "selectedId = link.id" in text
     assert "createObjectURL" in text
+    assert "itemFromLinks" not in text
+    assert "reverseLinks" not in text
+    assert "provenance: []" not in text
+    assert "cardShowsLinks" not in text
+    assert "link.id === current.id" not in text
+    assert "current.id === item.id" in text

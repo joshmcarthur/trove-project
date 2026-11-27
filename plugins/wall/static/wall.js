@@ -83,63 +83,20 @@ function provenanceNote(row) {
   return parts.join(" · ");
 }
 
-function reverseLinks(id) {
-  const rows = [];
-  for (const item of items) {
-    for (const link of item.links || []) {
-      if (link.id === id) {
-        rows.push({
-          rel: link.rel,
-          id: item.id,
-          type: item.type,
-          values: item.values,
-        });
-      }
-    }
-  }
-  return rows;
-}
-
-function itemFromLinks(id) {
-  for (const item of items) {
-    const link = (item.links || []).find((row) => row.id === id);
-    if (!link) {
-      continue;
-    }
-    return {
-      id: link.id,
-      type: link.type,
-      values: link.values,
-      colours: [],
-      links: reverseLinks(id),
-      provenance: [],
-    };
-  }
-  return null;
-}
-
 function selectedItem() {
   if (selectedId) {
     const top = items.find((item) => item.id === selectedId);
     if (top) {
       return top;
     }
-    const nested = itemFromLinks(selectedId);
-    if (nested) {
-      return nested;
+    const owner = items.find((item) =>
+      (item.links || []).some((link) => link.id === selectedId),
+    );
+    if (owner) {
+      return owner;
     }
   }
   return items[0] || null;
-}
-
-function cardShowsLinks(item, current) {
-  if (!current) {
-    return false;
-  }
-  if (current.id === item.id) {
-    return true;
-  }
-  return (item.links || []).some((link) => link.id === current.id);
 }
 
 function photoSha(item) {
@@ -336,12 +293,12 @@ function Tile({ item, title }) {
 function ItemCard({ item, current }) {
   const title = item.values.title || item.type;
   const extras = visibleValues(item.values).slice(0, 4);
-  const derived = cardShowsLinks(item, current) ? linkedRows(item) : [];
   const onGrid = current && current.id === item.id;
+  const derived = onGrid ? linkedRows(item) : [];
   return html`
     <article
       class="card"
-      aria-current=${onGrid || derived.length ? "true" : undefined}
+      aria-current=${onGrid ? "true" : undefined}
     >
       <button
         type="button"
