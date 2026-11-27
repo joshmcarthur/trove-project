@@ -11,7 +11,7 @@ _BLOCKED_SUFFIXES = (".local", ".ts.net", ".internal")
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 
 
-def require_public_http(url: str) -> None:
+def require_public_http(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme.lower() not in {"http", "https"}:
         raise FetchError("only http(s) urls")
@@ -21,9 +21,11 @@ def require_public_http(url: str) -> None:
     lowered = host.lower().rstrip(".")
     if lowered in _BLOCKED_HOSTS or lowered.endswith(_BLOCKED_SUFFIXES):
         raise FetchError("private url")
-    for ip in _host_ips(lowered):
+    ips = _host_ips(lowered)
+    for ip in ips:
         if _is_private(ip):
             raise FetchError("private url")
+    return str(ips[0])
 
 
 def _host_ips(host: str):

@@ -2,26 +2,48 @@
 
 from __future__ import annotations
 
+import http.client
 import os
 import signal
 import threading
 import time
 from contextlib import contextmanager
-from urllib.parse import urljoin, urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin
+from urllib.request import Request
 
-from playwright.sync_api import Error, Request, Route, sync_playwright
-from playwright.sync_api import TimeoutError as PlaywrightTimeout
+from playwright.sync_api import (
+    Error,
+    sync_playwright,
+)
+from playwright.sync_api import (
+    TimeoutError as PlaywrightTimeout,
+)
 
 from trove.services.fetch_error import FetchError
+from trove.services.public_http import open_hop
 from trove.services.public_url import require_public_http
 
-INTERNAL_SCHEMES = {"about", "blob", "chrome", "chrome-untrusted", "devtools"}
 SNAPSHOT_METHOD = "Page.captureSnapshot"
 SNAPSHOT_PARAMS = {"format": "mhtml"}
 LAUNCH_ARGS = ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
 CLOSE_WAIT_S = 5
 MAX_HOP_BYTES = 20 * 1024 * 1024
-HOP_STRIP_HEADERS = {"authorization"}
+HOP_DROP_HEADERS = {
+    "connection",
+    "content-length",
+    "keep-alive",
+    "proxy-connection",
+    "transfer-encoding",
+}
+HOP_SKIP_REQUEST_HEADERS = {
+    "accept-encoding",
+    "connection",
+    "content-length",
+    "host",
+    "keep-alive",
+    "transfer-encoding",
+}
 
 
 class CaptureError(Exception):
@@ -49,11 +71,6 @@ def _close_chromium(browser, playwright, pid: int) -> None:
     timer.start()
     try:
         if browser is not None:
-            for context in list(browser.contexts):
-                try:
-                    context.close()
-                except Exception:
-                    pass
             try:
                 browser.close()
             except Exception:
@@ -114,14 +131,6 @@ def _remaining_s(deadline: float) -> float:
     return left
 
 
-def _route_failure(exc: BaseException) -> BaseException:
-    if isinstance(exc, (CaptureError, FetchError)):
-        return exc
-    if isinstance(exc, (PlaywrightTimeout, TimeoutError)):
-        return CaptureError("timed out")
-    return CaptureError(str(exc) or "fetch failed")
-
-
 def _snapshot(browser, url: str, *, timeout_ms: int) -> bytes:
     context = browser.new_context(
         accept_downloads=False,
@@ -136,20 +145,14 @@ def _snapshot(browser, url: str, *, timeout_ms: int) -> bytes:
     def on_route(route):
         try:
             handle_route(route, timeout=_remaining_s(deadline))
-        except (
-            CaptureError,
-            FetchError,
-            PlaywrightTimeout,
-            Error,
-            OSError,
-            TimeoutError,
-        ) as exc:
+        except Exception as exc:
+            if not isinstance(exc, (CaptureError, FetchError)):
+                exc = CaptureError(str(exc) or "capture failed")
+            failure.append(exc)
             try:
                 route.abort()
             except Exception:
                 pass
-            if _is_main_navigation(route.request):
-                failure.append(_route_failure(exc))
 
     context.route("**/*", on_route)
     context.route_web_socket("**/*", lambda ws: ws.close())
@@ -190,79 +193,120 @@ def _cdp_mhtml(page, *, timeout_ms: int) -> str:
     return data
 
 
-def _hop_headers(request: Request) -> dict[str, str]:
-    return {
-        key: value
-        for key, value in request.headers.items()
-        if key.lower() not in HOP_STRIP_HEADERS
-    }
-
-
-def _locations(response) -> list[str]:
-    return [
-        row["value"]
-        for row in response.headers_array
-        if str(row.get("name", "")).lower() == "location"
-    ]
-
-
-def handle_route(route: Route, *, timeout: float) -> None:
+def handle_route(route, *, timeout: float) -> None:
     url = route.request.url
     main = _is_main_navigation(route.request)
-    scheme = urlparse(url).scheme.lower()
-    # about/blob/chrome/data are not HTTP hops. route.fetch cannot load them.
-    # continue_() lets Chromium keep document blobs and inline data URLs.
-    if not main and scheme in INTERNAL_SCHEMES | {"data"}:
-        route.continue_()
-        return
-    if scheme in {"ws", "wss"} or not _is_public_http(url):
+    if not _is_public_http(url):
+        route.abort()
         if main:
             raise FetchError("private url")
-        route.abort()
         return
+    _fulfill_hop(route, url, timeout=timeout, main=main)
+
+
+def _fulfill_hop(route, url, *, timeout, main) -> None:
     try:
-        response = route.fetch(
-            headers=_hop_headers(route.request),
-            max_redirects=0,
-            timeout=timeout * 1000,
+        status, headers, body = fetch_hop(
+            url,
+            method=getattr(route.request, "method", "GET") or "GET",
+            headers=dict(getattr(route.request, "headers", None) or {}),
+            body=_request_body(route.request),
+            timeout=timeout,
         )
-    except (PlaywrightTimeout, TimeoutError) as exc:
-        if main:
-            raise CaptureError("timed out") from exc
+    except FetchError:
         route.abort()
-        return
-    except (Error, OSError) as exc:
         if main:
-            raise CaptureError(str(exc) or "fetch failed") from exc
-        route.abort()
+            raise
         return
-    locations = _locations(response)
-    if 300 <= response.status < 400:
-        if len(locations) > 1:
-            if main:
-                raise FetchError("multiple location headers")
-            route.abort()
-            return
+    if 300 <= status < 400:
+        locations = _locations(headers)
         if locations:
+            next_url = urljoin(url, locations[0])
             try:
-                require_public_http(urljoin(url, locations[0]))
+                require_public_http(next_url)
             except FetchError:
+                route.abort()
                 if main:
                     raise
-                route.abort()
                 return
-    if len(response.body()) > MAX_HOP_BYTES:
+    if len(body) > MAX_HOP_BYTES:
         if main:
             raise CaptureError("archive too large")
         route.abort()
         return
-    route.fulfill(response=response)
+    route.fulfill(status=status, headers=headers, body=body)
 
 
-def _is_main_navigation(request: Request) -> bool:
+def _request_body(request) -> bytes | None:
+    buffer = getattr(request, "post_data_buffer", None)
+    if buffer:
+        return bytes(buffer)
+    data = getattr(request, "post_data", None)
+    if data is None:
+        return None
+    if isinstance(data, bytes):
+        return data
+    return data.encode()
+
+
+def _locations(headers) -> list[str]:
+    return [value for key, value in headers.items() if key.lower() == "location"]
+
+
+def fetch_hop(
+    url: str, *, method: str, headers: dict, body: bytes | None, timeout: float
+) -> tuple[int, dict[str, str], bytes]:
+    ip = require_public_http(url)
+    outgoing = {}
+    for key, value in headers.items():
+        lowered = key.lower()
+        if lowered in HOP_SKIP_REQUEST_HEADERS or key.startswith(":"):
+            continue
+        outgoing[key] = value
+    request = Request(url, data=body, method=method, headers=outgoing)
+    request.pinned_ip = ip
+    try:
+        with open_hop(request, timeout=timeout) as response:
+            return _hop_result(response)
+    except HTTPError as exc:
+        try:
+            return _hop_result(exc)
+        finally:
+            exc.close()
+    except TimeoutError as exc:
+        raise CaptureError("timed out") from exc
+    except http.client.HTTPException as exc:
+        raise FetchError(str(exc) or "fetch failed") from exc
+    except URLError as exc:
+        if isinstance(exc.reason, TimeoutError):
+            raise CaptureError("timed out") from exc
+        raise FetchError(str(exc) or "fetch failed") from exc
+    except OSError as exc:
+        raise FetchError(str(exc) or "fetch failed") from exc
+
+
+def _hop_result(response) -> tuple[int, dict[str, str], bytes]:
+    raw = response.headers
+    locations = raw.get_all("location") if hasattr(raw, "get_all") else None
+    if locations is not None and len(locations) > 1:
+        raise FetchError("multiple location headers")
+    status = getattr(response, "status", None) or response.getcode()
+    headers = {}
+    for key, value in raw.items():
+        if key.lower() in HOP_DROP_HEADERS:
+            continue
+        headers[key] = value
+    body = response.read(MAX_HOP_BYTES + 1)
+    return int(status), headers, body
+
+
+def _is_main_navigation(request) -> bool:
     if not request.is_navigation_request():
         return False
-    return request.frame.parent_frame is None
+    frame = getattr(request, "frame", None)
+    if frame is None:
+        return True
+    return getattr(frame, "parent_frame", None) is None
 
 
 def _is_public_http(url: str) -> bool:
