@@ -1,3 +1,4 @@
+from .context import Context
 from .emit import Emit
 from .enqueue import (
     BACKFILL,
@@ -12,6 +13,7 @@ from .transient_error import TransientError
 __all__ = [
     "BACKFILL",
     "LIVE",
+    "Context",
     "Emit",
     "Result",
     "TransientError",

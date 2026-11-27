@@ -20,7 +20,7 @@ def already_done(p: Processor, item: Item) -> bool:
     ).exists()
 
 
-def execute_derive(p: Processor, item_id: str):
+def execute_derive(p: Processor, item_id: str, *, attempt=1, max_attempts=1):
     """One attempt. django-ox retries TransientError."""
     item = Item.objects.get(id=item_id)
     if already_done(p, item):
@@ -29,7 +29,11 @@ def execute_derive(p: Processor, item_id: str):
     started = timezone.now()
     try:
         result = p.run(item, ctx) or Result()
-    except TransientError:
+    except TransientError as exc:
+        if attempt >= max_attempts:
+            record_failure(
+                "derive", p.agent, item, exc, started, {"attempts": max_attempts}
+            )
         raise
     except Exception as exc:  # noqa: BLE001
         record_failure("derive", p.agent, item, exc, started, {"attempt": 1})

@@ -24,6 +24,6 @@ def reconcile() -> int:
             .exclude(id__in=done)
             .values_list("id", flat=True)
         ):
-            enqueue_derive(p.name, item_id, priority=BACKFILL)
-            count += 1
+            if enqueue_derive(p.name, item_id, priority=BACKFILL):
+                count += 1
     return count
