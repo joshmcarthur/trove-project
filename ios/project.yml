@@ -1,0 +1,59 @@
+name: Trove
+options:
+  bundleIdPrefix: com.joshmcarthur
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  TARGETED_DEVICE_FAMILY: "1"
+  SWIFT_VERSION: "5.9"
+  IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+  CURRENT_PROJECT_VERSION: "1"
+  MARKETING_VERSION: "1.0"
+targets:
+  Trove:
+    type: application
+    platform: iOS
+    sources:
+      - path: Trove
+      - path: Shared
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.joshmcarthur.trove
+      INFOPLIST_FILE: Trove/Info.plist
+      CODE_SIGN_ENTITLEMENTS: Trove/Trove.entitlements
+      GENERATE_INFOPLIST_FILE: false
+      PRODUCT_NAME: Trove
+    dependencies:
+      - target: Share
+        embed: true
+    scheme:
+      testTargets:
+        - TroveTests
+  Share:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Share
+      - path: Shared
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.joshmcarthur.trove.share
+      INFOPLIST_FILE: Share/Info.plist
+      CODE_SIGN_ENTITLEMENTS: Share/Share.entitlements
+      GENERATE_INFOPLIST_FILE: false
+      PRODUCT_NAME: Share
+      LD_RUNPATH_SEARCH_PATHS:
+        - "$(inherited)"
+        - "@executable_path/Frameworks"
+        - "@executable_path/../../Frameworks"
+  TroveTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Shared
+      - path: TroveTests
+    dependencies:
+      - target: Trove
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.joshmcarthur.trove.tests
+      GENERATE_INFOPLIST_FILE: true
+      PRODUCT_NAME: TroveTests
