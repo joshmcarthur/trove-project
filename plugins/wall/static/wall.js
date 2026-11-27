@@ -4,6 +4,7 @@ import htm from "./htm.module.js";
 const html = htm.bind(h);
 const VERIFIER_KEY = "trove.wall.pkce";
 const ITEMS_URL = "/wall/api/items";
+const BLOBS_URL = "/wall/api/blobs/";
 const config = {
   clientId: document.body.dataset.clientId,
   authorizeUrl: document.body.dataset.authorizeUrl,
@@ -17,6 +18,7 @@ let items = [];
 let selectedId = null;
 let status = "Signing in…";
 let error = "";
+const blobUrls = new Map();
 
 function b64url(bytes) {
   let binary = "";
@@ -69,6 +71,25 @@ function formatWhen(iso) {
 
 function selectedItem() {
   return items.find((item) => item.id === selectedId) || items[0] || null;
+}
+
+function photoSha(item) {
+  if (item.type !== "capture.image") {
+    return null;
+  }
+  const sha = item.values.$blob;
+  return typeof sha === "string" && sha ? sha : null;
+}
+
+async function authorizedGet(url, retried = false) {
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    credentials: "omit",
+  });
+  if (response.status === 401 && !retried && (await refreshAccess())) {
+    return authorizedGet(url, true);
+  }
+  return response;
 }
 
 async function startLogin() {
@@ -138,14 +159,8 @@ async function refreshAccess() {
   return true;
 }
 
-async function loadItems(retried = false) {
-  const response = await fetch(ITEMS_URL, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    credentials: "omit",
-  });
-  if (response.status === 401 && !retried && (await refreshAccess())) {
-    return loadItems(true);
-  }
+async function loadItems() {
+  const response = await authorizedGet(ITEMS_URL);
   if (!response.ok) {
     throw new Error("Could not load these items.");
   }
@@ -157,8 +172,33 @@ async function loadItems(retried = false) {
   status = items.length ? `${items.length} on the wall` : "Nothing on the wall yet.";
 }
 
+async function loadBlobUrls() {
+  const shas = [
+    ...new Set(items.map(photoSha).filter((sha) => sha && !blobUrls.has(sha))),
+  ];
+  await Promise.all(
+    shas.map(async (sha) => {
+      const response = await authorizedGet(BLOBS_URL + encodeURIComponent(sha));
+      if (!response.ok) {
+        blobUrls.set(sha, null);
+        return;
+      }
+      blobUrls.set(sha, URL.createObjectURL(await response.blob()));
+    }),
+  );
+}
+
 function Chip({ hex }) {
   return html`<span class="chip" style=${{ background: hex }} title=${hex}></span>`;
+}
+
+function Tile({ item, title }) {
+  const sha = photoSha(item);
+  const url = sha ? blobUrls.get(sha) : null;
+  if (typeof url === "string") {
+    return html`<img class="tile" src=${url} alt=${title} />`;
+  }
+  return html`<div class="tile tile-empty" aria-hidden="true"></div>`;
 }
 
 function ItemCard({ item, current }) {
@@ -174,21 +214,24 @@ function ItemCard({ item, current }) {
         paint();
       }}
     >
-      <p class="type">${item.type}</p>
-      <h2 class="title">${title}</h2>
-      <dl class="kv">
-        ${extras.map(
-          ([key, value]) => html`
-            <div key=${key}>
-              <dt>${key}</dt>
-              <dd>${displayValue(value)}</dd>
-            </div>
-          `,
-        )}
-      </dl>
-      ${item.colours.length
-        ? html`<div class="chips">${item.colours.map((hex) => html`<${Chip} hex=${hex} />`)}</div>`
-        : null}
+      <${Tile} item=${item} title=${title} />
+      <div class="card-copy">
+        <p class="type">${item.type}</p>
+        <h2 class="title">${title}</h2>
+        <dl class="kv">
+          ${extras.map(
+            ([key, value]) => html`
+              <div key=${key}>
+                <dt>${key}</dt>
+                <dd>${displayValue(value)}</dd>
+              </div>
+            `,
+          )}
+        </dl>
+        ${item.colours.length
+          ? html`<div class="chips">${item.colours.map((hex) => html`<${Chip} hex=${hex} />`)}</div>`
+          : null}
+      </div>
     </button>
   `;
 }
@@ -259,6 +302,8 @@ async function boot() {
       return;
     }
     await loadItems();
+    paint();
+    await loadBlobUrls();
   } catch (err) {
     error = err.message || "Could not open the wall.";
     status = "";
