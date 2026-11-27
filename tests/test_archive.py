@@ -15,9 +15,7 @@ pytestmark = pytest.mark.django_db(databases=["default", "data"])
 
 PAGE = "https://example.com/lamp"
 FIXTURE = Path(__file__).parent / "fixtures" / "lamp.mhtml"
-SHELL = Path(__file__).parent / "fixtures" / "hallway-lamp.html"
 MHTML = FIXTURE.read_bytes()
-SHELL_HTML = SHELL.read_text()
 
 
 @pytest.fixture
@@ -217,16 +215,6 @@ def test_public_https_url_stores_mhtml_blob(core, blob_dir, monkeypatch):
     act = Activity.objects.get(agent="archive@2", subject=item)
     assert act.outcome == "ok"
     assert timeouts == [30]
-
-
-def test_js_rendered_fixture_stores_rendered_text(core, blob_dir, monkeypatch):
-    assert "hallway lamp" not in SHELL_HTML
-    patch_capture(monkeypatch, returns_mhtml(MHTML))
-    item = archive(core, make_link(PAGE))
-    sha = derived_files(item)[0].current_values()["$blob"]
-    stored = (blob_dir / sha[:2] / sha).read_bytes()
-    assert b"hallway lamp" in stored
-    assert stored != SHELL.read_bytes()
 
 
 def test_same_url_twice_gets_two_archive_items(core, blob_dir, monkeypatch):

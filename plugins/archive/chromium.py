@@ -40,7 +40,7 @@ def capture_mhtml(url: str, *, timeout: int) -> bytes:
         with launch_chromium() as browser:
             return _snapshot(browser, url, timeout_ms=timeout * 1000)
     except PlaywrightTimeout as exc:
-        raise TimeoutError("timed out") from exc
+        raise CaptureError("timed out") from exc
     except FetchError:
         raise
     except Error as exc:
