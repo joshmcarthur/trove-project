@@ -17,11 +17,6 @@ install. Deno and Lume stay gone.
 
 ## First run
 
-The collector is one process: Django 6.1 serving the wall, plus derive jobs on
-Django Tasks and django-ox. Facts live in a `data` SQLite database, config in
-a `default` SQLite database (`ConfigEntry` rows), and blobs in a directory
-beside them. There are no `.storage/` JSON files.
-
 Toolchain checks:
 
 ```bash

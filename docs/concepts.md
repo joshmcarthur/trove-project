@@ -55,11 +55,8 @@ and Telegram are roadmap.
 
 ## Jobs
 
-Processors run as derive jobs in the core process. Derivation state lives in
-activities, not a separate queue table. When an item is created, matching
-processors are submitted. Reconcile finds items that still need a successful
-derive at the current processor version. Transient errors retry; a permanent
-failure ends the activity as `failed` and shows in the admin.
-
-Version 1 persists those jobs with Django Tasks and django-ox on the `data`
-database. Do not port the spike thread pool.
+Processors run as derive jobs; derivation state lives in activities. When an
+item is created, matching processors are submitted. Reconcile finds items
+that still need a successful derive at the current processor version.
+Transient errors retry; a permanent failure ends the activity as `failed`
+and shows in the admin.
