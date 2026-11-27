@@ -1,0 +1,20 @@
+From: <Saved by Blink>
+Snapshot-Content-Location: https://example.com/lamp
+Subject: Hallway lamp
+Date: Sat, 28 Nov 2026 00:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----MultipartBoundary--lamp----"
+
+
+------MultipartBoundary--lamp----
+Content-Type: text/html
+Content-Location: https://example.com/lamp
+
+<!DOCTYPE html>
+<html>
+<head><title>Hallway lamp</title></head>
+<body><p>hallway lamp</p></body>
+</html>
+------MultipartBoundary--lamp------
