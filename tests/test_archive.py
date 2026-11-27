@@ -77,16 +77,6 @@ def patch_capture(monkeypatch, fake):
     monkeypatch.setattr(archive_mod(), "capture_mhtml", fake)
 
 
-def patch_hop(monkeypatch, status=200, headers=None, body=b"<html></html>"):
-    response_headers = dict(headers or {})
-    response_body = body
-
-    def hop(url, *, method, headers, body, timeout):
-        return status, response_headers, response_body
-
-    monkeypatch.setattr(chromium_mod(), "fetch_hop", hop)
-
-
 def returns_mhtml(body=MHTML, timeout_seen=None):
     def capture(url, *, timeout):
         if timeout_seen is not None:
@@ -127,8 +117,6 @@ class FakeRequest:
         self.url = url
         self.method = "GET"
         self.headers = {}
-        self.post_data = None
-        self.post_data_buffer = None
         self._navigation = navigation
         self.frame = FakeFrame(main)
 
@@ -136,17 +124,36 @@ class FakeRequest:
         return self._navigation
 
 
+class FakeAPIResponse:
+    def __init__(self, status=200, headers=None, body=b"<html></html>"):
+        self.status = status
+        self.headers = {
+            key.lower(): value for key, value in dict(headers or {}).items()
+        }
+        self._body = body
+
+    def body(self):
+        return self._body
+
+
 class FakeRoute:
-    def __init__(self, url, *, navigation=False, main=True):
+    def __init__(self, url, *, navigation=False, main=True, fetch_response=None):
         self.request = FakeRequest(url, navigation=navigation, main=main)
         self.actions = []
         self.fulfilled = None
+        self.fetch_kwargs = None
+        self._fetch_response = fetch_response or FakeAPIResponse()
 
     def continue_(self):
         self.actions.append("continue")
 
     def abort(self):
         self.actions.append("abort")
+
+    def fetch(self, **kwargs):
+        self.actions.append("fetch")
+        self.fetch_kwargs = kwargs
+        return self._fetch_response
 
     def fulfill(self, **kwargs):
         self.actions.append("fulfill")
@@ -169,13 +176,14 @@ class FakeCDP:
 
 
 class FakePage:
-    def __init__(self, cdp):
+    def __init__(self, cdp, fetch_response=None):
         self._cdp = cdp
         self.url = ""
         self.goto_calls = []
         self.context = None
         self.handlers = {}
         self.closed = False
+        self.fetch_response = fetch_response or FakeAPIResponse()
 
     def route(self, pattern, handler):
         self.handlers["route"] = (pattern, handler)
@@ -186,14 +194,14 @@ class FakePage:
     def goto(self, url, **kwargs):
         self.goto_calls.append((url, kwargs))
         _pattern, handler = self.handlers["route"]
-        route = FakeRoute(url, navigation=True)
+        route = FakeRoute(url, navigation=True, fetch_response=self.fetch_response)
         handler(route)
         if route.actions[-1:] == ["abort"]:
             raise chromium_mod().Error("net::ERR_ABORTED")
         self.url = url
         status = 200
-        if route.fulfilled:
-            status = route.fulfilled.get("status", 200)
+        if route.fulfilled and route.fulfilled.get("response") is not None:
+            status = route.fulfilled["response"].status
         return FakeNavResponse(status)
 
     def set_default_timeout(self, ms):
@@ -221,9 +229,9 @@ class FakeContext:
 
 
 class FakeBrowser:
-    def __init__(self, payload):
+    def __init__(self, payload, fetch_response=None):
         self.cdp = FakeCDP(payload)
-        self.page = FakePage(self.cdp)
+        self.page = FakePage(self.cdp, fetch_response=fetch_response)
         self.context = FakeContext(self.page)
         self.context_kwargs = None
         self.closed = False
@@ -234,6 +242,59 @@ class FakeBrowser:
 
     def close(self):
         self.closed = True
+
+
+class FakeProc:
+    pid = 4242
+
+
+class FakeTransport:
+    _proc = FakeProc()
+
+
+class FakeClient:
+    _transport = FakeTransport()
+
+
+class FakeLaunched:
+    def close(self):
+        pass
+
+
+class FakeChromiumType:
+    def __init__(self, seen):
+        self._seen = seen
+
+    def launch(self, **kwargs):
+        self._seen.update(kwargs)
+        return FakeLaunched()
+
+
+class FakePlaywright:
+    def __init__(self, seen):
+        self.chromium = FakeChromiumType(seen)
+        self.stopped = False
+
+    def stop(self):
+        self.stopped = True
+
+
+class FakeManager:
+    def __init__(self, playwright, *, pid=4242):
+        self._playwright = playwright
+        if pid is None:
+            self._client = None
+        else:
+            proc = FakeProc()
+            proc.pid = pid
+            transport = FakeTransport()
+            transport._proc = proc
+            client = FakeClient()
+            client._transport = transport
+            self._client = client
+
+    def start(self):
+        return self._playwright
 
 
 def serve_fixture():
@@ -392,47 +453,62 @@ def test_private_urls_fail_without_launching(core, monkeypatch, url):
 @pytest.mark.parametrize("location", ["http://127.0.0.1/", "http://100.64.0.1/"])
 def test_redirect_to_private_ip_is_aborted(core, location):
     chromium = chromium_mod()
-    blocked = []
     route = FakeRoute(location, navigation=True)
-    chromium.handle_route(route, blocked, timeout=5)
-    assert route.actions == ["abort"]
-    assert blocked == [location]
+    with pytest.raises(FetchError, match="private url"):
+        chromium.handle_route(route, timeout=5)
+    assert route.actions == []
 
 
-def test_redirect_location_to_private_ip_is_aborted(core, monkeypatch):
+def test_redirect_location_to_private_ip_is_aborted(core):
     chromium = chromium_mod()
+    route = FakeRoute(
+        PAGE,
+        navigation=True,
+        fetch_response=FakeAPIResponse(
+            302, {"Location": "http://127.0.0.1/secret"}, b""
+        ),
+    )
+    with pytest.raises(FetchError, match="private url"):
+        chromium.handle_route(route, timeout=5)
+    assert route.actions == ["fetch"]
+    assert route.fetch_kwargs["max_redirects"] == 0
+    assert "continue" not in route.actions
 
-    def hop(url, *, method, headers, body, timeout):
-        return 302, {"Location": "http://127.0.0.1/secret"}, b""
 
-    monkeypatch.setattr(chromium, "fetch_hop", hop)
-    blocked = []
-    route = FakeRoute(PAGE, navigation=True)
-    chromium.handle_route(route, blocked, timeout=5)
-    assert route.actions == ["abort"]
-    assert blocked == ["http://127.0.0.1/secret"]
-
-
-def test_public_navigation_is_fulfilled(core, monkeypatch):
+def test_public_navigation_is_fulfilled(core):
     chromium = chromium_mod()
-    patch_hop(monkeypatch, body=b"ok")
-    blocked = []
-    route = FakeRoute(PAGE, navigation=True)
-    chromium.handle_route(route, blocked, timeout=5)
-    assert route.actions == ["fulfill"]
-    assert route.fulfilled["status"] == 200
-    assert route.fulfilled["body"] == b"ok"
-    assert blocked == []
+    route = FakeRoute(PAGE, navigation=True, fetch_response=FakeAPIResponse(body=b"ok"))
+    chromium.handle_route(route, timeout=5)
+    assert route.actions == ["fetch", "fulfill"]
+    assert route.fetch_kwargs["max_redirects"] == 0
+    assert route.fulfilled["response"].body() == b"ok"
     assert "continue" not in route.actions
 
 
 def test_file_subresource_is_aborted_without_failing_the_page(core):
     chromium = chromium_mod()
-    blocked = []
     route = FakeRoute("file:///etc/passwd", navigation=False)
-    chromium.handle_route(route, blocked, timeout=5)
+    chromium.handle_route(route, timeout=5)
     assert route.actions == ["abort"]
-    assert blocked == []
+
+
+def test_data_subresource_is_continued(core):
+    chromium = chromium_mod()
+    route = FakeRoute("data:text/html,hi", navigation=False)
+    chromium.handle_route(route, timeout=5)
+    assert route.actions == ["continue"]
+
+
+def test_oversize_hop_fails_main_navigation(core):
+    chromium = chromium_mod()
+    route = FakeRoute(
+        PAGE,
+        navigation=True,
+        fetch_response=FakeAPIResponse(body=b"x" * (chromium.MAX_HOP_BYTES + 1)),
+    )
+    with pytest.raises(chromium.CaptureError, match="archive too large"):
+        chromium.handle_route(route, timeout=5)
+    assert route.actions == ["fetch"]
 
 
 def test_oversize_archive_fails_without_storing(core, blob_dir, monkeypatch):
@@ -458,17 +534,16 @@ def test_fetch_failures_fail_derive_and_keep_the_link(core, monkeypatch, fake):
 
 def test_http_error_status_fails_without_snapshot(core, blob_dir, monkeypatch):
     chromium = chromium_mod()
-    browser = FakeBrowser(MHTML.decode())
+    browser = FakeBrowser(
+        MHTML.decode(),
+        fetch_response=FakeAPIResponse(404, {"Content-Type": "text/html"}, b"nope"),
+    )
 
     @contextmanager
     def fake_launch():
         yield browser
 
-    def hop(url, *, method, headers, body, timeout):
-        return 404, {"Content-Type": "text/html"}, b"nope"
-
     monkeypatch.setattr(chromium, "launch_chromium", fake_launch)
-    monkeypatch.setattr(chromium, "fetch_hop", hop)
     monkeypatch.setattr(chromium.time, "monotonic", lambda: 1000.0)
     item = archive(core, make_link(PAGE))
     act = Activity.objects.get(agent="archive@2", subject=item)
@@ -498,7 +573,6 @@ def test_capture_mhtml_uses_bundled_headless_chromium(core, monkeypatch):
         yield browser
 
     monkeypatch.setattr(chromium, "launch_chromium", fake_launch)
-    patch_hop(monkeypatch)
     monkeypatch.setattr(chromium.time, "monotonic", lambda: 1000.0)
     data = chromium.capture_mhtml(PAGE, timeout=30)
     assert data == MHTML
@@ -514,31 +588,25 @@ def test_capture_mhtml_uses_bundled_headless_chromium(core, monkeypatch):
 def test_launch_chromium_disables_non_proxied_webrtc(monkeypatch):
     chromium = chromium_mod()
     seen = {}
-
-    class FakeLaunched:
-        def close(self):
-            pass
-
-    class FakeChromiumType:
-        def launch(self, **kwargs):
-            seen.update(kwargs)
-            return FakeLaunched()
-
-    class FakePlaywright:
-        chromium = FakeChromiumType()
-
-        def stop(self):
-            pass
-
-    class FakeManager:
-        _client = None
-
-        def start(self):
-            return FakePlaywright()
-
-    monkeypatch.setattr(chromium, "sync_playwright", lambda: FakeManager())
+    playwright = FakePlaywright(seen)
+    monkeypatch.setattr(chromium, "sync_playwright", lambda: FakeManager(playwright))
     with chromium.launch_chromium():
         pass
     assert seen["headless"] is True
     assert seen["args"] == chromium.LAUNCH_ARGS
     assert "--force-webrtc-ip-handling-policy=disable_non_proxied_udp" in seen["args"]
+    assert playwright.stopped
+
+
+def test_launch_fails_when_driver_pid_is_missing(monkeypatch):
+    chromium = chromium_mod()
+    seen = {}
+    playwright = FakePlaywright(seen)
+    monkeypatch.setattr(
+        chromium, "sync_playwright", lambda: FakeManager(playwright, pid=None)
+    )
+    with pytest.raises(chromium.CaptureError, match="chromium driver pid missing"):
+        with chromium.launch_chromium():
+            pass
+    assert seen == {}
+    assert playwright.stopped
