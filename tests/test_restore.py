@@ -4,14 +4,18 @@ import sqlite3
 import subprocess
 import sys
 import tarfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 from django.conf import settings
 from django.db import connections
+from django.test.utils import override_settings
 
+from plugins.wall.queries import wall_items
 from trove.models import Activity, Claim
 from trove.services.backup import unpack_tarball, write_tarball
+from trove.services.blobs import blob_path
 from trove.services.recorder import record
 
 
@@ -42,6 +46,23 @@ def _snapshot_db(alias: str, dest: Path):
         target.executescript("\n".join(conn.connection.iterdump()))
     finally:
         target.close()
+
+
+@contextmanager
+def _against_restored(dest: Path):
+    databases = {
+        alias: {**settings.DATABASES[alias], "NAME": dest / name}
+        for alias, name in (("default", "config.sqlite3"), ("data", "data.sqlite3"))
+    }
+    with override_settings(
+        DATABASES=databases,
+        TROVE={**settings.TROVE, "BLOB_DIR": dest / "blobs"},
+    ):
+        connections.close_all()
+        try:
+            yield
+        finally:
+            connections.close_all()
 
 
 def _migrate_restored(dest: Path):
@@ -122,6 +143,7 @@ def test_unpack_stays_inside_dest(tmp_path):
 
 
 @pytest.mark.django_db(databases=["default", "data"])
+@pytest.mark.filterwarnings("ignore:Overriding setting DATABASES:UserWarning")
 def test_restore_keeps_ingest_and_derive_after_migrate(blob_dir, tmp_path):
     with record("ingest", "test") as rec:
         item = rec.item("capture.image")
@@ -152,18 +174,16 @@ def test_restore_keeps_ingest_and_derive_after_migrate(blob_dir, tmp_path):
     unpack_tarball(tarball, dest)
     _migrate_restored(dest)
 
-    restored = sqlite3.connect(dest / "data.sqlite3")
-    try:
-        types = {row[0] for row in restored.execute("select type from trove_item")}
-        kinds = {row[0] for row in restored.execute("select kind from trove_activity")}
-        blob_sha = restored.execute("select sha256 from trove_blob").fetchone()[0]
-        ids = {row[0] for row in restored.execute("select id from trove_item")}
-    finally:
-        restored.close()
-    assert item.id in ids
-    assert colour.id in ids
-    assert "capture.image" in types
-    assert "colour" in types
-    assert {"ingest", "derive"} <= kinds
-    assert blob_sha == sha
-    assert (dest / "blobs" / sha[:2] / sha).read_bytes() == live_bytes
+    with _against_restored(dest):
+        assert Path(settings.DATABASES["data"]["NAME"]) == dest / "data.sqlite3"
+        assert Path(settings.TROVE["BLOB_DIR"]) == dest / "blobs"
+        row = next(entry for entry in wall_items()["items"] if entry["id"] == item.id)
+        assert row["type"] == "capture.image"
+        assert row["values"]["title"] == "lamp"
+        assert row["values"]["$blob"] == sha
+        assert "#336699" in row["colours"]
+        kinds = {entry["kind"] for entry in row["provenance"]}
+        assert {"ingest", "derive"} <= kinds
+        restored_blob = blob_path(sha)
+        assert restored_blob == dest / "blobs" / sha[:2] / sha
+        assert restored_blob.read_bytes() == live_bytes
