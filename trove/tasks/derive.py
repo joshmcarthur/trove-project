@@ -1,0 +1,137 @@
+from __future__ import annotations
+
+import time
+
+from django.tasks import task
+from django.utils import timezone
+
+from trove.models import Activity, Claim, ConfigEntry, Item, Link
+from trove.registry.processor import Processor
+from trove.runtime.core import get_core
+from trove.tasks.context import Context
+from trove.tasks.emit import Emit
+from trove.tasks.result import Result
+from trove.tasks.transient_error import TransientError
+
+LIVE = 10
+BACKFILL = 0
+
+
+def derive_backoff(exception, task_result):
+    if isinstance(exception, TransientError):
+        if exception.retry_after is not None:
+            return exception.retry_after
+        return min(5 * 2 ** (task_result.attempts - 1), 300)
+    return None
+
+
+@task(max_attempts=3, backoff=derive_backoff)
+def derive_item(processor_name: str, item_id: str):
+    p = get_core().processors[processor_name]
+    execute_derive(p, item_id)
+
+
+def enqueue_derive(processor_name: str, item_id: str, priority=LIVE):
+    derive_item.using(priority=priority).enqueue(processor_name, item_id)
+
+
+def enqueue_for_items(item_ids, priority=LIVE):
+    if not item_ids:
+        return
+    core = get_core()
+    for item in Item.objects.filter(id__in=item_ids):
+        for p in core.processors_for(item.type):
+            enqueue_derive(p.name, item.id, priority=priority)
+
+
+def already_done(p: Processor, item: Item) -> bool:
+    return Activity.objects.filter(
+        kind="derive",
+        agent=p.agent,
+        subject=item,
+        outcome=Activity.Outcome.OK,
+    ).exists()
+
+
+def execute_derive(p: Processor, item_id: str):
+    """One attempt. TransientError is left for django-ox to retry."""
+    from trove.services.recorder import record, record_failure
+
+    item = Item.objects.get(id=item_id)
+    if already_done(p, item):
+        return
+    ctx = Context(_options(p))
+    started = timezone.now()
+    try:
+        result = p.run(item, ctx) or Result()
+    except TransientError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        record_failure("derive", p.agent, item, exc, started, {"attempt": 1})
+        return
+    try:
+        with record("derive", p.agent, subject=item, params=result.params) as rec:
+            rec.cost = result.cost
+            _apply(rec, item, result)
+    except Exception as exc:  # noqa: BLE001
+        record_failure(
+            "derive", p.agent, item, exc, started, result.params, result.cost
+        )
+
+
+def run_job(p: Processor, item_id: str, sleep=time.sleep):
+    """Run a processor, retrying TransientError. Tests call this directly."""
+    from trove.services.recorder import record_failure
+
+    last_exc = None
+    for attempt in range(1, p.attempts + 1):
+        try:
+            execute_derive(p, item_id)
+            return
+        except TransientError as exc:
+            last_exc = exc
+            if attempt < p.attempts:
+                sleep(exc.retry_after or min(2**attempt, 60))
+                continue
+    item = Item.objects.get(id=item_id)
+    record_failure(
+        "derive", p.agent, item, last_exc, timezone.now(), {"attempts": p.attempts}
+    )
+
+
+def _apply(rec, item: Item, result: Result):
+    for path, value in result.claims.items():
+        rec.claim(item, path, value)
+    for emit in result.emits:
+        target = _existing_emit(item, emit) or rec.item(emit.type)
+        if target._state.adding:
+            rec.link(target, item, "derived_from")
+            rec.claim(target, "$key", emit.key)
+        for path, value in emit.claims.items():
+            rec.claim(target, path, value)
+        if emit.blob is not None:
+            rec.claim(target, "$blob", rec.blob(emit.blob, emit.content_type))
+
+
+def _existing_emit(source: Item, emit: Emit) -> Item | None:
+    derived = (
+        Link.objects.live()
+        .filter(target=source, rel="derived_from")
+        .values("source_id")
+    )
+    claim = (
+        Claim.objects.filter(
+            path="$key",
+            value=emit.key,
+            item__type=emit.type,
+            item_id__in=derived,
+        )
+        .select_related("item")
+        .first()
+    )
+    return claim.item if claim else None
+
+
+def _options(p: Processor) -> dict:
+    entry = ConfigEntry.objects.filter(domain=p.name).first()
+    return entry.options if entry else {}
