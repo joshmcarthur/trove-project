@@ -1,8 +1,11 @@
+from allauth.account.decorators import secure_admin_login
 from django.contrib import admin
 from django.urls import include, path
 
 from trove.runtime.core import get_core
 from trove.views.setup import SetupView
+
+admin.site.login = secure_admin_login(admin.site.login)
 
 
 def _plugin_urlpatterns():

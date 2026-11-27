@@ -4,10 +4,7 @@ from django.apps import apps
 
 
 def _db_for(model):
-    meta = getattr(model, "_meta", None)
-    if meta is None:
-        return "default"
-    if meta.app_label == "django_ox":
+    if model._meta.app_label == "django_ox":
         return "data"
     return getattr(model, "trove_database", "default")
 
@@ -19,7 +16,7 @@ class TroveRouter:
     db_for_write = db_for_read
 
     def allow_relation(self, a, b, **hints):
-        return _db_for(type(a)) == _db_for(type(b))
+        return _db_for(a._meta.model) == _db_for(b._meta.model)
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if "target_db" in hints:

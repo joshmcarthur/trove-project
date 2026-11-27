@@ -4,11 +4,15 @@ Facts go on `data`. ConfigEntry goes on `default`. Later issues add factories
 here rather than a second module.
 """
 
+from datetime import timedelta
+
 from django.utils import timezone
 from factory import Faker, Sequence, SubFactory
 from factory.django import DjangoModelFactory
+from oauth2_provider.models import get_access_token_model, set_token_value
 
 from trove.models import Activity, Blob, Claim, ConfigEntry, Item, Link, SetupCode
+from trove.services.clients import ensure_wall_client
 from trove.services.owner import ensure_owner
 from trove.services.tokens import mint_ingest_token
 
@@ -89,3 +93,16 @@ def seed_dev_ingest_token(
 ) -> str:
     ensure_owner()
     return mint_ingest_token(client_name, raw_token=raw_token)
+
+
+def seed_dev_wall_token(raw_token: str = "dev-wall-token") -> str:
+    owner = ensure_owner()
+    token = get_access_token_model()(
+        user=owner,
+        application=ensure_wall_client(),
+        expires=timezone.now() + timedelta(hours=1),
+        scope="read:all",
+    )
+    set_token_value(token, raw_token)
+    token.save()
+    return raw_token

@@ -9,13 +9,21 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from allauth.mfa.models import Authenticator
+from asgiref.sync import async_to_sync
+from asgiref.testing import ApplicationCommunicator
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.urls import reverse
-from oauth2_provider.models import get_access_token_model
+from django.utils.functional import SimpleLazyObject
+from oauth2_provider.models import get_access_token_model, get_application_model
 from PIL import Image
 
-from tests.factories import seed_dev_ingest_token
+from config.asgi import application
+from tests.factories import seed_dev_ingest_token, seed_dev_wall_token
+from trove.core import get_core, reset_core
+from trove.models import Item
+from trove.routers import TroveRouter
 from trove.services.clients import ensure_wall_client
 from trove.services.owner import ensure_owner, get_owner
 from trove.services.setup_code import issue_setup_code
@@ -149,7 +157,7 @@ def test_wall_authorization_code_pkce(client):
         {
             "response_type": "code",
             "client_id": app.client_id,
-            "redirect_uri": "http://testserver/",
+            "redirect_uri": "http://testserver/wall/",
             "scope": "read:all",
             "code_challenge": challenge,
             "code_challenge_method": "S256",
@@ -168,7 +176,7 @@ def test_wall_authorization_code_pkce(client):
         {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": "http://testserver/",
+            "redirect_uri": "http://testserver/wall/",
             "client_id": app.client_id,
             "code_verifier": verifier,
         },
@@ -190,13 +198,95 @@ def test_wall_authorize_without_pkce_is_rejected(client):
         {
             "response_type": "code",
             "client_id": app.client_id,
-            "redirect_uri": "http://testserver/",
+            "redirect_uri": "http://testserver/wall/",
             "scope": "read:all",
         },
     )
     assert response.status_code in {302, 400}
     if response.status_code == 302:
         assert "error=" in response["Location"]
+
+
+def test_wall_items_rejects_missing_auth(client):
+    response = client.get("/wall/api/items")
+    assert response.status_code == 401
+
+
+def test_wall_items_rejects_write_capture_token(client):
+    seed_dev_ingest_token()
+    response = client.get(
+        "/wall/api/items", HTTP_AUTHORIZATION="Bearer dev-shortcut-token"
+    )
+    assert response.status_code == 401
+
+
+def test_wall_items_accepts_read_all_token(client):
+    seed_dev_wall_token()
+    response = client.get("/wall/api/items", HTTP_AUTHORIZATION="Bearer dev-wall-token")
+    assert response.status_code == 200
+    assert "items" in response.json()
+
+
+def test_wall_redirect_uris_point_at_wall_and_accept_env_host(monkeypatch):
+    monkeypatch.setenv("TROVE_WALL_REDIRECT_URI", "http://100.64.0.1:8123/wall/")
+    app = ensure_wall_client()
+    uris = app.redirect_uris.split()
+    assert "http://localhost:8123/wall/" in uris
+    assert "http://127.0.0.1:8123/wall/" in uris
+    assert "http://testserver/wall/" in uris
+    assert "http://100.64.0.1:8123/wall/" in uris
+    assert "http://localhost:8123/" not in uris
+    assert "http://testserver/" not in uris
+
+
+def test_loading_wall_plugin_ensures_client():
+    get_application_model().objects.filter(name="wall").delete()
+    reset_core()
+    get_core()
+    assert get_application_model().objects.filter(name="wall").exists()
+
+
+def test_asgi_serves_webauthn_js():
+    async def fetch():
+        communicator = ApplicationCommunicator(
+            application,
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "http",
+                "path": "/static/mfa/js/webauthn.js",
+                "raw_path": b"/static/mfa/js/webauthn.js",
+                "query_string": b"",
+                "headers": [(b"host", b"testserver")],
+                "client": ("127.0.0.1", 123),
+                "server": ("testserver", 80),
+            },
+        )
+        await communicator.send_input(
+            {"type": "http.request", "body": b"", "more_body": False}
+        )
+        start = await communicator.receive_output()
+        await communicator.wait()
+        return start["status"]
+
+    assert async_to_sync(fetch)() == 200
+
+
+def test_admin_login_redirects_to_allauth(client):
+    response = client.get("/admin/login/")
+    assert response.status_code == 302
+    assert response["Location"].startswith("/accounts/login/")
+
+
+def test_allow_relation_unwraps_lazy_objects_via_meta():
+    item = Item(type="capture.image")
+    lazy = SimpleLazyObject(lambda: item)
+    router = TroveRouter()
+    assert router.allow_relation(lazy, item) is True
+    user = get_user_model()(username="owner")
+    assert router.allow_relation(lazy, user) is False
 
 
 def _tiny_png():

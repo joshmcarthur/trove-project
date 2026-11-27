@@ -16,7 +16,12 @@ from django_ox.testing import run_tasks
 from PIL import Image
 from pydantic import ValidationError
 
-from tests.factories import ConfigEntryFactory, ItemFactory, seed_dev_ingest_token
+from tests.factories import (
+    ConfigEntryFactory,
+    ItemFactory,
+    seed_dev_ingest_token,
+    seed_dev_wall_token,
+)
 from trove.core import Processor, get_core, reset_core
 from trove.models import Activity, AppendOnlyError, Claim, Item, Link
 from trove.services.reap import reap_abandoned
@@ -147,7 +152,10 @@ def test_reconcile_derive_and_idempotence(capture, client):
     assert colours == again
     get_core().processors["palette"].version = 1
 
-    wall = client.get("/wall/api/items").json()["items"][0]
+    seed_dev_wall_token()
+    wall = client.get(
+        "/wall/api/items", HTTP_AUTHORIZATION="Bearer dev-wall-token"
+    ).json()["items"][0]
     assert sorted(wall["colours"]) == ["#336699", "#e67828"]
 
 

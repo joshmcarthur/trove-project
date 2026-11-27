@@ -71,14 +71,18 @@ DATABASE_ROUTERS = ["trove.routers.TroveRouter"]
 
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/admin/"
 ACCOUNT_SIGNUP_ENABLED = False
 ACCOUNT_LOGIN_METHODS = {"username"}
 ACCOUNT_EMAIL_VERIFICATION = "none"
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+MAILERS = {
+    "default": {
+        "BACKEND": "django.core.mail.backends.console.EmailBackend",
+    }
+}
 
 MFA_SUPPORTED_TYPES = ["webauthn"]
 MFA_PASSKEY_LOGIN_ENABLED = True
