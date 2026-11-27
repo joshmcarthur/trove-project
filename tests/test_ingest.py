@@ -4,13 +4,14 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from tests.factories import seed_dev_ingest_token
-from trove.models import Claim, Item
+from trove.models import Activity, Blob, Claim, Item
 
 TOKEN = {"HTTP_AUTHORIZATION": "Bearer dev-shortcut-token"}
 FIXTURES = Path(__file__).parent / "fixtures"
 TINY_PDF = FIXTURES / "tiny.pdf"
 ENCRYPTED_PDF = FIXTURES / "encrypted.pdf"
 TINY_MP4 = FIXTURES / "tiny.mp4"
+TINY_HEIC = FIXTURES / "tiny.heic"
 
 pytestmark = pytest.mark.django_db(databases=["default", "data"])
 
@@ -191,6 +192,7 @@ def test_empty_file_is_400(client):
     response = client.post("/ingest/", {"file": empty}, **TOKEN)
     assert response.status_code == 400
     assert not Item.objects.exists()
+    assert not Activity.objects.filter(kind="ingest").exists()
 
 
 def test_encrypted_pdf_stores_blob_without_page_count(client, blob_dir):
@@ -293,3 +295,64 @@ def test_large_video_is_accepted(client, blob_dir):
     values = Item.objects.get(id=response.json()["id"]).current_values()
     assert values["duration"] == 1
     assert "$blob" in values
+
+
+def test_same_bytes_twice_are_two_items_one_blob(client, blob_dir):
+    payload = b"same lamp twice"
+
+    def upload():
+        return SimpleUploadedFile("lamp.bin", payload, "application/octet-stream")
+
+    first = client.post("/ingest/", {"file": upload()}, **TOKEN)
+    second = client.post("/ingest/", {"file": upload()}, **TOKEN)
+    assert first.status_code == 201, first.content
+    assert second.status_code == 201, second.content
+    assert first.json()["id"] != second.json()["id"]
+    assert Item.objects.count() == 2
+    assert Blob.objects.count() == 1
+    sha = Item.objects.get(id=first.json()["id"]).current_values()["$blob"]
+    assert Item.objects.get(id=second.json()["id"]).current_values()["$blob"] == sha
+    assert (blob_dir / sha[:2] / sha).read_bytes() == payload
+
+
+def test_over_limit_body_is_413(client, settings):
+    settings.TROVE = {**settings.TROVE, "INGEST_MAX_BYTES": 64}
+    huge = SimpleUploadedFile("big.bin", b"x" * 1000, "application/octet-stream")
+    response = client.post("/ingest/", {"file": huge}, **TOKEN)
+    assert response.status_code == 413
+    assert not Item.objects.exists()
+    assert not Blob.objects.exists()
+    assert not Activity.objects.filter(kind="ingest").exists()
+
+
+def test_live_photo_keeps_the_still_and_ignores_motion(client, blob_dir):
+    still = SimpleUploadedFile("IMG_0001.HEIC", TINY_HEIC.read_bytes(), "image/heic")
+    motion = SimpleUploadedFile(
+        "IMG_0001.MOV", TINY_MP4.read_bytes(), "video/quicktime"
+    )
+    response = client.post(
+        "/ingest/",
+        {"file": still, "video": motion, "title": "hallway"},
+        **TOKEN,
+    )
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.image"
+    assert Item.objects.count() == 1
+    values = Item.objects.get(id=payload["id"]).current_values()
+    assert values["title"] == "hallway"
+    assert (blob_dir / values["$blob"][:2] / values["$blob"]).read_bytes() == (
+        TINY_HEIC.read_bytes()
+    )
+
+
+def test_live_photo_motion_only_is_video(client, blob_dir):
+    motion = SimpleUploadedFile(
+        "IMG_0001.MOV", TINY_MP4.read_bytes(), "video/quicktime"
+    )
+    response = client.post("/ingest/", {"file": motion}, **TOKEN)
+    assert response.status_code == 201, response.content
+    assert response.json()["type"] == "capture.video"
+    values = Item.objects.get(id=response.json()["id"]).current_values()
+    assert "$blob" in values
+    assert (blob_dir / values["$blob"][:2]).exists()

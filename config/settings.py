@@ -115,4 +115,5 @@ TROVE = {
     "BLOB_DIR": BASE_DIR / "blobs",
     "PLUGIN_DIRS": [BASE_DIR / "plugins"],
     "WORKER_CONCURRENCY": 2,
+    "INGEST_MAX_BYTES": 512 * 1024 * 1024,
 }

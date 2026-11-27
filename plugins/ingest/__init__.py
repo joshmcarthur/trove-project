@@ -4,6 +4,7 @@ import io
 import re
 from urllib.parse import urlparse
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
@@ -210,18 +211,41 @@ def _posted_url(request):
     return url or None
 
 
+def _content_length(request):
+    raw = request.META.get("CONTENT_LENGTH")
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _too_large(size):
+    return size > settings.TROVE["INGEST_MAX_BYTES"]
+
+
+def _reject_too_large():
+    return JsonResponse({"error": "file too large"}, status=413)
+
+
 @csrf_exempt
 @require_POST
 def ingest(request):
     agent = _client(request)
     if agent is None:
         return JsonResponse({"error": "unauthorised"}, status=401)
+    length = _content_length(request)
+    if length is not None and _too_large(length):
+        return _reject_too_large()
     upload = request.FILES.get("file")
     url = _posted_url(request)
     if url is not None and urlparse(url).scheme == "data":
         return JsonResponse({"error": "data urls are not allowed"}, status=400)
     data, ctype = None, None
     if upload is not None:
+        if _too_large(upload.size):
+            return _reject_too_large()
         data = upload.read()
         ctype = upload.content_type or "application/octet-stream"
         if not data:

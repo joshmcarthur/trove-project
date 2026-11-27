@@ -34,6 +34,13 @@ That creates a blob, an item, and claims inside an `ingest` activity.
 Metadata you supply (title, notes) is a preferred claim. A successful
 capture returns 201.
 
+Empty files and a POST with no file and no URL return 400 and create no
+item. Post the same bytes twice and you get two items that share one
+content-addressed blob; the second call is still 201. Bodies larger than
+512 MiB (`TROVE["INGEST_MAX_BYTES"]`) return 413, and Trove does not store
+a truncated copy. If Photos sends a Live Photo, we keep the one `file`
+part that arrived.
+
 Mint a long-lived token with scope `write:capture` (`manage.py token create`
 or the admin). Shortcuts cannot run a browser login, so they use that token
 the way Home Assistant uses long-lived tokens. Bind to localhost or a
