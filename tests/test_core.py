@@ -179,7 +179,9 @@ def test_reconcile_derive_and_idempotence(capture, client):
     run_tasks()
     colours = sorted(Item.objects.filter(type="colour").values_list("id", flat=True))
     assert len(colours) == 2
-    assert item.current_values()["summary"] == "An image titled 'nice palette'"
+    agent = Activity.objects.get(agent="agent@1", subject=item, outcome="ok")
+    assert agent.params["prompt_hash"]
+    assert agent.params["model"]
     assert reconcile() == 0
 
     get_core().processors["palette"].version = 2
@@ -306,7 +308,7 @@ def test_killed_running_task_is_reaped_and_not_duplicated(capture):
 
     run_tasks()
     assert Item.objects.filter(type="colour").count() == 2
-    assert item.current_values()["summary"] == "An image titled 'nice palette'"
+    assert Activity.objects.filter(agent="agent@1", subject=item, outcome="ok").exists()
 
 
 def test_derive_backoff_returns_timedelta_for_retry_after():

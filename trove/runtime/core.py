@@ -106,7 +106,8 @@ class Core:
             p.name: [
                 q.name
                 for q in procs
-                if any(fnmatch.fnmatch(t, q.consumes) for t in self.provided(p))
+                if q.name != p.name
+                and any(fnmatch.fnmatch(t, q.consumes) for t in self.provided(p))
             ]
             for p in procs
         }
