@@ -10,7 +10,7 @@ never happen.
 - A REST API for its own sake. Machine interfaces exist only where an
   integration needs them (ingest, the wall, and later MCP and Telegram).
 - MCP, embeddings, type proposals, Telegram, purge, a native iOS app, or
-  data-defined types. Those are roadmap, not version 1.
+  data-defined types. Those are on the roadmap, not version 1.
 - An event journal, revisions, folds, or Go modules. That was the previous
   system.
 

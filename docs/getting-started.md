@@ -56,7 +56,7 @@ Google Photos album.
 During the test:
 
 - Capture at least once a day (Shortcut or `curl` to `/ingest/`).
-- Browse the wall. MCP is roadmap, so it is not part of the test.
+- Browse the wall. MCP is on the roadmap, so it is not part of the test.
 - Note gaps. Leave roadmap items (MCP, embeddings, Telegram, purge) until
   after the test.
 
