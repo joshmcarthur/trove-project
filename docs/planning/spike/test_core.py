@@ -83,7 +83,7 @@ class CoreTests(TestCase):
         self.assertEqual(rt.reconcile(), 2)                # palette + agent
         colours = sorted(Item.objects.filter(type="colour").values_list("id", flat=True))
         self.assertEqual(len(colours), 2)
-        self.assertEqual(item.current_values()["summary"], "A image titled 'nice palette'")
+        self.assertEqual(item.current_values()["summary"], "An image titled 'nice palette'")
         self.assertEqual(rt.reconcile(), 0)                # nothing left to do
 
         # Version bump re-derives, and keyed emits keep their identity.

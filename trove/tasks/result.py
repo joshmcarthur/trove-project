@@ -1,0 +1,11 @@
+from dataclasses import dataclass, field
+
+from .emit import Emit
+
+
+@dataclass
+class Result:
+    claims: dict = field(default_factory=dict)
+    emits: list[Emit] = field(default_factory=list)
+    cost: float | None = None
+    params: dict = field(default_factory=dict)
