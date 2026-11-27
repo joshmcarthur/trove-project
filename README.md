@@ -8,6 +8,7 @@ This is a Django 6.1 rewrite. The previous Go implementation lives on the
 [`legacy-go`](https://github.com/joshmcarthur/trove-project/tree/legacy-go)
 branch.
 
+- **Docs:** https://joshmcarthur.github.io/trove/
 - **Specification:** [docs/spec.md](docs/spec.md)
 - **Work queue:** GitHub issues on the `v1` milestone
 
@@ -18,14 +19,15 @@ in scope.
 ## Development
 
 Python 3.13, [uv](https://docs.astral.sh/uv/), Django 6.1, Django Tasks, and
-django-ox. Pin everything. Ruff, pytest, pytest-django, and factory-boy live
-in the `dev` dependency group.
+django-ox. Pin everything. Ruff, pytest, pytest-django, factory-boy, and
+Zensical live in the `dev` dependency group.
 
 ```bash
 uv sync --group dev
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
+uv run zensical serve
 ```
 
 Do not use `manage.py test`. Put Django model graphs in `tests/factories.py`.
