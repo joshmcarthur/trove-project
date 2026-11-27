@@ -646,15 +646,17 @@ def test_launch_chromium_disables_non_proxied_webrtc(monkeypatch):
     assert playwright.stopped
 
 
-def test_launch_without_driver_pid_still_stops(monkeypatch):
+def test_launch_aborts_without_driver_pid(core, monkeypatch):
     chromium = chromium_mod()
     seen = {}
     playwright = FakePlaywright(seen)
     monkeypatch.setattr(
         chromium, "sync_playwright", lambda: FakeManager(playwright, pid=None)
     )
-    with chromium.launch_chromium():
-        pass
+    with pytest.raises(chromium.CaptureError, match="chromium driver pid missing"):
+        with chromium.launch_chromium():
+            pass
+    assert seen == {}
     assert playwright.stopped
 
 

@@ -57,16 +57,14 @@ def _driver_pid(manager) -> int | None:
     return pid if isinstance(pid, int) else None
 
 
-def _kill_pid(pid: int | None) -> None:
-    if not pid:
-        return
+def _kill_pid(pid: int) -> None:
     try:
         os.kill(pid, signal.SIGKILL)
     except OSError:
         pass
 
 
-def _close_chromium(browser, playwright, pid: int | None) -> None:
+def _close_chromium(browser, playwright, pid: int) -> None:
     timer = threading.Timer(CLOSE_WAIT_S, _kill_pid, args=(pid,))
     timer.daemon = True
     timer.start()
@@ -89,6 +87,12 @@ def launch_chromium():
     manager = sync_playwright()
     playwright = manager.start()
     pid = _driver_pid(manager)
+    if pid is None:
+        try:
+            playwright.stop()
+        except Exception:
+            pass
+        raise CaptureError("chromium driver pid missing")
     browser = None
     try:
         browser = playwright.chromium.launch(headless=True, args=LAUNCH_ARGS)
