@@ -10,14 +10,17 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.middleware.csrf import get_token
 from django.template import RequestContext, Template
 from django.urls import path
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt, csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from PIL import Image
 from pydantic import BaseModel
 
 from trove.models import Claim
-from trove.services.recorder import record
+from trove.services.recorder import record, record_failure
 from trove.services.tokens import INGEST_SCOPE, agent_for_request
+
+from .fetch import FetchError, fetch_public_file, looks_like_file_url
 
 PLUGIN_DIR = Path(__file__).parent
 
@@ -267,7 +270,10 @@ def _ingest_post(request):
     if url is not None and urlparse(url).scheme == "data":
         return JsonResponse({"error": "data urls are not allowed"}, status=400)
     data, ctype = None, None
-    if upload is not None:
+    from_upload = upload is not None
+    fetch_error = None
+    fetch_started = None
+    if from_upload:
         if _too_large(upload.size):
             return _reject_too_large()
         data = upload.read()
@@ -276,23 +282,37 @@ def _ingest_post(request):
             return JsonResponse({"error": "empty file"}, status=400)
     elif not url:
         return JsonResponse({"error": "send a file or a url"}, status=400)
+    elif looks_like_file_url(url):
+        fetch_started = timezone.now()
+        try:
+            data, ctype = fetch_public_file(url, settings.TROVE["INGEST_MAX_BYTES"])
+        except FetchError as exc:
+            fetch_error = exc
     with record("ingest", agent) as rec:
-        if data is not None:
-            item_type, meta = _upload_type_and_meta(data, ctype)
-            item = rec.item(item_type)
-            rec.claim(item, "$blob", rec.blob(data, ctype))
-            for key, value in meta.items():
-                rec.claim(item, key, value)
-        else:
-            item = rec.item("capture.link")
+        item = _record_capture(rec, data, ctype, from_upload=from_upload)
         if url:
             rec.claim(item, "url", url, rank=PREFERRED)
         for key in ("title", "notes"):
             if request.POST.get(key):
                 rec.claim(item, key, request.POST[key], rank=PREFERRED)
+    if fetch_error is not None:
+        record_failure("derive", "fetch@1", item, fetch_error, fetch_started)
     if agent_for_request(request, INGEST_SCOPE) is None:
         return HttpResponseRedirect(f"/ingest/?id={item.id}")
     return JsonResponse({"id": item.id, "type": item.type}, status=201)
+
+
+def _record_capture(rec, data, ctype, *, from_upload: bool):
+    if data is None:
+        return rec.item("capture.link")
+    item_type, meta = _upload_type_and_meta(data, ctype)
+    if not from_upload and item_type not in {"capture.document", "capture.image"}:
+        return rec.item("capture.link")
+    item = rec.item(item_type)
+    rec.claim(item, "$blob", rec.blob(data, ctype))
+    for key, value in meta.items():
+        rec.claim(item, key, value)
+    return item
 
 
 @csrf_exempt
