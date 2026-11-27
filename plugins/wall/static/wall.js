@@ -69,6 +69,20 @@ function formatWhen(iso) {
   });
 }
 
+function provenanceNote(row) {
+  const parts = [];
+  if (row.model) {
+    parts.push(row.model);
+  }
+  if (typeof row.prompt_hash === "string" && row.prompt_hash) {
+    parts.push(row.prompt_hash.slice(0, 12));
+  }
+  if (row.cost != null) {
+    parts.push(`cost ${row.cost}`);
+  }
+  return parts.join(" · ");
+}
+
 function selectedItem() {
   return items.find((item) => item.id === selectedId) || items[0] || null;
 }
@@ -247,17 +261,19 @@ function Provenance({ item }) {
       ${rows.length
         ? html`
             <ol class="timeline">
-              ${rows.map(
-                (row) => html`
+              ${rows.map((row) => {
+                const note = provenanceNote(row);
+                return html`
                   <li key=${row.kind + row.agent + row.when}>
                     <span class="when">${formatWhen(row.when)}</span>
                     <div>
                       <div class="kind">${row.kind}</div>
                       <div class="agent">${row.agent}</div>
+                      ${note ? html`<div class="agent">${note}</div>` : null}
                     </div>
                   </li>
-                `,
-              )}
+                `;
+              })}
             </ol>
           `
         : html`<p class="empty">No history for this item.</p>`}
