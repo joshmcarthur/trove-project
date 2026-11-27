@@ -63,6 +63,29 @@ them, edit them, or replace them with Ask for Input. Fields you send become
 preferred claims. Camera-roll HEIC is a normal file upload, and a native
 share extension is on the roadmap.
 
+## Backup and restore
+
+`manage.py backup` writes one gzip tarball: `config.sqlite3`, `data.sqlite3`,
+then the files under `blobs/`. Restore is unpacking that tarball into a Trove
+checkout.
+
+```bash
+uv run python manage.py backup /tmp/trove.tar.gz
+```
+
+On a clean checkout of the same or newer code:
+
+```bash
+tar -xzf /tmp/trove.tar.gz
+uv run python manage.py migrate
+uv run python manage.py migrate --database=data
+uv run python manage.py trove
+```
+
+Migrate both databases. After that, the collection and blob files match the
+instance you backed up. If this checkout already has sqlite files or a `blobs/`
+directory, move them aside before you unpack.
+
 ## Two-week live test
 
 Version 1 is meant to survive two weeks of real use. Kill criterion: after two

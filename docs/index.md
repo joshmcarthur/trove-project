@@ -12,7 +12,7 @@ that fills a handful of code-declared types.
 
 | Page | Start here |
 |------|------------|
-| [Getting started](getting-started.md) | Install, first run, ingest, iOS Shortcut, two-week live test |
+| [Getting started](getting-started.md) | Install, first run, ingest, backup and restore, iOS Shortcut, two-week live test |
 | [Concepts](concepts.md) | Items, blobs, claims, links, activities, plugins, jobs, rank |
 | [Specification](spec.md) | The v1 spec |
 | [Roadmap](roadmap.md) | Weekend build vs later work |

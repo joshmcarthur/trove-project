@@ -30,6 +30,12 @@ def write_tarball(output: Path, *, config_path: Path, data_path: Path, blob_dir:
             _add_blobs(tar, blob_dir)
 
 
+def unpack_tarball(archive: Path, dest: Path):
+    dest.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(dest, filter="data")
+
+
 def _connect(path: Path) -> sqlite3.Connection:
     text = str(path)
     if text.startswith("file:"):
