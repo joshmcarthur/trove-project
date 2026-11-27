@@ -157,6 +157,10 @@ def test_reconcile_derive_and_idempotence(capture, client):
         "/wall/api/items", HTTP_AUTHORIZATION="Bearer dev-wall-token"
     ).json()["items"][0]
     assert sorted(wall["colours"]) == ["#336699", "#e67828"]
+    assert wall["values"]["title"] == "nice palette"
+    kinds = {row["kind"] for row in wall["provenance"]}
+    assert {"ingest", "derive"} <= kinds
+    assert all("agent" in row and "when" in row for row in wall["provenance"])
 
 
 def test_rank_then_recency():

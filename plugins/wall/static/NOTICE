@@ -1,0 +1,4 @@
+Vendored front-end modules for the wall SPA.
+
+- preact 10.26.9 — MIT — https://github.com/preactjs/preact
+- htm 3.1.1 — Apache-2.0 — https://github.com/developit/htm
