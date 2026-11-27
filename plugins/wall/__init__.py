@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.urls import path
 
-from trove.queries import wall_items
+from .queries import wall_items
 
 
 def items(request):

@@ -8,6 +8,7 @@ import json
 import logging
 import sys
 import threading
+import types
 from pathlib import Path
 
 from django.conf import settings
@@ -15,8 +16,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.utils import OperationalError, ProgrammingError
 from pydantic import BaseModel
 
+from trove.models import ConfigEntry
 from trove.registry.processor import REGISTRY, Processor
-from trove.runtime.default_entry import DefaultEntry
 from trove.runtime.loaded_plugin import LoadedPlugin
 
 log = logging.getLogger("trove")
@@ -76,7 +77,7 @@ class Core:
             snapshot = (dict(self.types), dict(self.processors))
             self._current = lp
             try:
-                _import(domain, path).setup(self, entry or DefaultEntry(domain))
+                _import(domain, path).setup(self, entry or ConfigEntry(domain=domain))
             except Exception as exc:  # noqa: BLE001
                 self.types, self.processors = snapshot
                 if manifest.get("kind") == "core":
@@ -143,7 +144,12 @@ def _dependency_order(manifests) -> list[str]:
 
 
 def _import(domain: str, path: Path):
-    name = f"trove_plugins.{domain}"
+    parent = "trove_plugins"
+    if parent not in sys.modules:
+        pkg = types.ModuleType(parent)
+        pkg.__path__ = []
+        sys.modules[parent] = pkg
+    name = f"{parent}.{domain}"
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(
@@ -156,8 +162,6 @@ def _import(domain: str, path: Path):
 
 
 def _config_entries() -> dict:
-    from trove.models import ConfigEntry
-
     try:
         return {e.domain: e for e in ConfigEntry.objects.all()}
     except (OperationalError, ProgrammingError):

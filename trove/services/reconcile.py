@@ -4,7 +4,7 @@ import fnmatch
 
 from trove.models import Activity, Item
 from trove.runtime.core import get_core
-from trove.tasks.derive import BACKFILL, enqueue_derive
+from trove.tasks.enqueue import BACKFILL, enqueue_derive
 
 
 def reconcile() -> int:

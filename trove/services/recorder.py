@@ -11,6 +11,7 @@ from django.utils import timezone
 from trove.models import Activity, Blob, Claim, Item, Link
 from trove.runtime.core import get_core
 from trove.services.blobs import write_blob
+from trove.tasks.enqueue import enqueue_for_items
 
 DATA = "data"
 
@@ -87,8 +88,6 @@ def record(
         raise
     with transaction.atomic(using=DATA):
         rec.activity = rec._flush(started)
-        from trove.tasks.derive import enqueue_for_items
-
         enqueue_for_items([i.id for i in rec._items])
 
 

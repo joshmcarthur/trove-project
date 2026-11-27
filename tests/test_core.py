@@ -17,7 +17,8 @@ from trove.core import Processor, get_core, reset_core
 from trove.models import Activity, AppendOnlyError, Claim, Item, Link
 from trove.services.reconcile import reconcile
 from trove.services.recorder import record
-from trove.tasks import Emit, Result, TransientError, enqueue_derive, execute_derive
+from trove.tasks import Emit, Result, TransientError, enqueue_derive
+from trove.tasks.execute import execute_derive
 
 TOKEN = {"HTTP_AUTHORIZATION": "Bearer dev-shortcut-token"}
 TMP = tempfile.mkdtemp()
