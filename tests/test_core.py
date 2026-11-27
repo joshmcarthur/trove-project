@@ -86,7 +86,7 @@ class CoreTests(TestCase):
         )
         self.assertEqual(len(colours), 2)
         self.assertEqual(
-            item.current_values()["summary"], "A image titled 'nice palette'"
+            item.current_values()["summary"], "An image titled 'nice palette'"
         )
         self.assertEqual(reconcile(), 0)
 
