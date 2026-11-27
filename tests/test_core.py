@@ -320,7 +320,7 @@ def _data_delete_triggers(enabled: bool):
 
 
 @pytest.mark.django_db(transaction=True, databases=["default", "data"])
-def test_execute_derive_waits_while_inflight():
+def test_execute_derive_lock_runs_processor_once():
     first_in = threading.Event()
     release = threading.Event()
     saw_two = threading.Event()

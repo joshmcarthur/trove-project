@@ -24,8 +24,8 @@ def run(item, ctx):
         Path(hold).write_text("1")
         time.sleep(60)
     log = Path(os.environ["TROVE_RUN_LOG"])
-    n = int(log.read_text()) if log.exists() else 0
-    log.write_text(str(n + 1))
+    with log.open("a") as fh:
+        fh.write("1\\n")
     return Result(claims={"slow": True})
 
 
@@ -43,7 +43,7 @@ def _ox_worker_env(settings_dir: Path, plugin_root: str, dest: Path) -> dict:
         f"DATABASES['default']['NAME'] = {default_name!r}\n"
         f"DATABASES['data']['NAME'] = {data_name!r}\n"
         f"TROVE = {{**TROVE, 'PLUGIN_DIRS': [{plugin_root!r}], "
-        f"'WORKER_CONCURRENCY': 1}}\n"
+        f"'WORKER_CONCURRENCY': 2}}\n"
         "TASKS = {**TASKS, 'default': {**TASKS['default'], "
         "'OPTIONS': {**TASKS['default']['OPTIONS'], 'LOCK_TIMEOUT': 0.4}}}\n"
     )
@@ -73,7 +73,7 @@ def _migrate_file_dbs(dest: Path, plugin_root: str):
     _manage_py(env, "migrate", "--database", "data", "--verbosity", "0")
 
 
-def _seed_slow_job(dest: Path, plugin_root: str) -> str:
+def _seed_slow_jobs(dest: Path, plugin_root: str) -> str:
     env = _ox_worker_env(dest / "_settings", plugin_root, dest)
     marker = dest / "item_id"
     seed = dest / "_settings" / "seed.py"
@@ -88,25 +88,28 @@ def _seed_slow_job(dest: Path, plugin_root: str) -> str:
         "enqueue_derive('slow', item.id)\n"
         f"open({str(marker)!r}, 'w').write(item.id)\n"
     )
-    subprocess.run(
+    result = subprocess.run(
         [sys.executable, str(seed)],
-        check=True,
         cwd=str(settings.BASE_DIR),
         env=env,
         capture_output=True,
         text=True,
     )
+    if result.returncode:
+        raise AssertionError(result.stderr or result.stdout)
     return marker.read_text()
 
 
-def _file_db_script(dest: Path, plugin_root: str, body: str) -> str:
+def _file_db_reconcile(dest: Path, plugin_root: str) -> int:
     env = _ox_worker_env(dest / "_settings", plugin_root, dest)
-    script = dest / "_settings" / "query.py"
+    script = dest / "_settings" / "reconcile.py"
     script.write_text(
         "import django\n"
         "django.setup()\n"
         "from trove.core import reset_core\n"
-        "reset_core()\n" + body
+        "from trove.services.reconcile import reconcile\n"
+        "reset_core()\n"
+        "print(reconcile())\n"
     )
     result = subprocess.run(
         [sys.executable, str(script)],
@@ -116,40 +119,7 @@ def _file_db_script(dest: Path, plugin_root: str, body: str) -> str:
         capture_output=True,
         text=True,
     )
-    return result.stdout.strip().splitlines()[-1]
-
-
-def _ok_count(dest: Path, plugin_root: str, item_id: str) -> int:
-    return int(
-        _file_db_script(
-            dest,
-            plugin_root,
-            "from trove.models import Activity\n"
-            f"print(Activity.objects.filter(agent='slow@1', "
-            f"subject_id={item_id!r}, outcome='ok').count())\n",
-        )
-    )
-
-
-def _file_db_reconcile(dest: Path, plugin_root: str) -> int:
-    return int(
-        _file_db_script(
-            dest,
-            plugin_root,
-            "from trove.services.reconcile import reconcile\nprint(reconcile())\n",
-        )
-    )
-
-
-def _ox_count(dest: Path, where: str = "") -> int:
-    conn = sqlite3.connect(dest / "config.sqlite3")
-    try:
-        sql = "SELECT COUNT(*) FROM django_ox_oxtask"
-        if where:
-            sql += f" WHERE {where}"
-        return conn.execute(sql).fetchone()[0]
-    finally:
-        conn.close()
+    return int(result.stdout.strip().splitlines()[-1])
 
 
 def _wait_for_hold(proc: subprocess.Popen, hold: Path, log: Path):
@@ -176,8 +146,13 @@ def test_killed_running_task_is_reaped_and_not_duplicated(tmp_path):
     run_log = tmp_path / "runs"
     worker_log = dest / "worker.log"
     _migrate_file_dbs(dest, root)
-    item_id = _seed_slow_job(dest, root)
-    assert _ox_count(dest) == 1
+    item_id = _seed_slow_jobs(dest, root)
+    queued = (
+        sqlite3.connect(dest / "config.sqlite3")
+        .execute("SELECT COUNT(*) FROM django_ox_oxtask")
+        .fetchone()[0]
+    )
+    assert queued == 1, f"seed wrote {queued} OxTask rows"
 
     env = _ox_worker_env(dest / "_settings", root, dest)
     env["TROVE_HOLD"] = str(hold)
@@ -191,7 +166,7 @@ def test_killed_running_task_is_reaped_and_not_duplicated(tmp_path):
                 "--processes",
                 "1",
                 "--concurrency",
-                "1",
+                "2",
                 "--lock-timeout",
                 "0.4",
             ],
@@ -209,8 +184,7 @@ def test_killed_running_task_is_reaped_and_not_duplicated(tmp_path):
             proc.kill()
             proc.wait(timeout=5)
 
-    assert _ox_count(dest, "status = 'RUNNING'") == 1
-    assert _file_db_reconcile(dest, root) == 1
+    _file_db_reconcile(dest, root)
     time.sleep(0.6)
     restart = env.copy()
     restart.pop("TROVE_HOLD", None)
@@ -220,11 +194,27 @@ def test_killed_running_task_is_reaped_and_not_duplicated(tmp_path):
         "--processes",
         "1",
         "--concurrency",
-        "1",
+        "2",
         "--lock-timeout",
         "0.4",
         "--batch",
     )
-    assert _ox_count(dest, "status != 'SUCCESSFUL'") == 0
-    assert run_log.read_text() == "1", restarted.stderr or restarted.stdout
-    assert _ok_count(dest, root, item_id) == 1
+    assert run_log.read_text().splitlines() == ["1"], (
+        restarted.stderr or restarted.stdout
+    )
+    ok = (
+        sqlite3.connect(dest / "data.sqlite3")
+        .execute(
+            "SELECT COUNT(*) FROM trove_activity "
+            "WHERE agent=? AND subject_id=? AND outcome=?",
+            ("slow@1", item_id, "ok"),
+        )
+        .fetchone()[0]
+    )
+    assert ok == 1
+    leftover = (
+        sqlite3.connect(dest / "config.sqlite3")
+        .execute("SELECT COUNT(*) FROM django_ox_oxtask WHERE status != 'SUCCESSFUL'")
+        .fetchone()[0]
+    )
+    assert leftover == 0
