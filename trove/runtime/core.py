@@ -46,11 +46,7 @@ class Core:
         ]
 
     def provided(self, p: Processor) -> list[str]:
-        if p.provides != REGISTRY:
-            return list(p.provides)
-        # REGISTRY means "any type this processor does not itself consume".
-        # Counting capture.* as an agent output would look like a self-loop.
-        return [t for t in self.types if not fnmatch.fnmatch(t, p.consumes)]
+        return list(self.types) if p.provides == REGISTRY else list(p.provides)
 
     def validate(self, type_name: str, values: dict):
         model = self.types.get(type_name)

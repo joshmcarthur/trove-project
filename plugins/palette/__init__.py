@@ -2,7 +2,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 from trove.core import Processor
-from trove.jobs import Emit, Result
+from trove.tasks import Emit, Result
 
 
 class Colour(BaseModel):

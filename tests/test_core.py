@@ -13,11 +13,11 @@ from PIL import Image
 from pydantic import ValidationError
 
 from tests.factories import ConfigEntryFactory, ItemFactory
-from trove import jobs
-from trove.core import get_core, reset_core
+from trove.core import Processor, get_core, reset_core
 from trove.models import Activity, AppendOnlyError, Claim, Item, Link
 from trove.services.reconcile import reconcile
 from trove.services.recorder import record
+from trove.tasks import Emit, Result, TransientError, enqueue_derive, execute_derive
 
 TOKEN = {"HTTP_AUTHORIZATION": "Bearer dev-shortcut-token"}
 TMP = tempfile.mkdtemp()
@@ -138,21 +138,23 @@ class CoreTests(TestCase):
         def flaky(i, ctx):
             calls.append(1)
             if len(calls) < 3:
-                raise jobs.TransientError("429", retry_after=1)
-            return jobs.Result(claims={"flaky": True})
+                raise TransientError("429", retry_after=0)
+            return Result(claims={"flaky": True})
 
-        jobs.run_job(
-            jobs.Processor("flaky", 1, "capture.*", [], flaky),
-            item.id,
-            sleep=lambda s: None,
-        )
+        core = get_core()
+        core.add_processor(Processor("flaky", 1, "capture.*", [], flaky))
+        try:
+            enqueue_derive("flaky", item.id)
+            run_tasks()
+        finally:
+            core.processors.pop("flaky", None)
         self.assertEqual(len(calls), 3)
         self.assertTrue(item.current_values()["flaky"])
 
         def broken(i, ctx):
             raise ValueError("bad response")
 
-        jobs.run_job(jobs.Processor("broken", 1, "capture.*", [], broken), item.id)
+        execute_derive(Processor("broken", 1, "capture.*", [], broken), item.id)
         failed = Activity.objects.get(agent="broken@1")
         self.assertEqual(failed.outcome, "failed")
         self.assertIn("bad response", failed.error)
@@ -236,14 +238,14 @@ class InvalidOutputTests(TestCase):
     def test_invalid_processor_output_is_a_recorded_failure(self):
         with record("ingest", "test") as r:
             item = r.item("capture.link")
-        bad = jobs.Processor(
+        bad = Processor(
             "bad_ai",
             1,
             "capture.*",
             ["colour"],
-            lambda i, c: jobs.Result(emits=[jobs.Emit("colour", "k", {"hex": 1})]),
+            lambda i, c: Result(emits=[Emit("colour", "k", {"hex": 1})]),
         )
-        jobs.run_job(bad, item.id)
+        execute_derive(bad, item.id)
         act = Activity.objects.get(agent="bad_ai@1")
         self.assertEqual(act.outcome, "failed")
         self.assertIn("validation", act.error.lower())

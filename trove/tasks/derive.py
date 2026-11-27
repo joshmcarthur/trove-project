@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import time
-
 from django.tasks import task
 from django.utils import timezone
 
@@ -54,7 +52,7 @@ def already_done(p: Processor, item: Item) -> bool:
 
 
 def execute_derive(p: Processor, item_id: str):
-    """One attempt. TransientError is left for django-ox to retry."""
+    """One attempt. django-ox retries TransientError."""
     from trove.services.recorder import record, record_failure
 
     item = Item.objects.get(id=item_id)
@@ -77,26 +75,6 @@ def execute_derive(p: Processor, item_id: str):
         record_failure(
             "derive", p.agent, item, exc, started, result.params, result.cost
         )
-
-
-def run_job(p: Processor, item_id: str, sleep=time.sleep):
-    """Run a processor, retrying TransientError. Tests call this directly."""
-    from trove.services.recorder import record_failure
-
-    last_exc = None
-    for attempt in range(1, p.attempts + 1):
-        try:
-            execute_derive(p, item_id)
-            return
-        except TransientError as exc:
-            last_exc = exc
-            if attempt < p.attempts:
-                sleep(exc.retry_after or min(2**attempt, 60))
-                continue
-    item = Item.objects.get(id=item_id)
-    record_failure(
-        "derive", p.agent, item, last_exc, timezone.now(), {"attempts": p.attempts}
-    )
 
 
 def _apply(rec, item: Item, result: Result):

@@ -4,7 +4,7 @@ from .derive import (
     derive_item,
     enqueue_derive,
     enqueue_for_items,
-    run_job,
+    execute_derive,
 )
 from .emit import Emit
 from .result import Result
@@ -19,5 +19,5 @@ __all__ = [
     "derive_item",
     "enqueue_derive",
     "enqueue_for_items",
-    "run_job",
+    "execute_derive",
 ]

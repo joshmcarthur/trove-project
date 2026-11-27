@@ -14,8 +14,6 @@ class Processor:
     consumes: str
     provides: list[str] | str
     run: Callable[..., Any]
-    lane: str = "local"
-    attempts: int = 3
 
     @property
     def agent(self) -> str:

@@ -1,5 +1,5 @@
-from trove.core import REGISTRY, Processor
-from trove.jobs import Result
+from trove.core import Processor
+from trove.tasks import Result
 
 
 def run(item, ctx):
@@ -10,4 +10,4 @@ def run(item, ctx):
 
 
 def setup(core, entry):
-    core.add_processor(Processor("agent", 1, "capture.*", REGISTRY, run))
+    core.add_processor(Processor("agent", 1, "capture.*", [], run))
