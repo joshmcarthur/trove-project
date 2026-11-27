@@ -10,6 +10,8 @@ htmlcov/
 
 .DS_Store
 .env
+xcuserdata/
+*.xcuserstate
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
