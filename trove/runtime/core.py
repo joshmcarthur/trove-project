@@ -56,6 +56,16 @@ class Core:
                 {k: v for k, v in values.items() if not k.startswith("$")}
             )
 
+    def describe(self) -> list[dict]:
+        return [
+            {
+                "name": name,
+                "description": (model.__doc__ or "").strip(),
+                "schema": model.model_json_schema(),
+            }
+            for name, model in self.types.items()
+        ]
+
     def load(self):
         manifests = _discover(settings.TROVE["PLUGIN_DIRS"])
         entries = _config_entries()
