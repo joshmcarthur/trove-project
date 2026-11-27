@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connections, transaction
 from django.test import override_settings
 from django.utils import timezone
@@ -49,6 +50,13 @@ def png(colour="#336699", second=(230, 120, 40)):
     buf.name = "x.png"
     buf.seek(0)
     return buf
+
+
+HEIC_FIXTURE = Path(__file__).parent / "fixtures" / "tiny.heic"
+
+
+def heic(content_type="image/heic"):
+    return SimpleUploadedFile("lamp.heic", HEIC_FIXTURE.read_bytes(), content_type)
 
 
 @pytest.fixture
@@ -134,6 +142,35 @@ def test_ingest(capture, client, blob_dir):
     assert (act.kind, act.agent, act.outcome) == ("ingest", "shortcut:iphone", "ok")
     assert (blob_dir / values["$blob"][:2]).exists()
     assert client.post("/ingest/", {"url": "x"}).status_code == 401
+
+
+def test_ingest_heic(client, blob_dir):
+    response = client.post("/ingest/", {"file": heic()}, **TOKEN)
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.image"
+    item = Item.objects.get(id=payload["id"])
+    values = item.current_values()
+    assert (values["width"], values["height"]) == (100, 100)
+    assert (blob_dir / values["$blob"][:2]).exists()
+
+
+def test_palette_reads_heic(client, blob_dir):
+    response = client.post("/ingest/", {"file": heic()}, **TOKEN)
+    assert response.status_code == 201, response.content
+    run_tasks()
+    assert Item.objects.filter(type="colour").exists()
+
+
+def test_ingest_heic_octet_stream(client, blob_dir):
+    response = client.post(
+        "/ingest/", {"file": heic("application/octet-stream")}, **TOKEN
+    )
+    assert response.status_code == 201, response.content
+    payload = response.json()
+    assert payload["type"] == "capture.image"
+    values = Item.objects.get(id=payload["id"]).current_values()
+    assert (values["width"], values["height"]) == (100, 100)
 
 
 def test_reconcile_derive_and_idempotence(capture, client):

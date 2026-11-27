@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from PIL import Image
 from pydantic import BaseModel
 
 from trove.models import Claim
@@ -13,6 +14,7 @@ from trove.services.recorder import record
 from trove.services.tokens import INGEST_SCOPE, agent_for_request
 
 PREFERRED = Claim.Rank.PREFERRED
+HEIC_BRANDS = {b"heic", b"heif", b"mif1", b"msf1", b"heix", b"heim", b"heis"}
 
 
 class Capture(BaseModel):
@@ -25,12 +27,21 @@ def _client(request):
     return agent_for_request(request, INGEST_SCOPE)
 
 
-def _file_metadata(data: bytes, content_type: str) -> dict:
-    if not content_type.startswith("image/"):
+def _looks_like_heic(data: bytes, name: str = "") -> bool:
+    if name.lower().endswith((".heic", ".heif")):
+        return True
+    brand = data[8:12] if len(data) >= 12 and data[4:8] == b"ftyp" else b""
+    return brand in HEIC_BRANDS
+
+
+def _is_image(data: bytes, content_type: str, name: str = "") -> bool:
+    return content_type.startswith("image/") or _looks_like_heic(data, name)
+
+
+def _file_metadata(data: bytes, content_type: str, name: str = "") -> dict:
+    if not _is_image(data, content_type, name):
         return {}
     try:
-        from PIL import Image
-
         with Image.open(io.BytesIO(data)) as img:
             return {"width": img.width, "height": img.height}
     except Exception:  # noqa: BLE001
@@ -53,11 +64,12 @@ def ingest(request):
                 upload.read(),
                 upload.content_type or "application/octet-stream",
             )
+            name = getattr(upload, "name", "") or ""
             item = rec.item(
-                "capture.image" if ctype.startswith("image/") else "capture.file"
+                "capture.image" if _is_image(data, ctype, name) else "capture.file"
             )
             rec.claim(item, "$blob", rec.blob(data, ctype))
-            for key, value in _file_metadata(data, ctype).items():
+            for key, value in _file_metadata(data, ctype, name).items():
                 rec.claim(item, key, value)
         else:
             item = rec.item("capture.link")
