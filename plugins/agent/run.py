@@ -11,7 +11,6 @@ import urllib.request
 from PIL import Image
 
 from trove.core import get_core
-from trove.models import Blob
 from trove.tasks import Emit, Result, TransientError
 
 SKIP_TYPES = frozenset({"colour"})
@@ -133,16 +132,12 @@ def _image_part(item, ctx) -> dict | None:
     sha = ctx.values(item).get("$blob")
     if not sha:
         return None
-    path = ctx.blob_path(sha)
-    if not path.exists():
+    try:
+        with Image.open(ctx.blob_path(sha)) as img:
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, "JPEG", quality=85)
+    except Exception:  # noqa: BLE001
         return None
-    blob = Blob.objects.filter(pk=sha).first()
-    content_type = blob.content_type if blob else ""
-    if content_type and not content_type.startswith("image/"):
-        return None
-    with Image.open(path) as img:
-        buf = io.BytesIO()
-        img.convert("RGB").save(buf, "JPEG", quality=85)
     b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     return {
         "type": "image_url",

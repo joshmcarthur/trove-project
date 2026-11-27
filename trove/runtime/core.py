@@ -47,7 +47,9 @@ class Core:
         ]
 
     def provided(self, p: Processor) -> list[str]:
-        return list(self.types) if p.provides == REGISTRY else list(p.provides)
+        if p.provides != REGISTRY:
+            return list(p.provides)
+        return [name for name in self.types if not fnmatch.fnmatch(name, p.consumes)]
 
     def validate(self, type_name: str, values: dict):
         model = self.types.get(type_name)
@@ -106,8 +108,7 @@ class Core:
             p.name: [
                 q.name
                 for q in procs
-                if q.name != p.name
-                and any(fnmatch.fnmatch(t, q.consumes) for t in self.provided(p))
+                if any(fnmatch.fnmatch(t, q.consumes) for t in self.provided(p))
             ]
             for p in procs
         }

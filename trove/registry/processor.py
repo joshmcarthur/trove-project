@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-REGISTRY = "*"  # a processor that may emit any registered type
+REGISTRY = "*"  # any registered type this processor does not consume
 
 
 @dataclass

@@ -28,6 +28,14 @@ def test_agent_provides_registry(core):
     assert processor.consumes == "capture.*"
 
 
+def test_agent_plus_registry_still_loads(core):
+    processor = core.processors["agent"]
+    provided = core.provided(processor)
+    assert processor.provides == REGISTRY
+    assert "capture.image" not in provided
+    assert "colour" in provided
+
+
 def test_describe_still_includes_colour_and_capture(core):
     names = {row["name"] for row in core.describe()}
     assert "colour" in names

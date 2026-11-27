@@ -362,6 +362,19 @@ def test_processor_loop_refused():
         load(root)
 
 
+def test_explicit_self_loop_is_refused():
+    code = (
+        "from pydantic import BaseModel\nfrom trove.core import Processor\n"
+        "class T(BaseModel): pass\n"
+        "def setup(core, entry):\n"
+        "    core.add_type('x', T)\n"
+        "    core.add_processor(Processor('loop', 1, 'x', ['x'], lambda i, c: None))\n"
+    )
+    root = plugin_dir({"selfie": ("core", code, [])})
+    with pytest.raises(ImproperlyConfigured):
+        load(root)
+
+
 def test_invalid_processor_output_is_a_recorded_failure():
     item = ItemFactory(type="capture.link")
     bad = Processor(
