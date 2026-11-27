@@ -35,8 +35,8 @@ register the owner passkey. There is no password; the code dies once used.
 
 The wall is an OAuth client: authorization code + PKCE, scope `read:all`.
 Approve it after you sign in with that passkey. For Shortcuts and curl,
-mint a long-lived `write:capture` token with `manage.py token create` or
-the admin. List and revoke tokens in the admin.
+mint a long-lived `write:capture` token with `manage.py token create`.
+List and revoke tokens in the admin.
 
 ## Ingest
 
@@ -52,9 +52,9 @@ content-addressed blob; the second call is still 201. Bodies larger than
 a truncated copy. If Photos sends a Live Photo, we keep the one `file`
 part that arrived.
 
-Mint a long-lived token with scope `write:capture` (`manage.py token create`
-or the admin). Shortcuts cannot run a browser login, so they use that token
-the way Home Assistant uses long-lived tokens.
+Mint a long-lived `write:capture` token with `manage.py token create`.
+Shortcuts cannot run a browser login, so they use that token the way
+Home Assistant uses long-lived tokens.
 
 ## iOS Shortcut
 
