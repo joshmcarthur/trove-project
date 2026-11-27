@@ -24,18 +24,25 @@ Zensical live in the `dev` dependency group.
 
 ```bash
 uv sync --group dev
+uv run playwright install chromium-headless-shell
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
 uv run zensical serve
 ```
 
+`playwright install chromium-headless-shell` is Playwright's pinned browser, not
+the Chrome you log into. pytest launches it for one local JS-rendered fixture.
+CI installs the same browser with `--with-deps` before pytest. Without that
+binary, the JS fixture test is skipped and the rest of the suite still uses
+fakes.
+
 Do not use `manage.py test`. Put Django model graphs in `tests/factories.py`.
 `manage.py backup` writes a tarball; restore is unpack plus migrate. The steps
 are in [docs/getting-started.md](docs/getting-started.md).
 
-CI on pull requests to `main` runs `uv sync --frozen --group dev`, then ruff
-format, ruff check, and pytest.
+CI on pull requests to `main` runs `uv sync --frozen --group dev`, installs
+`chromium-headless-shell`, then ruff format, ruff check, and pytest.
 
 ## Contributing
 

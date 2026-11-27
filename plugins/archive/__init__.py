@@ -6,4 +6,4 @@ from .run import run
 
 
 def setup(core, entry):
-    core.add_processor(Processor("archive", 1, "capture.link", ["capture.file"], run))
+    core.add_processor(Processor("archive", 2, "capture.link", ["capture.file"], run))
