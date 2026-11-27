@@ -24,11 +24,15 @@ Zensical live in the `dev` dependency group.
 
 ```bash
 uv sync --group dev
+uv run playwright install chromium
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
 uv run zensical serve
 ```
+
+`playwright install chromium` is only needed when Trove archives a live URL.
+Tests fake the browser, so CI skips that download.
 
 Do not use `manage.py test`. Put Django model graphs in `tests/factories.py`.
 `manage.py backup` writes a tarball; restore is unpack plus migrate. The steps

@@ -1,17 +1,13 @@
 import sys
-import urllib.request
-from email.message import EmailMessage
-from io import BytesIO
+from contextlib import contextmanager
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
-from urllib.response import addinfourl
 
 import pytest
 
-from tests.factories import ItemFactory
+from tests.factories import ActivityFactory, ItemFactory
 from trove.core import get_core, reset_core
 from trove.models import Activity, Blob, Claim, Item, Link
+from trove.services.fetch_error import FetchError
 from trove.services.recorder import record
 from trove.tasks.execute import execute_derive
 
@@ -19,10 +15,9 @@ pytestmark = pytest.mark.django_db(databases=["default", "data"])
 
 PAGE = "https://example.com/lamp"
 FIXTURE = Path(__file__).parent / "fixtures" / "lamp.mhtml"
+SHELL = Path(__file__).parent / "fixtures" / "hallway-lamp.html"
 MHTML = FIXTURE.read_bytes()
-PUBLIC_ADDR = [
-    (0, 0, 0, "", ("93.184.216.34", 0)),
-]
+SHELL_HTML = SHELL.read_text()
 
 
 @pytest.fixture
@@ -40,33 +35,6 @@ def blob_dir(settings, tmp_path):
     return path
 
 
-@pytest.fixture
-def public_dns(monkeypatch):
-    monkeypatch.setattr("socket.getaddrinfo", lambda *a, **k: PUBLIC_ADDR)
-
-
-class Fetched:
-    def __init__(self, body, content_type="multipart/related", url=PAGE):
-        self._body = body if isinstance(body, bytes) else body.encode()
-        self.headers = EmailMessage()
-        self.headers["Content-Type"] = content_type
-        self._url = url
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def read(self, n=-1):
-        if n is None or n < 0:
-            return self._body
-        return self._body[:n]
-
-    def geturl(self):
-        return self._url
-
-
 def make_link(url):
     with record("ingest", "test") as rec:
         item = rec.item("capture.link")
@@ -74,52 +42,33 @@ def make_link(url):
     return item
 
 
-def patch_open(monkeypatch, fake):
-    monkeypatch.setattr(sys.modules["trove_plugins.archive.run"], "_open", fake)
+def archive_mod():
+    return sys.modules["trove_plugins.archive.run"]
 
 
-def returns(body, url=PAGE, timeout_seen=None):
-    def open_http(request, timeout=None):
+def chromium_mod():
+    return sys.modules["trove_plugins.archive.chromium"]
+
+
+def patch_capture(monkeypatch, fake):
+    monkeypatch.setattr(archive_mod(), "capture_mhtml", fake)
+
+
+def returns_mhtml(body=MHTML, timeout_seen=None):
+    def capture(url, *, timeout):
         if timeout_seen is not None:
             timeout_seen.append(timeout)
-        assert not request.has_header("Authorization")
-        return Fetched(body, url=url)
+        return body
 
-    return open_http
-
-
-class RedirectToPrivate(urllib.request.BaseHandler):
-    handler_order = 1
-
-    def __init__(self, location):
-        self.location = location
-        self.opened = []
-
-    def http_open(self, req):
-        return self._open(req)
-
-    def https_open(self, req):
-        return self._open(req)
-
-    def _open(self, req):
-        url = req.full_url
-        self.opened.append(url)
-        host = urlparse(url).hostname
-        if host in {"127.0.0.1", "100.64.0.1"}:
-            raise AssertionError(f"private hop opened: {url}")
-        headers = EmailMessage()
-        headers["Location"] = self.location
-        resp = addinfourl(BytesIO(b""), headers, url, code=302)
-        resp.msg = "Found"
-        return resp
+    return capture
 
 
-def http_404(request, timeout=None):
-    raise HTTPError(request.full_url, 404, "Not Found", {}, BytesIO(b""))
+def timed_out(url, *, timeout):
+    raise TimeoutError("timed out")
 
 
-def timed_out(request, timeout=None):
-    raise URLError(TimeoutError("timed out"))
+def capture_failed(url, *, timeout):
+    raise FetchError("HTTP 404")
 
 
 def archive(core, item):
@@ -135,18 +84,119 @@ def derived_files(link):
     return list(Item.objects.filter(id__in=ids, type="capture.file"))
 
 
+class FakeFrame:
+    def __init__(self, main=True):
+        self.parent_frame = None if main else object()
+
+
+class FakeRequest:
+    def __init__(self, url, *, navigation=False, main=True):
+        self.url = url
+        self._navigation = navigation
+        self.frame = FakeFrame(main)
+
+    def is_navigation_request(self):
+        return self._navigation
+
+
+class FakeRoute:
+    def __init__(self, url, *, navigation=False, main=True):
+        self.request = FakeRequest(url, navigation=navigation, main=main)
+        self.actions = []
+
+    def continue_(self):
+        self.actions.append("continue")
+
+    def abort(self):
+        self.actions.append("abort")
+
+
+class FakeCDP:
+    def __init__(self, payload):
+        self.calls = []
+        self.payload = payload
+
+    def send(self, method, params=None):
+        self.calls.append((method, params))
+        return {"data": self.payload}
+
+
+class FakePage:
+    def __init__(self, cdp):
+        self._cdp = cdp
+        self.url = ""
+        self.goto_calls = []
+        self.context = None
+        self.handlers = {}
+        self.closed = False
+
+    def route(self, pattern, handler):
+        self.handlers["route"] = (pattern, handler)
+
+    def on(self, event, handler):
+        self.handlers[event] = handler
+
+    def goto(self, url, **kwargs):
+        self.goto_calls.append((url, kwargs))
+        _pattern, handler = self.handlers["route"]
+        route = FakeRoute(url, navigation=True)
+        handler(route)
+        if route.actions == ["abort"]:
+            raise chromium_mod().Error("net::ERR_ABORTED")
+        self.url = url
+
+    def set_default_timeout(self, ms):
+        pass
+
+
+class FakeContext:
+    def __init__(self, page):
+        self._page = page
+        page.context = self
+        self.closed = False
+        self.timeout = None
+
+    def new_page(self):
+        return self._page
+
+    def new_cdp_session(self, page):
+        return page._cdp
+
+    def close(self):
+        self.closed = True
+
+    def set_default_timeout(self, ms):
+        self.timeout = ms
+
+
+class FakeBrowser:
+    def __init__(self, payload):
+        self.cdp = FakeCDP(payload)
+        self.page = FakePage(self.cdp)
+        self.context = FakeContext(self.page)
+        self.context_kwargs = None
+        self.closed = False
+
+    def new_context(self, **kwargs):
+        self.context_kwargs = kwargs
+        return self.context
+
+    def close(self):
+        self.closed = True
+
+
 def test_missing_url_fails_and_keeps_the_item(core):
     item = ItemFactory(type="capture.link")
     archive(core, item)
-    act = Activity.objects.get(agent="archive@1", subject=item)
+    act = Activity.objects.get(agent="archive@2", subject=item)
     assert act.outcome == "failed"
     assert Item.objects.filter(id=item.id).exists()
     assert not Item.objects.filter(type="capture.file").exists()
 
 
-def test_public_https_url_stores_mhtml_blob(core, blob_dir, public_dns, monkeypatch):
+def test_public_https_url_stores_mhtml_blob(core, blob_dir, monkeypatch):
     timeouts = []
-    patch_open(monkeypatch, returns(MHTML, timeout_seen=timeouts))
+    patch_capture(monkeypatch, returns_mhtml(timeout_seen=timeouts))
     item = archive(core, make_link(PAGE))
     files = derived_files(item)
     assert len(files) == 1
@@ -164,13 +214,23 @@ def test_public_https_url_stores_mhtml_blob(core, blob_dir, public_dns, monkeypa
     url_claim = Claim.objects.get(item=item, path="url")
     assert url_claim.value == PAGE
     assert url_claim.rank == Claim.Rank.PREFERRED
-    act = Activity.objects.get(agent="archive@1", subject=item)
+    act = Activity.objects.get(agent="archive@2", subject=item)
     assert act.outcome == "ok"
     assert timeouts == [30]
 
 
-def test_same_url_twice_gets_two_archive_items(core, blob_dir, public_dns, monkeypatch):
-    patch_open(monkeypatch, returns(MHTML))
+def test_js_rendered_fixture_stores_rendered_text(core, blob_dir, monkeypatch):
+    assert "hallway lamp" not in SHELL_HTML
+    patch_capture(monkeypatch, returns_mhtml(MHTML))
+    item = archive(core, make_link(PAGE))
+    sha = derived_files(item)[0].current_values()["$blob"]
+    stored = (blob_dir / sha[:2] / sha).read_bytes()
+    assert b"hallway lamp" in stored
+    assert stored != SHELL.read_bytes()
+
+
+def test_same_url_twice_gets_two_archive_items(core, blob_dir, monkeypatch):
+    patch_capture(monkeypatch, returns_mhtml())
     first = archive(core, make_link(PAGE))
     second = archive(core, make_link(PAGE))
     assert first.id != second.id
@@ -181,24 +241,41 @@ def test_same_url_twice_gets_two_archive_items(core, blob_dir, public_dns, monke
     assert first_files[0].id != second_files[0].id
 
 
-def test_rederive_reuses_the_same_archive_item(core, blob_dir, public_dns, monkeypatch):
-    patch_open(monkeypatch, returns(MHTML))
+def test_rederive_same_version_skips_a_second_fetch(core, blob_dir, monkeypatch):
+    calls = []
+
+    def capture(url, *, timeout):
+        calls.append(url)
+        return MHTML
+
+    patch_capture(monkeypatch, capture)
     item = archive(core, make_link(PAGE))
     first = derived_files(item)[0]
-    processor = core.processors["archive"]
-    processor.version = 2
-    try:
-        archive(core, item)
-    finally:
-        processor.version = 1
-    files = derived_files(item)
-    assert [row.id for row in files] == [first.id]
+    archive(core, item)
+    assert calls == [PAGE]
+    assert [row.id for row in derived_files(item)] == [first.id]
     agents = list(
         Activity.objects.filter(kind="derive", subject=item, outcome="ok")
         .order_by("started")
         .values_list("agent", flat=True)
     )
-    assert agents == ["archive@1", "archive@2"]
+    assert agents == ["archive@2"]
+
+
+def test_v2_runs_when_v1_already_ok(core, blob_dir, monkeypatch):
+    patch_capture(monkeypatch, returns_mhtml())
+    item = make_link(PAGE)
+    ActivityFactory(
+        kind="derive",
+        agent="archive@1",
+        subject=item,
+        outcome=Activity.Outcome.OK,
+    )
+    archive(core, item)
+    files = derived_files(item)
+    assert len(files) == 1
+    act = Activity.objects.get(agent="archive@2", subject=item, kind="derive")
+    assert act.outcome == "ok"
 
 
 @pytest.mark.parametrize(
@@ -212,17 +289,17 @@ def test_rederive_reuses_the_same_archive_item(core, blob_dir, public_dns, monke
         "http://169.254.1.1/",
     ],
 )
-def test_private_urls_fail_without_fetching(core, monkeypatch, url):
+def test_private_urls_fail_without_launching(core, monkeypatch, url):
     seen = []
 
-    def urlopen(request, timeout=None):
-        seen.append(request.full_url)
-        return Fetched(MHTML)
+    def capture(target, *, timeout):
+        seen.append(target)
+        return MHTML
 
-    patch_open(monkeypatch, urlopen)
+    patch_capture(monkeypatch, capture)
     item = archive(core, make_link(url))
     assert seen == []
-    act = Activity.objects.get(agent="archive@1", subject=item)
+    act = Activity.objects.get(agent="archive@2", subject=item)
     assert act.outcome == "failed"
     assert Item.objects.filter(id=item.id, type="capture.link").exists()
     assert not Item.objects.filter(type="capture.file").exists()
@@ -230,45 +307,79 @@ def test_private_urls_fail_without_fetching(core, monkeypatch, url):
 
 
 @pytest.mark.parametrize("location", ["http://127.0.0.1/", "http://100.64.0.1/"])
-def test_redirect_to_private_ip_is_not_opened(core, public_dns, monkeypatch, location):
-    archive_run = sys.modules["trove_plugins.archive.run"]
-    handler = RedirectToPrivate(location)
-    monkeypatch.setattr(
-        archive_run,
-        "_build_opener",
-        lambda: urllib.request.build_opener(
-            archive_run._PublicRedirectHandler, handler
-        ),
-    )
+def test_redirect_to_private_ip_is_aborted(core, location):
+    chromium = chromium_mod()
+    blocked = []
+    route = FakeRoute(location, navigation=True)
+    chromium.handle_route(route, blocked)
+    assert route.actions == ["abort"]
+    assert blocked == [location]
+
+
+def test_public_navigation_continues(core):
+    chromium = chromium_mod()
+    blocked = []
+    route = FakeRoute(PAGE, navigation=True)
+    chromium.handle_route(route, blocked)
+    assert route.actions == ["continue"]
+    assert blocked == []
+
+
+def test_file_subresource_is_aborted_without_failing_the_page(core):
+    chromium = chromium_mod()
+    blocked = []
+    route = FakeRoute("file:///etc/passwd", navigation=False)
+    chromium.handle_route(route, blocked)
+    assert route.actions == ["abort"]
+    assert blocked == []
+
+
+def test_oversize_archive_fails_without_storing(core, blob_dir, monkeypatch):
+    patch_capture(monkeypatch, returns_mhtml(b"x" * (20 * 1024 * 1024 + 1)))
     item = archive(core, make_link(PAGE))
-    assert handler.opened == [PAGE]
-    act = Activity.objects.get(agent="archive@1", subject=item)
+    act = Activity.objects.get(agent="archive@2", subject=item)
     assert act.outcome == "failed"
     assert Item.objects.filter(id=item.id, type="capture.link").exists()
     assert not Item.objects.filter(type="capture.file").exists()
     assert not Blob.objects.exists()
 
 
-def test_oversize_archive_fails_without_storing(
-    core, blob_dir, public_dns, monkeypatch
-):
-    patch_open(monkeypatch, returns(b"x" * (20 * 1024 * 1024 + 1)))
+@pytest.mark.parametrize("fake", [timed_out, capture_failed])
+def test_fetch_failures_fail_derive_and_keep_the_link(core, monkeypatch, fake):
+    patch_capture(monkeypatch, fake)
     item = archive(core, make_link(PAGE))
-    act = Activity.objects.get(agent="archive@1", subject=item)
+    act = Activity.objects.get(agent="archive@2", subject=item)
     assert act.outcome == "failed"
     assert Item.objects.filter(id=item.id, type="capture.link").exists()
     assert not Item.objects.filter(type="capture.file").exists()
     assert not Blob.objects.exists()
 
 
-@pytest.mark.parametrize("fake", [http_404, timed_out])
-def test_fetch_failures_fail_derive_and_keep_the_link(
-    core, public_dns, monkeypatch, fake
-):
-    patch_open(monkeypatch, fake)
-    item = archive(core, make_link(PAGE))
-    act = Activity.objects.get(agent="archive@1", subject=item)
-    assert act.outcome == "failed"
-    assert Item.objects.filter(id=item.id, type="capture.link").exists()
-    assert not Item.objects.filter(type="capture.file").exists()
-    assert not Blob.objects.exists()
+def test_cdp_snapshot_requests_mhtml(core):
+    chromium = chromium_mod()
+    cdp = FakeCDP(MHTML.decode())
+    page = FakePage(cdp)
+    page.context = FakeContext(page)
+    data = chromium._cdp_mhtml(page)
+    assert cdp.calls == [("Page.captureSnapshot", {"format": "mhtml"})]
+    assert data == MHTML.decode()
+
+
+def test_capture_mhtml_uses_bundled_headless_chromium(core, monkeypatch):
+    chromium = chromium_mod()
+    browser = FakeBrowser(MHTML.decode())
+
+    @contextmanager
+    def fake_launch():
+        yield browser
+
+    monkeypatch.setattr(chromium, "launch_chromium", fake_launch)
+    data = chromium.capture_mhtml(PAGE, timeout=30)
+    assert data == MHTML
+    assert browser.context_kwargs == {"accept_downloads": False}
+    assert "storage_state" not in browser.context_kwargs
+    assert "extra_http_headers" not in browser.context_kwargs
+    assert browser.page.goto_calls == [(PAGE, {"timeout": 30000, "wait_until": "load"})]
+    assert browser.cdp.calls == [("Page.captureSnapshot", {"format": "mhtml"})]
+    assert browser.context.closed
+    assert "download" in browser.page.handlers
