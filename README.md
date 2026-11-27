@@ -59,7 +59,7 @@ CI on pull requests to `main` runs `uv sync --frozen --group dev`, installs
 | Concern | Skill default | Trove v1 |
 |---------|---------------|----------|
 | Framework | Django 6 | Django 6.1 |
-| Jobs | Django Tasks + django-ox | Django Tasks + django-ox (`OxTask` on `data`) |
+| Jobs | Django Tasks + django-ox | Django Tasks + django-ox (`OxTask` on `default`) |
 | UI | Turbo + Stimulus | Wall is Preact + htm, vendored, no build step |
 | Config | settings.py | `ConfigEntry` in the `default` database; facts in `data` |
 

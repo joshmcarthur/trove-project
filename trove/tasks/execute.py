@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import threading
+import weakref
+
 from django.utils import timezone
 
 from trove.models import Activity, Claim, ConfigEntry, Item, Link
@@ -11,41 +14,57 @@ from trove.tasks.result import Result
 from trove.tasks.transient_error import TransientError
 
 
-def already_done(p: Processor, item: Item) -> bool:
-    return Activity.objects.filter(
-        kind="derive",
-        agent=p.agent,
-        subject=item,
-        outcome=Activity.Outcome.OK,
-    ).exists()
+class _KeyedLock:
+    __slots__ = ("lock", "__weakref__")
+
+    def __init__(self):
+        self.lock = threading.Lock()
+
+
+_lock_registry = threading.Lock()
+_derive_locks: weakref.WeakValueDictionary[tuple[str, str], _KeyedLock] = (
+    weakref.WeakValueDictionary()
+)
+
+
+def _lock_for(processor_name: str, item_id: str) -> _KeyedLock:
+    key = (processor_name, item_id)
+    with _lock_registry:
+        keyed = _derive_locks.get(key)
+        if keyed is None:
+            keyed = _KeyedLock()
+            _derive_locks[key] = keyed
+        return keyed
 
 
 def execute_derive(p: Processor, item_id: str, *, attempt=1, max_attempts=1):
     """One attempt. django-ox retries TransientError."""
-    item = Item.objects.get(id=item_id)
-    if already_done(p, item):
-        return
-    ctx = Context(_options(p))
-    started = timezone.now()
-    try:
-        result = p.run(item, ctx) or Result()
-    except TransientError as exc:
-        if attempt >= max_attempts:
+    keyed = _lock_for(p.name, item_id)
+    with keyed.lock:
+        item = Item.objects.get(id=item_id)
+        if Activity.successful_derives(p.agent, subject_id=item_id).exists():
+            return
+        ctx = Context(_options(p))
+        started = timezone.now()
+        try:
+            result = p.run(item, ctx) or Result()
+        except TransientError as exc:
+            if attempt >= max_attempts:
+                record_failure(
+                    "derive", p.agent, item, exc, started, {"attempts": max_attempts}
+                )
+            raise
+        except Exception as exc:  # noqa: BLE001
+            record_failure("derive", p.agent, item, exc, started, {"attempt": 1})
+            return
+        try:
+            with record("derive", p.agent, subject=item, params=result.params) as rec:
+                rec.cost = result.cost
+                _apply(rec, item, result, p.name)
+        except Exception as exc:  # noqa: BLE001
             record_failure(
-                "derive", p.agent, item, exc, started, {"attempts": max_attempts}
+                "derive", p.agent, item, exc, started, result.params, result.cost
             )
-        raise
-    except Exception as exc:  # noqa: BLE001
-        record_failure("derive", p.agent, item, exc, started, {"attempt": 1})
-        return
-    try:
-        with record("derive", p.agent, subject=item, params=result.params) as rec:
-            rec.cost = result.cost
-            _apply(rec, item, result, p.name)
-    except Exception as exc:  # noqa: BLE001
-        record_failure(
-            "derive", p.agent, item, exc, started, result.params, result.cost
-        )
 
 
 def _apply(rec, item: Item, result: Result, processor_name: str):

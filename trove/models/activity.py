@@ -30,3 +30,14 @@ class Activity(Fact):
 
     class Meta:
         verbose_name_plural = "activities"
+
+    @classmethod
+    def successful_derives(cls, agent: str, *, subject_id: str | None = None):
+        qs = cls.objects.filter(
+            kind="derive",
+            agent=agent,
+            outcome=cls.Outcome.OK,
+        )
+        if subject_id is not None:
+            qs = qs.filter(subject_id=subject_id)
+        return qs

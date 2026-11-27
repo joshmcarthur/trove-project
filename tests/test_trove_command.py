@@ -22,7 +22,6 @@ def test_trove_starts_web_and_one_ox_worker(monkeypatch):
         return FakeWorker()
 
     monkeypatch.setattr("trove.management.commands.trove.get_core", lambda: None)
-    monkeypatch.setattr("trove.management.commands.trove.reap_abandoned", lambda: 0)
     monkeypatch.setattr("trove.management.commands.trove.reconcile", lambda: 0)
     monkeypatch.setattr(
         "trove.management.commands.trove.announce_setup", lambda stdout: None
@@ -45,8 +44,6 @@ def test_trove_starts_web_and_one_ox_worker(monkeypatch):
         "1",
         "--concurrency",
         str(settings.TROVE["WORKER_CONCURRENCY"]),
-        "--database",
-        "data",
     ]
     assert seen["kwargs"].get("shell") is not True
     assert seen.get("terminated") is True

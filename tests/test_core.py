@@ -1,6 +1,8 @@
 import io
 import json
 import tempfile
+import threading
+import time
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,9 +11,9 @@ import pytest
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import IntegrityError, connections, transaction
 from django.test import override_settings
-from django.utils import timezone
 from django_ox.models import OxTask
 from django_ox.testing import run_tasks
 from PIL import Image
@@ -25,7 +27,6 @@ from tests.factories import (
 )
 from trove.core import Processor, get_core, reset_core
 from trove.models import Activity, AppendOnlyError, Claim, Item, Link
-from trove.services.reap import reap_abandoned
 from trove.services.reconcile import reconcile
 from trove.services.recorder import record
 from trove.tasks import Emit, Result, TransientError, enqueue_derive
@@ -112,10 +113,12 @@ def test_two_databases():
 
     assert "trove_item" in tables("data")
     assert "trove_item" not in tables("default")
+    assert "trove_activity" in tables("data")
+    assert "trove_activity" not in tables("default")
     assert "trove_configentry" in tables("default")
     assert "auth_user" not in tables("data")
-    assert "django_ox_oxtask" in tables("data")
-    assert "django_ox_oxtask" not in tables("default")
+    assert "django_ox_oxtask" in tables("default")
+    assert "django_ox_oxtask" not in tables("data")
     assert "oauth2_provider_accesstoken" in tables("default")
     assert "oauth2_provider_accesstoken" not in tables("data")
     assert "mfa_authenticator" in tables("default")
@@ -296,32 +299,77 @@ def test_transient_exhaustion_records_failed_activity():
     assert "429" in failed.error
 
 
-def test_killed_running_task_is_reaped_and_not_duplicated(capture):
-    item = capture()
-    assert OxTask.objects.count() == 2
-    assert reconcile() == 0
-    assert OxTask.objects.count() == 2
+_FACT_TABLES = (
+    "trove_item",
+    "trove_blob",
+    "trove_claim",
+    "trove_link",
+    "trove_activity",
+)
 
-    task = next(row for row in OxTask.objects.all() if row.args[0] == "palette")
-    task.status = OxTask.Status.RUNNING
-    task.locked_by = "dead-worker"
-    task.locked_at = timezone.now()
-    task.lease_expires_at = timezone.now() + timedelta(hours=1)
-    task.save()
 
-    assert reconcile() == 0
-    assert OxTask.objects.count() == 2
-    assert OxTask.objects.get(pk=task.pk).status == OxTask.Status.RUNNING
+def _data_delete_triggers(enabled: bool):
+    with connections["data"].cursor() as cursor:
+        for table in _FACT_TABLES:
+            cursor.execute(f"DROP TRIGGER IF EXISTS {table}_no_delete")
+            if enabled:
+                cursor.execute(
+                    f"CREATE TRIGGER {table}_no_delete BEFORE DELETE ON {table} "
+                    "BEGIN SELECT RAISE(ABORT, 'append-only'); END;"
+                )
 
-    assert reap_abandoned() >= 1
-    task.refresh_from_db()
-    assert task.status == OxTask.Status.READY
-    assert reconcile() == 0
-    assert OxTask.objects.count() == 2
 
-    run_tasks()
-    assert Item.objects.filter(type="colour").count() == 2
-    assert Activity.objects.filter(agent="agent@1", subject=item, outcome="ok").exists()
+@pytest.mark.django_db(transaction=True, databases=["default", "data"])
+def test_execute_derive_lock_runs_processor_once():
+    first_in = threading.Event()
+    release = threading.Event()
+    saw_two = threading.Event()
+
+    def run(item, ctx):
+        if first_in.is_set():
+            saw_two.set()
+            release.set()
+            return Result()
+        first_in.set()
+        assert release.wait(timeout=2)
+        return Result(claims={"once": True})
+
+    p = Processor("once", 1, "capture.image", [], run)
+    _data_delete_triggers(False)
+    try:
+        item = ItemFactory(type="capture.image")
+
+        def go():
+            connections.close_all()
+            try:
+                execute_derive(p, item.id)
+            finally:
+                connections.close_all()
+
+        threads = [threading.Thread(target=go) for _ in range(2)]
+        for t in threads:
+            t.start()
+        assert first_in.wait(timeout=2)
+        time.sleep(0.2)
+        assert not saw_two.is_set()
+        release.set()
+        for t in threads:
+            t.join(timeout=2)
+            assert not t.is_alive()
+        assert not saw_two.is_set()
+        assert (
+            Activity.objects.filter(
+                kind="derive",
+                agent="once@1",
+                subject_id=item.id,
+                outcome="ok",
+            ).count()
+            == 1
+        )
+        call_command("flush", verbosity=0, interactive=False, database="data")
+        call_command("flush", verbosity=0, interactive=False, database="default")
+    finally:
+        _data_delete_triggers(True)
 
 
 def test_derive_backoff_returns_timedelta_for_retry_after():

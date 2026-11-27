@@ -88,7 +88,7 @@ def record(
         raise
     with transaction.atomic(using=DATA):
         rec.activity = rec._flush(started)
-        enqueue_for_items([i.id for i in rec._items])
+    enqueue_for_items([i.id for i in rec._items])
 
 
 def record_failure(kind, agent, subject, exc, started, params=None, cost=None):
