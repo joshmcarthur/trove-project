@@ -27,6 +27,17 @@ uv run pytest
 
 Do not use `manage.py test`. Preview this site with `uv run zensical serve`.
 
+## Auth
+
+On first start, `manage.py trove` prints a one-time setup code, and
+`manage.py setup_code` shows it again. Open `/setup`, type the code, and
+register the owner passkey. There is no password; the code dies once used.
+
+The wall is an OAuth client: authorization code + PKCE, scope `read:all`.
+Approve it after you sign in with that passkey. For Shortcuts and curl,
+mint a long-lived `write:capture` token with `manage.py token create` or
+the admin. List and revoke tokens in the admin.
+
 ## Ingest
 
 An authenticated client posts a file plus optional metadata to `/ingest/`.
@@ -43,8 +54,7 @@ part that arrived.
 
 Mint a long-lived token with scope `write:capture` (`manage.py token create`
 or the admin). Shortcuts cannot run a browser login, so they use that token
-the way Home Assistant uses long-lived tokens. Bind to localhost or a
-Tailscale network until auth is in place.
+the way Home Assistant uses long-lived tokens.
 
 ## iOS Shortcut
 
@@ -105,6 +115,3 @@ During the test:
 - Browse the wall. MCP is on the roadmap, so it is not part of the test.
 - Note gaps. Leave roadmap items (MCP, embeddings, Telegram, purge) until
   after the test.
-
-Auth is the large piece. If it runs long, the wall can sit behind Tailscale
-with the owner session alone and gain OAuth later.
