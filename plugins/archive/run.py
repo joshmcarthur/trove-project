@@ -41,8 +41,6 @@ def _fetch(url: str) -> bytes:
         raise ArchiveError(str(exc)) from exc
     except CaptureError as exc:
         raise ArchiveError(str(exc)) from exc
-    except TimeoutError as exc:
-        raise ArchiveError("timed out") from exc
     if len(data) > MAX_BYTES:
         raise ArchiveError("archive too large")
     return data

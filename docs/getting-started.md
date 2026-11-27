@@ -10,11 +10,12 @@ then install the project and the `dev` group (ruff, pytest, Zensical):
 
 ```bash
 uv sync --group dev
-uv run playwright install chromium
+uv run playwright install chromium-headless-shell
 ```
 
 That Chromium is Playwright's pinned browser, not the Chrome you log into.
-Tests do not launch it, so CI does not download a browser.
+pytest launches it for one local JS-rendered fixture. CI installs the same
+browser with `--with-deps`. Without it, that one test is skipped.
 
 Pin versions, and run Zensical with `uv run zensical` rather than a global
 install. Deno and Lume stay gone.
