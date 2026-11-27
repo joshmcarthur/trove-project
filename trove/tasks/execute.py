@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import weakref
 
 from django.utils import timezone
 
@@ -12,29 +13,36 @@ from trove.tasks.emit import Emit
 from trove.tasks.result import Result
 from trove.tasks.transient_error import TransientError
 
-_inflight: set[tuple[str, str]] = set()
-_cv = threading.Condition()
+
+class _KeyedLock:
+    __slots__ = ("lock", "__weakref__")
+
+    def __init__(self):
+        self.lock = threading.Lock()
 
 
-def already_done(p: Processor, item_id: str) -> bool:
-    return Activity.objects.filter(
-        kind="derive",
-        agent=p.agent,
-        subject_id=item_id,
-        outcome=Activity.Outcome.OK,
-    ).exists()
+_lock_registry = threading.Lock()
+_derive_locks: weakref.WeakValueDictionary[tuple[str, str], _KeyedLock] = (
+    weakref.WeakValueDictionary()
+)
+
+
+def _lock_for(processor_name: str, item_id: str) -> _KeyedLock:
+    key = (processor_name, item_id)
+    with _lock_registry:
+        keyed = _derive_locks.get(key)
+        if keyed is None:
+            keyed = _KeyedLock()
+            _derive_locks[key] = keyed
+        return keyed
 
 
 def execute_derive(p: Processor, item_id: str, *, attempt=1, max_attempts=1):
     """One attempt. django-ox retries TransientError."""
-    key = (p.name, item_id)
-    with _cv:
-        while key in _inflight:
-            _cv.wait()
-        _inflight.add(key)
-    try:
+    keyed = _lock_for(p.name, item_id)
+    with keyed.lock:
         item = Item.objects.get(id=item_id)
-        if already_done(p, item_id):
+        if Activity.successful_derives(p.agent, subject_id=item_id).exists():
             return
         ctx = Context(_options(p))
         started = timezone.now()
@@ -57,10 +65,6 @@ def execute_derive(p: Processor, item_id: str, *, attempt=1, max_attempts=1):
             record_failure(
                 "derive", p.agent, item, exc, started, result.params, result.cost
             )
-    finally:
-        with _cv:
-            _inflight.discard(key)
-            _cv.notify_all()
 
 
 def _apply(rec, item: Item, result: Result):

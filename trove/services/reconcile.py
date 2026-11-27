@@ -14,11 +14,7 @@ def reconcile() -> int:
     types = list(Item.objects.values_list("type", flat=True).distinct())
     for p in core.processors.values():
         matching = [t for t in types if fnmatch.fnmatch(t, p.consumes)]
-        done = Activity.objects.filter(
-            kind="derive",
-            agent=p.agent,
-            outcome=Activity.Outcome.OK,
-        ).values("subject_id")
+        done = Activity.successful_derives(p.agent).values("subject_id")
         for item_id in (
             Item.objects.filter(type__in=matching)
             .exclude(id__in=done)
