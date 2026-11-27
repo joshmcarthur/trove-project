@@ -8,7 +8,7 @@ This is a Django 6.1 rewrite. The previous Go implementation lives on the
 [`legacy-go`](https://github.com/joshmcarthur/trove-project/tree/legacy-go)
 branch.
 
-- **Docs:** https://joshmcarthur.github.io/trove/
+- **Docs:** https://joshmcarthur.github.io/trove-project/
 - **Specification:** [docs/spec.md](docs/spec.md)
 - **Work queue:** GitHub issues on the `v1` milestone
 
