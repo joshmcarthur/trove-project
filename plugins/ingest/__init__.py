@@ -5,7 +5,6 @@ import re
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.core.exceptions import RequestDataTooBig
 from django.http import JsonResponse
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
@@ -239,11 +238,8 @@ def ingest(request):
     length = _content_length(request)
     if length is not None and _too_large(length):
         return _reject_too_large()
-    try:
-        upload = request.FILES.get("file")
-        url = _posted_url(request)
-    except RequestDataTooBig:
-        return _reject_too_large()
+    upload = request.FILES.get("file")
+    url = _posted_url(request)
     if url is not None and urlparse(url).scheme == "data":
         return JsonResponse({"error": "data urls are not allowed"}, status=400)
     data, ctype = None, None
