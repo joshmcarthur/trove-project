@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ingest</title>
+  </head>
+  <body>
+    <h1>Add to Trove</h1>
+    {% if item_id %}
+    <p>Captured {{ item_id }}.</p>
+    {% endif %}
+    <form method="post" action="" enctype="multipart/form-data">
+      {% csrf_token %}
+      <p>
+        <label for="file">File</label>
+        <input id="file" type="file" name="file" />
+      </p>
+      <p>
+        <label for="url">URL</label>
+        <input id="url" type="text" name="url" />
+      </p>
+      <p>
+        <label for="title">Title</label>
+        <input id="title" type="text" name="title" />
+      </p>
+      <p>
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes"></textarea>
+      </p>
+      <button type="submit">Save</button>
+    </form>
+  </body>
+</html>

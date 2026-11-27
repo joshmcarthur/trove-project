@@ -1,20 +1,25 @@
-"""Core plugin: accept a POSTed file plus metadata from any authenticated client."""
+"""Core plugin: accept a file or URL plus metadata from a token or the owner session."""
 
 import io
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.middleware.csrf import get_token
+from django.template import RequestContext, Template
 from django.urls import path
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt, csrf_protect, ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods
 from PIL import Image
 from pydantic import BaseModel
 
 from trove.models import Claim
 from trove.services.recorder import record
 from trove.services.tokens import INGEST_SCOPE, agent_for_request
+
+PLUGIN_DIR = Path(__file__).parent
 
 PREFERRED = Claim.Rank.PREFERRED
 _PDF_COUNT = re.compile(rb"/Count\s+(\d+)")
@@ -41,7 +46,12 @@ class Capture(BaseModel):
 
 
 def _client(request):
-    return agent_for_request(request, INGEST_SCOPE)
+    agent = agent_for_request(request, INGEST_SCOPE)
+    if agent is not None:
+        return agent
+    if request.user.is_authenticated:
+        return request.user.get_username()
+    return None
 
 
 def _file_metadata(data: bytes) -> dict:
@@ -229,9 +239,23 @@ def _reject_too_large():
     return JsonResponse({"error": "file too large"}, status=413)
 
 
-@csrf_exempt
-@require_POST
-def ingest(request):
+@ensure_csrf_cookie
+def ingest_page(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorised"}, status=401)
+    html = Template((PLUGIN_DIR / "page.html").read_text()).render(
+        RequestContext(
+            request,
+            {
+                "csrf_token": get_token(request),
+                "item_id": request.GET.get("id"),
+            },
+        )
+    )
+    return HttpResponse(html)
+
+
+def _ingest_post(request):
     agent = _client(request)
     if agent is None:
         return JsonResponse({"error": "unauthorised"}, status=401)
@@ -266,7 +290,21 @@ def ingest(request):
         for key in ("title", "notes"):
             if request.POST.get(key):
                 rec.claim(item, key, request.POST[key], rank=PREFERRED)
+    if agent_for_request(request, INGEST_SCOPE) is None:
+        return HttpResponseRedirect(f"/ingest/?id={item.id}")
     return JsonResponse({"id": item.id, "type": item.type}, status=201)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def ingest(request):
+    if request.method == "GET":
+        return ingest_page(request)
+    if agent_for_request(request, INGEST_SCOPE) is not None:
+        return _ingest_post(request)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorised"}, status=401)
+    return csrf_protect(_ingest_post)(request)
 
 
 def setup(core, entry):
