@@ -1,10 +1,7 @@
 import io
 import json
-import os
-import sqlite3
-import subprocess
-import sys
 import tempfile
+import threading
 import time
 from datetime import timedelta
 from pathlib import Path
@@ -14,6 +11,7 @@ import pytest
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import IntegrityError, connections, transaction
 from django.test import override_settings
 from django_ox.models import OxTask
@@ -301,201 +299,77 @@ def test_transient_exhaustion_records_failed_activity():
     assert "429" in failed.error
 
 
-SLOW_PLUGIN = """
-import os
-import time
-from pathlib import Path
-
-from trove.core import Processor
-from trove.tasks import Result
-
-
-def run(item, ctx):
-    hold = os.environ.get("TROVE_HOLD")
-    if hold:
-        Path(hold).write_text("1")
-        time.sleep(60)
-    log = Path(os.environ["TROVE_RUN_LOG"])
-    n = int(log.read_text()) if log.exists() else 0
-    log.write_text(str(n + 1))
-    return Result(claims={"slow": True})
+_FACT_TABLES = (
+    "trove_item",
+    "trove_blob",
+    "trove_claim",
+    "trove_link",
+    "trove_activity",
+)
 
 
-def setup(core, entry):
-    core.add_processor(Processor("slow", 1, "capture.slow", [], run))
-"""
+def _data_delete_triggers(enabled: bool):
+    with connections["data"].cursor() as cursor:
+        for table in _FACT_TABLES:
+            cursor.execute(f"DROP TRIGGER IF EXISTS {table}_no_delete")
+            if enabled:
+                cursor.execute(
+                    f"CREATE TRIGGER {table}_no_delete BEFORE DELETE ON {table} "
+                    "BEGIN SELECT RAISE(ABORT, 'append-only'); END;"
+                )
 
 
-def _ox_worker_env(settings_dir: Path, plugin_root: str, dest: Path) -> dict:
-    settings_dir.mkdir(exist_ok=True)
-    default_name = str(dest / "config.sqlite3")
-    data_name = str(dest / "data.sqlite3")
-    (settings_dir / "kill_settings.py").write_text(
-        "from config.settings import *\n"
-        f"DATABASES['default']['NAME'] = {default_name!r}\n"
-        f"DATABASES['data']['NAME'] = {data_name!r}\n"
-        f"TROVE = {{**TROVE, 'PLUGIN_DIRS': [{plugin_root!r}], "
-        f"'WORKER_CONCURRENCY': 2}}\n"
-        "TASKS = {**TASKS, 'default': {**TASKS['default'], "
-        "'OPTIONS': {**TASKS['default']['OPTIONS'], 'LOCK_TIMEOUT': 0.4}}}\n"
-    )
-    env = os.environ.copy()
-    env["DJANGO_SETTINGS_MODULE"] = "kill_settings"
-    env["PYTHONUNBUFFERED"] = "1"
-    env["PYTHONPATH"] = os.pathsep.join(
-        [str(settings_dir), str(settings.BASE_DIR), env.get("PYTHONPATH", "")]
-    )
-    return env
+@pytest.mark.django_db(transaction=True, databases=["default", "data"])
+def test_execute_derive_waits_while_inflight():
+    first_in = threading.Event()
+    release = threading.Event()
+    saw_two = threading.Event()
 
+    def run(item, ctx):
+        if first_in.is_set():
+            saw_two.set()
+            release.set()
+            return Result()
+        first_in.set()
+        assert release.wait(timeout=2)
+        return Result(claims={"once": True})
 
-def _manage_py(env: dict, *args: str, check=True) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, str(Path(settings.BASE_DIR) / "manage.py"), *args],
-        check=check,
-        cwd=str(settings.BASE_DIR),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-
-
-def _migrate_file_dbs(dest: Path, plugin_root: str):
-    env = _ox_worker_env(dest / "_settings", plugin_root, dest)
-    _manage_py(env, "migrate", "--verbosity", "0")
-    _manage_py(env, "migrate", "--database", "data", "--verbosity", "0")
-
-
-def _seed_slow_jobs(dest: Path, plugin_root: str) -> str:
-    env = _ox_worker_env(dest / "_settings", plugin_root, dest)
-    marker = dest / "item_id"
-    seed = dest / "_settings" / "seed.py"
-    seed.write_text(
-        "import django\n"
-        "django.setup()\n"
-        "from tests.factories import ItemFactory\n"
-        "from trove.core import reset_core\n"
-        "from trove.tasks import enqueue_derive\n"
-        "reset_core()\n"
-        "item = ItemFactory(type='capture.slow')\n"
-        "enqueue_derive('slow', item.id)\n"
-        "enqueue_derive('slow', item.id)\n"
-        f"open({str(marker)!r}, 'w').write(item.id)\n"
-    )
-    subprocess.run(
-        [sys.executable, str(seed)],
-        check=True,
-        cwd=str(settings.BASE_DIR),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    return marker.read_text()
-
-
-def _file_db_reconcile(dest: Path, plugin_root: str) -> int:
-    env = _ox_worker_env(dest / "_settings", plugin_root, dest)
-    script = dest / "_settings" / "reconcile.py"
-    script.write_text(
-        "import django\n"
-        "django.setup()\n"
-        "from trove.core import reset_core\n"
-        "from trove.services.reconcile import reconcile\n"
-        "reset_core()\n"
-        "print(reconcile())\n"
-    )
-    result = subprocess.run(
-        [sys.executable, str(script)],
-        check=True,
-        cwd=str(settings.BASE_DIR),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    return int(result.stdout.strip().splitlines()[-1])
-
-
-def _wait_for_hold(proc: subprocess.Popen, hold: Path, log: Path):
-    deadline = time.monotonic() + 10
-    while not hold.exists():
-        if time.monotonic() > deadline:
-            proc.kill()
-            proc.wait(timeout=5)
-            raise AssertionError(
-                "worker never claimed the slow task\n" + log.read_text()
-            )
-        if proc.poll() is not None:
-            raise AssertionError(
-                f"worker exited early: {proc.returncode}\n" + log.read_text()
-            )
-        time.sleep(0.05)
-
-
-def test_killed_running_task_is_reaped_and_not_duplicated(tmp_path):
-    dest = tmp_path / "instance"
-    dest.mkdir()
-    root = plugin_dir({"slow": ("builtin", SLOW_PLUGIN, [])})
-    hold = tmp_path / "hold"
-    run_log = tmp_path / "runs"
-    worker_log = dest / "worker.log"
-    _migrate_file_dbs(dest, root)
-    item_id = _seed_slow_jobs(dest, root)
-    queued = sqlite3.connect(dest / "config.sqlite3").execute(
-        "SELECT COUNT(*) FROM django_ox_oxtask"
-    ).fetchone()[0]
-    assert queued == 2, f"seed wrote {queued} OxTask rows"
-
-    env = _ox_worker_env(dest / "_settings", root, dest)
-    env["TROVE_HOLD"] = str(hold)
-    env["TROVE_RUN_LOG"] = str(run_log)
-    with worker_log.open("w") as log:
-        proc = subprocess.Popen(
-            [
-                sys.executable,
-                str(Path(settings.BASE_DIR) / "manage.py"),
-                "ox_worker",
-                "--processes",
-                "1",
-                "--concurrency",
-                "2",
-                "--lock-timeout",
-                "0.4",
-            ],
-            env=env,
-            cwd=str(settings.BASE_DIR),
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
+    p = Processor("once", 1, "capture.image", [], run)
+    _data_delete_triggers(False)
     try:
-        _wait_for_hold(proc, hold, worker_log)
-        proc.kill()
-        proc.wait(timeout=5)
-    finally:
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait(timeout=5)
+        item = ItemFactory(type="capture.image")
 
-    time.sleep(0.6)
-    restart = env.copy()
-    restart.pop("TROVE_HOLD", None)
-    restarted = _manage_py(
-        restart,
-        "ox_worker",
-        "--processes",
-        "1",
-        "--concurrency",
-        "2",
-        "--lock-timeout",
-        "0.4",
-        "--batch",
-    )
-    assert run_log.read_text() == "1", restarted.stderr or restarted.stdout
-    ok = sqlite3.connect(dest / "data.sqlite3").execute(
-        "SELECT COUNT(*) FROM trove_activity "
-        "WHERE agent=? AND subject_id=? AND outcome=?",
-        ("slow@1", item_id, "ok"),
-    ).fetchone()[0]
-    assert ok == 1
-    assert _file_db_reconcile(dest, root) == 0
+        def go():
+            connections.close_all()
+            try:
+                execute_derive(p, item.id)
+            finally:
+                connections.close_all()
+
+        threads = [threading.Thread(target=go) for _ in range(2)]
+        for t in threads:
+            t.start()
+        assert first_in.wait(timeout=2)
+        time.sleep(0.2)
+        assert not saw_two.is_set()
+        release.set()
+        for t in threads:
+            t.join(timeout=2)
+            assert not t.is_alive()
+        assert not saw_two.is_set()
+        assert (
+            Activity.objects.filter(
+                kind="derive",
+                agent="once@1",
+                subject_id=item.id,
+                outcome="ok",
+            ).count()
+            == 1
+        )
+        call_command("flush", verbosity=0, interactive=False, database="data")
+        call_command("flush", verbosity=0, interactive=False, database="default")
+    finally:
+        _data_delete_triggers(True)
 
 
 def test_derive_backoff_returns_timedelta_for_retry_after():

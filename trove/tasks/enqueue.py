@@ -2,23 +2,13 @@ from datetime import timedelta
 
 from django.tasks import task
 
-from trove.models import Activity, Item
-from trove.registry.processor import Processor
+from trove.models import Item
 from trove.runtime.core import get_core
 from trove.tasks.transient_error import TransientError
 
 LIVE = 10
 BACKFILL = 0
 MAX_ATTEMPTS = 3
-
-
-def already_done(p: Processor, item: Item) -> bool:
-    return Activity.objects.filter(
-        kind="derive",
-        agent=p.agent,
-        subject=item,
-        outcome=Activity.Outcome.OK,
-    ).exists()
 
 
 def derive_backoff(exception, task_result):
@@ -39,9 +29,12 @@ def derive_item(context, processor_name: str, item_id: str):
 
 
 def enqueue_derive(processor_name: str, item_id: str, priority=LIVE) -> bool:
+    # already_done lives on execute.py. execute -> record -> enqueue, so a
+    # module-level import would loop.
+    from trove.tasks.execute import already_done
+
     p = get_core().processors[processor_name]
-    item = Item.objects.get(id=item_id)
-    if already_done(p, item):
+    if already_done(p, item_id):
         return False
     derive_item.using(priority=priority).enqueue(processor_name, item_id)
     return True
