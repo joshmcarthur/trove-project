@@ -49,6 +49,7 @@ def execute_derive(p: Processor, item_id: str, *, attempt=1, max_attempts=1):
 
 
 def _apply(rec, item: Item, result: Result):
+    emitted: dict[tuple[str, str], Item] = {}
     for path, value in result.claims.items():
         rec.claim(item, path, value)
     for emit in result.emits:
@@ -60,6 +61,57 @@ def _apply(rec, item: Item, result: Result):
             rec.claim(target, path, value)
         if emit.blob is not None:
             rec.claim(target, "$blob", rec.blob(emit.blob, emit.content_type))
+        emitted[(emit.type, emit.key)] = target
+    _apply_result_links(rec, item, result, emitted)
+
+
+def _apply_result_links(
+    rec, item: Item, result: Result, emitted: dict[tuple[str, str], Item]
+):
+    wanted: set[tuple[str, str, str]] = set()
+    for spec in result.links:
+        source = _link_end(spec.source, emitted)
+        target = _link_end(spec.target, emitted)
+        if source.pk and target.pk:
+            wanted.add((source.pk, target.pk, spec.rel))
+            if (
+                Link.objects.live()
+                .filter(source_id=source.pk, target_id=target.pk, rel=spec.rel)
+                .exists()
+            ):
+                continue
+        rec.link(source, target, spec.rel)
+    _retract_dropped_links(rec, item, wanted)
+
+
+def _link_end(end: Item | Emit, emitted: dict[tuple[str, str], Item]) -> Item:
+    if isinstance(end, Emit):
+        try:
+            return emitted[(end.type, end.key)]
+        except KeyError as exc:
+            raise ValueError(
+                "Result.links refers to emit "
+                f"{end.type!r}/{end.key!r} that was not emitted"
+            ) from exc
+    if isinstance(end, Item):
+        return end
+    raise TypeError(f"Result.links needs Item or Emit, not {type(end)!r}")
+
+
+def _retract_dropped_links(rec, item: Item, wanted: set[tuple[str, str, str]]):
+    name = rec.agent.rsplit("@", 1)[0]
+    previous = (
+        Link.objects.live()
+        .filter(
+            activity__kind="derive",
+            activity__agent__startswith=f"{name}@",
+            activity__subject=item,
+        )
+        .exclude(rel="derived_from")
+    )
+    for link in previous:
+        if (link.source_id, link.target_id, link.rel) not in wanted:
+            rec.retract(link)
 
 
 def _existing_emit(source: Item, emit: Emit) -> Item | None:
