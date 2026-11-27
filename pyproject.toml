@@ -13,6 +13,7 @@ dependencies = [
     "django-allauth[mfa]>=65.23.0",
     "django-oauth-toolkit>=3.4.1",
     "pillow-heif>=1",
+    "pypdfium2>=5.15.2",
 ]
 
 [dependency-groups]
