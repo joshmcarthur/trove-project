@@ -13,15 +13,26 @@ def wall_items() -> dict:
     )
     for item in items:
         colours = []
+        links = []
         derived = (
             Link.objects.live()
             .filter(target=item, rel="derived_from")
             .select_related("source")
         )
         for link in derived:
-            if link.source.type != "colour":
+            source = link.source
+            values = source.current_values()
+            links.append(
+                {
+                    "rel": link.rel,
+                    "id": source.id,
+                    "type": source.type,
+                    "values": values,
+                }
+            )
+            if source.type != "colour":
                 continue
-            hexv = link.source.current_values().get("hex")
+            hexv = values.get("hex")
             if hexv:
                 colours.append(hexv)
         payload.append(
@@ -30,6 +41,7 @@ def wall_items() -> dict:
                 "type": item.type,
                 "values": item.current_values(),
                 "colours": colours,
+                "links": links,
                 "provenance": provenance_for(item),
             }
         )

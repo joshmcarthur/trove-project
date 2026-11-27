@@ -88,11 +88,29 @@ function selectedItem() {
 }
 
 function photoSha(item) {
-  if (item.type !== "capture.image") {
-    return null;
+  if (item.type === "capture.image") {
+    const sha = item.values.$blob;
+    return typeof sha === "string" && sha ? sha : null;
   }
-  const sha = item.values.$blob;
-  return typeof sha === "string" && sha ? sha : null;
+  if (item.type === "capture.link") {
+    const preview = (item.links || []).find((link) => {
+      const sha = link.values && link.values.$blob;
+      return (
+        link.rel === "derived_from" &&
+        link.type === "capture.image" &&
+        typeof sha === "string" &&
+        sha
+      );
+    });
+    return preview ? preview.values.$blob : null;
+  }
+  return null;
+}
+
+function derivedRows(item) {
+  return (item.links || []).filter(
+    (link) => link.rel === "derived_from" && link.type !== "colour",
+  );
 }
 
 async function authorizedGet(url, retried = false) {
@@ -206,6 +224,34 @@ function Chip({ hex }) {
   return html`<span class="chip" style=${{ background: hex }} title=${hex}></span>`;
 }
 
+function DerivedList({ rows }) {
+  if (!rows.length) {
+    return null;
+  }
+  return html`
+    <div class="derived">
+      <h3>Derived</h3>
+      ${rows.map(
+        (link) => html`
+          <div key=${link.id} class="derived-item">
+            <p class="type">${link.type}</p>
+            <dl class="kv">
+              ${visibleValues(link.values).map(
+                ([key, value]) => html`
+                  <div key=${key}>
+                    <dt>${key}</dt>
+                    <dd>${displayValue(value)}</dd>
+                  </div>
+                `,
+              )}
+            </dl>
+          </div>
+        `,
+      )}
+    </div>
+  `;
+}
+
 function Tile({ item, title }) {
   const sha = photoSha(item);
   const url = sha ? blobUrls.get(sha) : null;
@@ -218,6 +264,7 @@ function Tile({ item, title }) {
 function ItemCard({ item, current }) {
   const title = item.values.title || item.type;
   const extras = visibleValues(item.values).slice(0, 4);
+  const derived = current ? derivedRows(item) : [];
   return html`
     <button
       type="button"
@@ -245,6 +292,7 @@ function ItemCard({ item, current }) {
         ${item.colours.length
           ? html`<div class="chips">${item.colours.map((hex) => html`<${Chip} hex=${hex} />`)}</div>`
           : null}
+        <${DerivedList} rows=${derived} />
       </div>
     </button>
   `;

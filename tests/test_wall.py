@@ -90,6 +90,7 @@ def test_wall_items_include_current_values_and_provenance(client):
     row = next(entry for entry in payload if entry["id"] == item.id)
     assert row["values"]["title"] == "hallway lamp"
     assert row["colours"] == []
+    assert row["links"] == []
     agents = {entry["agent"] for entry in row["provenance"]}
     kinds = {entry["kind"] for entry in row["provenance"]}
     assert "user" in agents
@@ -139,6 +140,69 @@ def test_wall_provenance_omits_missing_model_and_cost(client):
     assert "model" not in derive
     assert "prompt_hash" not in derive
     assert "cost" not in derive
+
+
+def test_wall_items_include_live_derived_from_that_is_not_colour(client):
+    photo = ItemFactory()
+    with record("derive", "agent@1", subject=photo) as rec:
+        bulb = rec.item("bulb")
+        rec.claim(bulb, "base", "E27")
+        rec.claim(bulb, "shape", "A60")
+        rec.link(bulb, photo, "derived_from")
+        colour = rec.item("colour")
+        rec.claim(colour, "hex", "#336699")
+        rec.link(colour, photo, "derived_from")
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    row = next(entry for entry in payload if entry["id"] == photo.id)
+    assert "#336699" in row["colours"]
+    by_id = {entry["id"]: entry for entry in row["links"]}
+    assert by_id[bulb.id]["rel"] == "derived_from"
+    assert by_id[bulb.id]["type"] == "bulb"
+    assert by_id[bulb.id]["values"]["base"] == "E27"
+    assert by_id[bulb.id]["values"]["shape"] == "A60"
+    assert by_id[colour.id]["rel"] == "derived_from"
+    assert by_id[colour.id]["type"] == "colour"
+    assert by_id[colour.id]["values"]["hex"] == "#336699"
+    assert colour.id not in {entry["id"] for entry in payload}
+    assert any(entry["id"] == bulb.id for entry in payload)
+
+
+def test_wall_items_omit_retracted_derived_from(client):
+    photo = ItemFactory()
+    with record("derive", "agent@1", subject=photo) as rec:
+        bulb = rec.item("bulb")
+        rec.claim(bulb, "base", "E27")
+        live = rec.link(bulb, photo, "derived_from")
+    with record("edit", "user") as rec:
+        rec.retract(live)
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    row = next(entry for entry in payload if entry["id"] == photo.id)
+    assert row["links"] == []
+    assert row["colours"] == []
+
+
+def test_wall_items_include_unfurl_preview_on_link(client, blob_dir):
+    data = image_bytes("PNG")
+    with record("ingest", "test") as rec:
+        page = rec.item("capture.link")
+        rec.claim(page, "url", "https://example.com/lamp")
+        rec.claim(page, "title", "Hallway lamp")
+    with record("derive", "unfurl@1", subject=page) as rec:
+        preview = rec.item("capture.image")
+        sha = rec.blob(data, "image/png")
+        rec.claim(preview, "$blob", sha)
+        rec.claim(preview, "title", "Hallway lamp")
+        rec.link(preview, page, "derived_from")
+    seed_dev_wall_token()
+    payload = client.get("/wall/api/items", **AUTH).json()["items"]
+    row = next(entry for entry in payload if entry["id"] == page.id)
+    link = next(entry for entry in row["links"] if entry["id"] == preview.id)
+    assert link["rel"] == "derived_from"
+    assert link["type"] == "capture.image"
+    assert link["values"]["$blob"] == sha
+    assert link["values"]["title"] == "Hallway lamp"
 
 
 def test_wall_spa_renders_model_cost_and_prompt_hash(client):
@@ -201,10 +265,19 @@ def test_wall_blob_unknown_sha_is_404_when_signed_in(client):
 def test_wall_spa_shows_photo_for_image_and_grey_tile_otherwise(client):
     text = client.get("/wall/vendor/wall.js").content.decode()
     assert "function photoSha" in text
-    assert 'item.type !== "capture.image"' in text
+    assert 'item.type === "capture.image"' in text
     assert "tile-empty" in text
     assert 'img class="tile"' in text
     assert "createObjectURL" in text
     assert "capture.video" not in text
     assert "localStorage" not in text
     assert "document.cookie" not in text
+
+
+def test_wall_spa_lists_derived_items_and_link_preview(client):
+    text = client.get("/wall/vendor/wall.js").content.decode()
+    assert "item.links" in text
+    assert 'link.type !== "colour"' in text
+    assert 'item.type === "capture.link"' in text
+    assert "Derived" in text
+    assert "createObjectURL" in text

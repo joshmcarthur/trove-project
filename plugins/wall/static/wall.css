@@ -115,7 +115,8 @@ body {
 }
 
 .card[aria-current="true"] .type,
-.card[aria-current="true"] .kv {
+.card[aria-current="true"] .kv,
+.card[aria-current="true"] .derived h3 {
   color: #c5d0d8;
 }
 
@@ -160,12 +161,30 @@ body {
   overflow-wrap: anywhere;
 }
 
+.chips,
+.derived {
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+.chips + .derived {
+  margin-top: 0;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
-  margin-top: auto;
-  padding-top: 0.75rem;
+}
+
+.derived h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.derived-item + .derived-item {
+  margin-top: 0.5rem;
 }
 
 .chip {
