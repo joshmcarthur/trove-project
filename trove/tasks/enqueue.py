@@ -1,16 +1,24 @@
 from datetime import timedelta
 
 from django.tasks import task
-from django_ox.models import OxTask
 
-from trove.models import Item
+from trove.models import Activity, Item
+from trove.registry.processor import Processor
 from trove.runtime.core import get_core
 from trove.tasks.transient_error import TransientError
 
 LIVE = 10
 BACKFILL = 0
 MAX_ATTEMPTS = 3
-UNFINISHED = (OxTask.Status.READY, OxTask.Status.RUNNING)
+
+
+def already_done(p: Processor, item: Item) -> bool:
+    return Activity.objects.filter(
+        kind="derive",
+        agent=p.agent,
+        subject=item,
+        outcome=Activity.Outcome.OK,
+    ).exists()
 
 
 def derive_backoff(exception, task_result):
@@ -31,11 +39,9 @@ def derive_item(context, processor_name: str, item_id: str):
 
 
 def enqueue_derive(processor_name: str, item_id: str, priority=LIVE) -> bool:
-    if OxTask.objects.filter(
-        task_path=derive_item.module_path,
-        args=[processor_name, item_id],
-        status__in=UNFINISHED,
-    ).exists():
+    p = get_core().processors[processor_name]
+    item = Item.objects.get(id=item_id)
+    if already_done(p, item):
         return False
     derive_item.using(priority=priority).enqueue(processor_name, item_id)
     return True

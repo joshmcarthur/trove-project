@@ -9,7 +9,6 @@ from django.db import connections
 
 from trove.runtime.core import get_core
 from trove.services.clients import ensure_wall_client
-from trove.services.reap import reap_abandoned
 from trove.services.reconcile import reconcile
 from trove.services.setup_code import announce_setup
 
@@ -28,7 +27,6 @@ class Command(BaseCommand):
         announce_setup(self.stdout)
         ensure_wall_client()
         get_core()
-        reap_abandoned()
         n = reconcile()
         self.stdout.write(f"reconcile submitted {n} jobs")
         if options["drain"]:
@@ -36,7 +34,6 @@ class Command(BaseCommand):
                 "ox_worker",
                 processes=1,
                 concurrency=settings.TROVE["WORKER_CONCURRENCY"],
-                database="data",
                 batch=True,
             )
             return
@@ -51,8 +48,6 @@ class Command(BaseCommand):
                 "1",
                 "--concurrency",
                 str(settings.TROVE["WORKER_CONCURRENCY"]),
-                "--database",
-                "data",
             ]
         )
         try:

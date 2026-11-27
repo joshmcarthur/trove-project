@@ -2,22 +2,14 @@ from __future__ import annotations
 
 from django.utils import timezone
 
-from trove.models import Activity, Claim, ConfigEntry, Item, Link
+from trove.models import Claim, ConfigEntry, Item, Link
 from trove.registry.processor import Processor
 from trove.services.recorder import record, record_failure
 from trove.tasks.context import Context
 from trove.tasks.emit import Emit
+from trove.tasks.enqueue import already_done
 from trove.tasks.result import Result
 from trove.tasks.transient_error import TransientError
-
-
-def already_done(p: Processor, item: Item) -> bool:
-    return Activity.objects.filter(
-        kind="derive",
-        agent=p.agent,
-        subject=item,
-        outcome=Activity.Outcome.OK,
-    ).exists()
 
 
 def execute_derive(p: Processor, item_id: str, *, attempt=1, max_attempts=1):

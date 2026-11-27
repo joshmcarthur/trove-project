@@ -1,11 +1,9 @@
-"""Facts and OxTask live on data. Config, auth, and the rest live on default."""
+"""Facts live on data. Config, auth, OxTask, and the rest live on default."""
 
 from django.apps import apps
 
 
 def _db_for(model):
-    if model._meta.app_label == "django_ox":
-        return "data"
     return getattr(model, "trove_database", "default")
 
 
@@ -21,8 +19,6 @@ class TroveRouter:
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if "target_db" in hints:
             return db == hints["target_db"]
-        if app_label == "django_ox":
-            return db == "data"
         if model_name is None:
             return db == "default"
         try:

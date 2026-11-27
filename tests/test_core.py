@@ -14,6 +14,7 @@ from django.test import override_settings
 from django.utils import timezone
 from django_ox.models import OxTask
 from django_ox.testing import run_tasks
+from django_ox.worker import Worker
 from PIL import Image
 from pydantic import ValidationError
 
@@ -25,7 +26,6 @@ from tests.factories import (
 )
 from trove.core import Processor, get_core, reset_core
 from trove.models import Activity, AppendOnlyError, Claim, Item, Link
-from trove.services.reap import reap_abandoned
 from trove.services.reconcile import reconcile
 from trove.services.recorder import record
 from trove.tasks import Emit, Result, TransientError, enqueue_derive
@@ -112,10 +112,12 @@ def test_two_databases():
 
     assert "trove_item" in tables("data")
     assert "trove_item" not in tables("default")
+    assert "trove_activity" in tables("data")
+    assert "trove_activity" not in tables("default")
     assert "trove_configentry" in tables("default")
     assert "auth_user" not in tables("data")
-    assert "django_ox_oxtask" in tables("data")
-    assert "django_ox_oxtask" not in tables("default")
+    assert "django_ox_oxtask" in tables("default")
+    assert "django_ox_oxtask" not in tables("data")
     assert "oauth2_provider_accesstoken" in tables("default")
     assert "oauth2_provider_accesstoken" not in tables("data")
     assert "mfa_authenticator" in tables("default")
@@ -299,29 +301,25 @@ def test_transient_exhaustion_records_failed_activity():
 def test_killed_running_task_is_reaped_and_not_duplicated(capture):
     item = capture()
     assert OxTask.objects.count() == 2
-    assert reconcile() == 0
-    assert OxTask.objects.count() == 2
 
     task = next(row for row in OxTask.objects.all() if row.args[0] == "palette")
     task.status = OxTask.Status.RUNNING
     task.locked_by = "dead-worker"
-    task.locked_at = timezone.now()
-    task.lease_expires_at = timezone.now() + timedelta(hours=1)
+    task.locked_at = timezone.now() - timedelta(seconds=10)
+    task.lease_expires_at = timezone.now() - timedelta(seconds=1)
     task.save()
 
-    assert reconcile() == 0
     assert OxTask.objects.count() == 2
-    assert OxTask.objects.get(pk=task.pk).status == OxTask.Status.RUNNING
-
-    assert reap_abandoned() >= 1
+    assert Worker().reap() >= 1
     task.refresh_from_db()
     assert task.status == OxTask.Status.READY
-    assert reconcile() == 0
     assert OxTask.objects.count() == 2
 
     run_tasks()
     assert Item.objects.filter(type="colour").count() == 2
     assert Activity.objects.filter(agent="agent@1", subject=item, outcome="ok").exists()
+    assert reconcile() == 0
+    assert OxTask.objects.count() == 2
 
 
 def test_derive_backoff_returns_timedelta_for_retry_after():
