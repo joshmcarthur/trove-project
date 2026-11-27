@@ -8,10 +8,10 @@ from trove.services.recorder import record
 
 
 class Command(BaseCommand):
-    help = "Append a preferred claim on one path of one item."
+    help = "Append a preferred claim to an item path."
 
     def add_arguments(self, parser):
-        parser.add_argument("item_id", help="Item id to claim on.")
+        parser.add_argument("item_id", help="ID of the item to update.")
         parser.add_argument("path", help="Claim path, for example title or base.")
         parser.add_argument(
             "value",
