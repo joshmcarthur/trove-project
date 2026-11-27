@@ -1,15 +1,18 @@
-import io
-from email.message import EmailMessage
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
-from PIL import Image
 
-from tests.factories import seed_dev_ingest_token
+from tests.factories import (
+    fake_urlopen,
+    http_404,
+    png_bytes,
+    seed_dev_ingest_token,
+    stub_public_http,
+    timed_out,
+)
 from trove.models import Activity, Blob, Claim, Item
 from trove.services.owner import ensure_owner
 
@@ -451,42 +454,6 @@ def test_owner_session_post_needs_csrf():
     assert Item.objects.get(id=item_id).type == "capture.link"
 
 
-class Fetched:
-    def __init__(self, body, content_type, url):
-        self._body = body
-        self.headers = EmailMessage()
-        self.headers["Content-Type"] = content_type
-        self._url = url
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def read(self, n=-1):
-        if n is None or n < 0:
-            return self._body
-        return self._body[:n]
-
-    def geturl(self):
-        return self._url
-
-
-def png_bytes():
-    img = Image.new("RGB", (2, 2), "#336699")
-    buf = io.BytesIO()
-    img.save(buf, "PNG")
-    return buf.getvalue()
-
-
-def fake_urlopen(body, content_type, url):
-    def urlopen(request, timeout=None):
-        return Fetched(body, content_type, url)
-
-    return urlopen
-
-
 def test_page_url_does_not_fetch(client, monkeypatch):
     seen = []
 
@@ -494,7 +461,7 @@ def test_page_url_does_not_fetch(client, monkeypatch):
         seen.append(request.full_url)
         raise AssertionError("ingest should not fetch a page url")
 
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    stub_public_http(monkeypatch, urlopen)
     response = client.post(
         "/ingest/", {"url": "https://example.com/blog/post"}, **TOKEN
     )
@@ -507,9 +474,8 @@ def test_public_pdf_url_becomes_document_keeping_preferred_url(
     client, blob_dir, monkeypatch
 ):
     url = "https://example.com/spec.pdf"
-    monkeypatch.setattr(
-        "urllib.request.urlopen",
-        fake_urlopen(TINY_PDF.read_bytes(), "application/pdf", url),
+    stub_public_http(
+        monkeypatch, fake_urlopen(TINY_PDF.read_bytes(), "application/pdf", url)
     )
     response = client.post(
         "/ingest/", {"url": url, "title": "spec", "notes": "from the cdn"}, **TOKEN
@@ -534,10 +500,7 @@ def test_public_image_url_becomes_image_keeping_preferred_url(
 ):
     url = "https://example.com/lamp.jpg"
     body = png_bytes()
-    monkeypatch.setattr(
-        "urllib.request.urlopen",
-        fake_urlopen(body, "image/png", url),
-    )
+    stub_public_http(monkeypatch, fake_urlopen(body, "image/png", url))
     response = client.post("/ingest/", {"url": url}, **TOKEN)
     assert response.status_code == 201, response.content
     payload = response.json()
@@ -552,10 +515,7 @@ def test_public_image_url_becomes_image_keeping_preferred_url(
 
 def test_pdf_url_that_returns_html_stays_a_link(client, blob_dir, monkeypatch):
     url = "https://example.com/spec.pdf"
-    monkeypatch.setattr(
-        "urllib.request.urlopen",
-        fake_urlopen(b"<html>login</html>", "text/html", url),
-    )
+    stub_public_http(monkeypatch, fake_urlopen(b"<html>login</html>", "text/html", url))
     response = client.post("/ingest/", {"url": url}, **TOKEN)
     assert response.status_code == 201, response.content
     payload = response.json()
@@ -565,17 +525,9 @@ def test_pdf_url_that_returns_html_stays_a_link(client, blob_dir, monkeypatch):
     assert not Blob.objects.exists()
 
 
-def http_404(request, timeout=None):
-    raise HTTPError(request.full_url, 404, "Not Found", {}, io.BytesIO(b""))
-
-
-def timed_out(request, timeout=None):
-    raise URLError(TimeoutError("timed out"))
-
-
 @pytest.mark.parametrize("fake", [http_404, timed_out])
 def test_pdf_url_fetch_failure_keeps_the_link(client, monkeypatch, fake):
-    monkeypatch.setattr("urllib.request.urlopen", fake)
+    stub_public_http(monkeypatch, fake)
     url = "https://example.com/spec.pdf"
     response = client.post("/ingest/", {"url": url}, **TOKEN)
     assert response.status_code == 201, response.content
@@ -585,6 +537,7 @@ def test_pdf_url_fetch_failure_keeps_the_link(client, monkeypatch, fake):
     assert item.current_values()["url"] == url
     assert item.activity.outcome == Activity.Outcome.OK
     failed = Activity.objects.get(subject=item, outcome="failed")
+    assert (failed.kind, failed.agent) == ("ingest", "shortcut:iphone")
     assert failed.error
     assert not Blob.objects.exists()
 
@@ -608,7 +561,7 @@ def test_file_or_private_url_is_not_fetched(client, monkeypatch, url):
         seen.append(request.full_url)
         raise AssertionError("must not fetch file or private urls")
 
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    stub_public_http(monkeypatch, urlopen)
     response = client.post("/ingest/", {"url": url}, **TOKEN)
     assert response.status_code == 201, response.content
     payload = response.json()
@@ -616,5 +569,6 @@ def test_file_or_private_url_is_not_fetched(client, monkeypatch, url):
     item = Item.objects.get(id=payload["id"])
     assert item.current_values()["url"] == url
     assert item.activity.outcome == Activity.Outcome.OK
-    assert Activity.objects.filter(subject=item, outcome="failed").exists()
+    failed = Activity.objects.get(subject=item, outcome="failed")
+    assert (failed.kind, failed.agent) == ("ingest", "shortcut:iphone")
     assert seen == []

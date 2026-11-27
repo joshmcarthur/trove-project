@@ -4,12 +4,16 @@ Facts go on `data`. ConfigEntry goes on `default`. Later issues add factories
 here rather than a second module.
 """
 
+import io
 from datetime import timedelta
+from email.message import EmailMessage
+from urllib.error import HTTPError, URLError
 
 from django.utils import timezone
 from factory import Faker, Sequence, SubFactory
 from factory.django import DjangoModelFactory
 from oauth2_provider.models import get_access_token_model, set_token_value
+from PIL import Image
 
 from trove.models import Activity, Blob, Claim, ConfigEntry, Item, Link, SetupCode
 from trove.services.clients import ensure_wall_client
@@ -106,3 +110,53 @@ def seed_dev_wall_token(raw_token: str = "dev-wall-token") -> str:
     set_token_value(token, raw_token)
     token.save()
     return raw_token
+
+
+class Fetched:
+    def __init__(
+        self, body, content_type="text/html; charset=utf-8", url="https://example.com/"
+    ):
+        self._body = body if isinstance(body, bytes) else body.encode()
+        self.headers = EmailMessage()
+        self.headers["Content-Type"] = content_type
+        self._url = url
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self, n=-1):
+        if n is None or n < 0:
+            return self._body
+        return self._body[:n]
+
+    def geturl(self):
+        return self._url
+
+
+def png_bytes():
+    img = Image.new("RGB", (2, 2), "#336699")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def fake_urlopen(body, content_type, url):
+    def urlopen(request, timeout=None):
+        return Fetched(body, content_type, url)
+
+    return urlopen
+
+
+def http_404(request, timeout=None):
+    raise HTTPError(request.full_url, 404, "Not Found", {}, io.BytesIO(b""))
+
+
+def timed_out(request, timeout=None):
+    raise URLError(TimeoutError("timed out"))
+
+
+def stub_public_http(monkeypatch, fake):
+    monkeypatch.setattr("trove.services.public_http.urlopen", fake)
