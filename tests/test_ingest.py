@@ -1,10 +1,13 @@
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client
 
 from tests.factories import seed_dev_ingest_token
 from trove.models import Activity, Blob, Claim, Item
+from trove.services.owner import ensure_owner
 
 TOKEN = {"HTTP_AUTHORIZATION": "Bearer dev-shortcut-token"}
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -356,3 +359,89 @@ def test_live_photo_motion_only_is_video(client, blob_dir):
     values = Item.objects.get(id=response.json()["id"]).current_values()
     assert "$blob" in values
     assert (blob_dir / values["$blob"][:2]).exists()
+
+
+def test_ingest_page_requires_session(client):
+    assert client.get("/ingest/").status_code == 401
+
+
+def test_owner_sees_ingest_form(client):
+    client.force_login(ensure_owner())
+    response = client.get("/ingest/")
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/html")
+    body = response.content.decode()
+    assert 'name="file"' in body
+    assert 'name="url"' in body
+    assert 'name="title"' in body
+    assert 'name="notes"' in body
+    assert "csrfmiddlewaretoken" in body
+
+
+def test_owner_session_posts_url_with_preferred_claims(client):
+    client.force_login(ensure_owner())
+    response = client.post(
+        "/ingest/",
+        {
+            "url": "https://example.com/lamp",
+            "title": "hallway",
+            "notes": "warm",
+        },
+    )
+    assert response.status_code == 302
+    item_id = parse_qs(urlparse(response["Location"]).query)["id"][0]
+    item = Item.objects.get(id=item_id)
+    assert item.type == "capture.link"
+    values = item.current_values()
+    assert values["url"] == "https://example.com/lamp"
+    assert values["title"] == "hallway"
+    assert values["notes"] == "warm"
+    ranks = {
+        claim.path: claim.rank
+        for claim in Claim.objects.filter(item=item, path__in=("url", "title", "notes"))
+    }
+    assert ranks == {
+        "url": Claim.Rank.PREFERRED,
+        "title": Claim.Rank.PREFERRED,
+        "notes": Claim.Rank.PREFERRED,
+    }
+    act = item.activity
+    assert (act.kind, act.agent, act.outcome) == ("ingest", "owner", "ok")
+    shown = client.get(response["Location"])
+    assert shown.status_code == 200
+    assert item_id in shown.content.decode()
+
+
+def test_owner_session_posts_file(client, blob_dir):
+    client.force_login(ensure_owner())
+    response = client.post(
+        "/ingest/",
+        {"file": pdf(), "title": "spec", "notes": "from the browser"},
+    )
+    assert response.status_code == 302
+    item_id = parse_qs(urlparse(response["Location"]).query)["id"][0]
+    item = Item.objects.get(id=item_id)
+    assert item.type == "capture.document"
+    values = item.current_values()
+    assert values["title"] == "spec"
+    assert values["notes"] == "from the browser"
+    assert (blob_dir / values["$blob"][:2]).exists()
+    assert item.activity.agent == "owner"
+
+
+def test_owner_session_post_needs_csrf():
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(ensure_owner())
+    denied = client.post("/ingest/", {"url": "https://example.com/csrf"})
+    assert denied.status_code == 403
+    assert not Item.objects.exists()
+    page = client.get("/ingest/")
+    assert page.status_code == 200
+    token = client.cookies["csrftoken"].value
+    created = client.post(
+        "/ingest/",
+        {"url": "https://example.com/csrf", "csrfmiddlewaretoken": token},
+    )
+    assert created.status_code == 302
+    item_id = parse_qs(urlparse(created["Location"]).query)["id"][0]
+    assert Item.objects.get(id=item_id).type == "capture.link"
