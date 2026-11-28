@@ -12,7 +12,7 @@ from tests.factories import ActivityFactory, seed_dev_ingest_token
 from trove.management.commands.backup import _reject_memory
 from trove.models import Activity
 from trove.runtime.core import reset_core
-from trove.services.backup import write_tarball
+from trove.services.backup import unpack_tarball, write_tarball
 from trove.services.owner import ensure_owner
 
 pytestmark = pytest.mark.django_db(databases=["default", "data"])
@@ -89,6 +89,36 @@ def test_backup_writes_sqlite_then_blobs_without_storage(tmp_path):
     finally:
         copied_data.close()
     assert "trove_item" in tables
+
+
+def test_backup_keeps_generated_secret_for_restore(tmp_path):
+    config = tmp_path / "config.sqlite3"
+    data = tmp_path / "data.sqlite3"
+    secret = tmp_path / ".secret-key"
+    _write_sqlite(config, "create table config (id integer);")
+    _write_sqlite(data, "create table data (id integer);")
+    secret.write_text("test-secret")
+    secret.chmod(0o600)
+    archive = tmp_path / "backup.tar.gz"
+    write_tarball(
+        archive,
+        config_path=config,
+        data_path=data,
+        blob_dir=tmp_path / "blobs",
+        secret_key_path=secret,
+    )
+
+    assert archive.stat().st_mode & 0o777 == 0o600
+    with tarfile.open(archive, "r:gz") as tar:
+        member = tar.getmember(".secret-key")
+        restored = tar.extractfile(member)
+        assert restored is not None
+        assert restored.read() == b"test-secret"
+        assert member.mode == 0o600
+    unpack_tarball(archive, tmp_path / "restore")
+    restored_secret = tmp_path / "restore" / ".secret-key"
+    assert restored_secret.read_text() == "test-secret"
+    assert restored_secret.stat().st_mode & 0o777 == 0o600
 
 
 def test_backup_rejects_in_memory_database():

@@ -25,6 +25,9 @@ class Command(BaseCommand):
             config_path=config_path,
             data_path=data_path,
             blob_dir=Path(settings.TROVE["BLOB_DIR"]),
+            secret_key_path=(
+                Path(settings.SECRET_KEY_FILE) if settings.SECRET_KEY_FILE else None
+            ),
         )
         self.stdout.write(str(output))
 
