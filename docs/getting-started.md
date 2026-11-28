@@ -20,6 +20,35 @@ browser with `--with-deps`. Without it, that one test is skipped.
 Pin versions, and run Zensical with `uv run zensical` rather than a global
 install. Deno and Lume stay gone.
 
+## Container
+
+Run the published image with a persistent data volume:
+
+```bash
+docker run -d --name trove -p 8123:8123 \
+  -v trove-data:/data ghcr.io/joshmcarthur/trove-project:latest
+docker logs trove
+```
+
+The first start creates a Django secret in `/data/.secret-key`, migrates both
+databases, and prints the owner setup code. Keep the volume when you replace
+the container. The image runs as UID 1990; a bind-mounted directory must be
+writable by that user. Set `DJANGO_SECRET_KEY` only if you manage the secret
+yourself. If debug mode is disabled, Django refuses to start without an
+explicit or persisted secret.
+
+The image disables Django debug mode. For access by another host, set
+`DJANGO_ALLOWED_HOSTS` to a comma-separated list and set
+`TROVE_WALL_REDIRECT_URI` to the exact public wall URL, such as
+`https://trove.example.com/wall/`. Use HTTPS for passkeys outside localhost.
+
+Images on `main` use `latest` and a commit SHA tag. Releases also use their
+semantic version tags. Release-please creates a release pull request from
+conventional commits. GitHub must allow Actions to create pull requests.
+With the default GitHub token, release pull requests do not start other
+workflows automatically; run required checks separately or configure a
+dedicated token.
+
 ## First run
 
 Toolchain checks:
@@ -93,8 +122,10 @@ share extension is on the roadmap.
 ## Backup and restore
 
 `manage.py backup` writes one gzip tarball: `config.sqlite3`, `data.sqlite3`,
-then the files under `blobs/`. Restore is unpacking that tarball into a Trove
-checkout.
+the generated container secret when present, then the files under `blobs/`.
+Backups containing the secret are sensitive. Store them securely. If you set
+`DJANGO_SECRET_KEY` yourself, preserve it separately. Restore is unpacking the
+tarball into a Trove checkout or data volume.
 
 ```bash
 uv run python manage.py backup /tmp/trove.tar.gz

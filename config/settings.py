@@ -1,11 +1,33 @@
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+from django.core.exceptions import ImproperlyConfigured
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key")
-DEBUG = True
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.environ.get("TROVE_DATA_DIR", BASE_DIR))
+
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in ("1", "true", "yes")
+_secret_key = os.environ.get("DJANGO_SECRET_KEY")
+SECRET_KEY_FILE = os.environ.get("TROVE_SECRET_KEY_FILE")
+if not _secret_key and os.environ.get("TROVE_DATA_DIR"):
+    _secret_path = DATA_DIR / ".secret-key"
+    if _secret_path.exists():
+        _secret_key = _secret_path.read_text().strip()
+        if not _secret_key:
+            raise ImproperlyConfigured("The persisted Django secret is empty")
+        SECRET_KEY_FILE = str(_secret_path)
+if not _secret_key and not DEBUG:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY or a persisted Django secret is required"
+    )
+SECRET_KEY = _secret_key or "insecure-dev-key"
+_extra_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "testserver",
+    *[h.strip() for h in _extra_hosts.split(",") if h.strip()],
+]
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -60,11 +82,11 @@ ASGI_APPLICATION = "config.asgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "config.sqlite3",
+        "NAME": DATA_DIR / "config.sqlite3",
     },
     "data": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "data.sqlite3",
+        "NAME": DATA_DIR / "data.sqlite3",
     },
 }
 DATABASE_ROUTERS = ["trove.routers.TroveRouter"]
@@ -112,7 +134,7 @@ TASKS = {
 }
 
 TROVE = {
-    "BLOB_DIR": BASE_DIR / "blobs",
+    "BLOB_DIR": DATA_DIR / "blobs",
     "PLUGIN_DIRS": [BASE_DIR / "plugins"],
     "WORKER_CONCURRENCY": 2,
     "INGEST_MAX_BYTES": 512 * 1024 * 1024,

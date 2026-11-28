@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 import tarfile
 import tempfile
@@ -16,7 +17,14 @@ def sqlite_backup(src: Path, dest: Path):
         source.close()
 
 
-def write_tarball(output: Path, *, config_path: Path, data_path: Path, blob_dir: Path):
+def write_tarball(
+    output: Path,
+    *,
+    config_path: Path,
+    data_path: Path,
+    blob_dir: Path,
+    secret_key_path: Path | None = None,
+):
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as raw_tmp:
         tmp = Path(raw_tmp)
@@ -24,10 +32,14 @@ def write_tarball(output: Path, *, config_path: Path, data_path: Path, blob_dir:
         data_copy = tmp / "data.sqlite3"
         sqlite_backup(config_path, config_copy)
         sqlite_backup(data_path, data_copy)
-        with tarfile.open(output, "w:gz") as tar:
-            tar.add(config_copy, arcname="config.sqlite3")
-            tar.add(data_copy, arcname="data.sqlite3")
-            _add_blobs(tar, blob_dir)
+        with output.open("wb") as file:
+            os.fchmod(file.fileno(), 0o600)
+            with tarfile.open(fileobj=file, mode="w:gz") as tar:
+                tar.add(config_copy, arcname="config.sqlite3")
+                tar.add(data_copy, arcname="data.sqlite3")
+                if secret_key_path is not None:
+                    tar.add(secret_key_path, arcname=".secret-key")
+                _add_blobs(tar, blob_dir)
 
 
 def unpack_tarball(archive: Path, dest: Path):
